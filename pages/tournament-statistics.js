@@ -44,6 +44,9 @@ class StatisticsTournamentPage extends React.Component {
                         <LinkButton href={'/t/' + tournamentStatistics.id}>
                             zurück zum Turnier
                         </LinkButton>
+                        <LinkButton href={'/t/' + tournamentStatistics.id + '/fullscreen'}>
+                            Turnier-Vollbild-Ansicht
+                        </LinkButton>
                     </ButtonGroup>
                 </TournamentStatusBar>
                 <div className='pb-5'>
