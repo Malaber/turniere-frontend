@@ -51,11 +51,23 @@ class Main extends React.Component {
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
         this.onTournamentMatchesRequestSuccess = this.onTournamentMatchesRequestSuccess.bind(this);
         this.onTournamentMatchesRequestError = this.onTournamentMatchesRequestError.bind(this);
+        this.updateMatches = this.updateMatches.bind(this);
     }
 
     componentDidMount() {
         const tournamentId = this.props.query.code;
         getTournamentMeta(tournamentId, this.onTournamentRequestSuccess, this.onTournamentRequestError);
+        this.updateMatches();
+        const intervalId = setInterval(this.updateMatches, 3000);
+        this.setState({intervalId: intervalId});
+    }
+
+    componentWillUnmount() {
+        clearInterval(this.state.intervalId);
+    }
+
+    updateMatches() {
+        const tournamentId = this.props.query.code;
         getTournamentMatches(tournamentId, this.onTournamentMatchesRequestSuccess,
             this.onTournamentMatchesRequestError);
     }
