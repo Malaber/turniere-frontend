@@ -4,14 +4,26 @@ import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../static/css/everypage.css';
 import '../static/css/tournament-fullscreen.css';
-import {getTournamentMeta} from '../js/redux/tournamentApi';
+import {getTournamentMatches, getTournamentMeta} from '../js/redux/tournamentApi';
 import {Navbar, NavbarBrand, NavItem} from 'reactstrap';
 
 
 function FullscreenPage(props) {
     return (<div>
         <FullscreenPageHeader title={props.tournamentMeta.name} code={props.tournamentMeta.code}/>
+        {JSON.stringify(props.tournamentMeta)}
+        <Matches matches={props.matches}/>
     </div>);
+}
+
+function Matches(props) {
+    return (<div>
+        {props.matches.map(match => <Match key={match.id} match={match}/>)}
+    </div>);
+}
+
+function Match(props) {
+    return <div>{JSON.stringify(props.match)}</div>;
 }
 
 function FullscreenPageHeader(props) {
@@ -33,15 +45,21 @@ class Main extends React.Component {
         super(props);
 
         this.state = {
-            tournamentMeta: null
+            tournamentMeta: null, matches: []
         };
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
+        this.onTournamentMatchesRequestSuccess = this.onTournamentMatchesRequestSuccess.bind(this);
+        this.onTournamentMatchesRequestError = this.onTournamentMatchesRequestError.bind(this);
     }
 
     componentDidMount() {
-        getTournamentMeta(this.props.query.code, this.onTournamentRequestSuccess, this.onTournamentRequestError);
+        const tournamentId = this.props.query.code;
+        getTournamentMeta(tournamentId, this.onTournamentRequestSuccess, this.onTournamentRequestError);
+        getTournamentMatches(tournamentId, this.onTournamentMatchesRequestSuccess,
+            this.onTournamentMatchesRequestError);
     }
+
 
     onTournamentRequestSuccess(requestStatus, tournament) {
         this.setState({metaStatus: requestStatus, tournamentMeta: tournament});
@@ -55,15 +73,27 @@ class Main extends React.Component {
         }
     }
 
+    onTournamentMatchesRequestSuccess(requestStatus, matches) {
+        this.setState({matchesStatus: requestStatus, matches: matches});
+    }
+
+    onTournamentMatchesRequestError(error) {
+        if (error.response) {
+            this.setState({matchesStatus: error.response.status});
+        } else {
+            this.setState({matchesStatus: -1});
+        }
+    }
+
 
     render() {
-        const {metaStatus, tournamentMeta} = this.state;
+        const {metaStatus, tournamentMeta, matches} = this.state;
         if (metaStatus === 200) {
             return (<div>
                 <Head>
                     <title>{tournamentMeta.name}: turnie.re</title>
                 </Head>
-                <FullscreenPage tournamentMeta={tournamentMeta}/>
+                <FullscreenPage tournamentMeta={tournamentMeta} matches={matches}/>
             </div>);
         } else {
             return <ErrorPageComponent code={metaStatus}/>;

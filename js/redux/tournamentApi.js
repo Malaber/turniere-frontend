@@ -33,6 +33,18 @@ export function getTournamentMeta(tournamentId, successCallback, errorCallback) 
         .catch(errorCallback);
 }
 
+export function getTournamentMatches(tournamentId, successCallback, errorCallback, matchState=null) {
+    let matchFilter = '';
+    if (matchState) {
+        matchFilter = '?state=' + matchState;
+    }
+    getRequest(getState(), '/tournaments/' + tournamentId + '/matches' + matchFilter)
+        .then(response => {
+            successCallback(response.status, response.data);
+        })
+        .catch(errorCallback);
+}
+
 
 function convertTournament(apiTournament) {
     let groupStage = null;
