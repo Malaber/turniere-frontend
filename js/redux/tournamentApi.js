@@ -25,6 +25,15 @@ export function getStage(stageId, successCallback, errorCallback) {
         .catch(errorCallback);
 }
 
+export function getTournamentMeta(tournamentId, successCallback, errorCallback) {
+    getRequest(getState(), '/tournaments/' + tournamentId + '?simple=true')
+        .then(response => {
+            successCallback(response.status, response.data);
+        })
+        .catch(errorCallback);
+}
+
+
 function convertTournament(apiTournament) {
     let groupStage = null;
     const playoffStages = [];
