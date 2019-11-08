@@ -67,6 +67,7 @@ function FullscreenPageHeader(props) {
 const matchFilters = {
     'all': {backend: null, label: 'alle'},
     'in_progress': {backend: 'in_progress', label: 'laufend'},
+    'upcoming': {backend: 'upcoming', label: 'kommend'},
     'not_started': {backend: 'not_started', label: 'bereit zum Starten'},
     'finished': {backend: 'finished', label: 'beendet'},
     'single_team': {backend: 'single_team', label: 'ohne Gegner'},
