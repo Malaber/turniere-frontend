@@ -72,7 +72,7 @@ function convertTournament(apiTournament) {
 
 function convertPlayoffStage(apiStage) {
     return {
-        id: apiStage.id, level: apiStage.level, matches: apiStage.matches.map(match => convertMatch(match, false))
+        id: apiStage.id, level: apiStage.level, matches: apiStage.matches.sort((a, b) => a.position > b.position).map(match => convertMatch(match, false))
     };
 }
 
@@ -81,7 +81,7 @@ function convertGroup(apiGroup) {
         id: apiGroup.id,
         number: apiGroup.number,
         scores: apiGroup.group_scores,
-        matches: apiGroup.matches.map(match => convertMatch(match, true))
+        matches: apiGroup.matches.sort((a, b) => a.position > b.position).map(match => convertMatch(match, true))
     };
 }
 
