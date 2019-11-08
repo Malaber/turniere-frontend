@@ -6,9 +6,10 @@ import '../static/css/everypage.css';
 import '../static/css/tournament-fullscreen.css';
 import {getTournamentMatches, getTournamentMeta} from '../js/redux/tournamentApi';
 import {
-    Col, DropdownItem, DropdownMenu, DropdownToggle, Navbar, NavbarBrand, NavItem, Row, UncontrolledDropdown
+    Col, Container, DropdownItem, DropdownMenu, DropdownToggle, Navbar, NavbarBrand, NavItem, Row, UncontrolledDropdown
 } from 'reactstrap';
 import {Match} from '../js/components/Match';
+import {Spinner} from 'react-bootstrap';
 
 
 function FullscreenPage(props) {
@@ -19,10 +20,19 @@ function FullscreenPage(props) {
 }
 
 function Matches(props) {
-    return (<div className='mx-4 h5'>
-        <Row>
+    let matches;
+    if (props.matches == null) {
+        matches = (<div className='text-center text-secondary'>
+            <Spinner animation='border' role='status' size='sm'/>
+            <span className='ml-3'>lade Matches</span>
+        </div>);
+    } else {
+        matches = (<Row>
             {props.matches.map(match => <Col md='auto'><Match key={match.id} match={match}/></Col>)}
-        </Row>
+        </Row>);
+    }
+    return (<div className='mx-4 h5'>
+        {matches}
     </div>);
 }
 
@@ -70,7 +80,7 @@ class Main extends React.Component {
         super(props);
 
         this.state = {
-            tournamentMeta: null, matches: [], matchFilter: matchFilters.all
+            tournamentMeta: null, matches: [], matchFilter: matchFilters.all, loadedMeta: false, loadedMatches: false
         };
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
@@ -81,7 +91,7 @@ class Main extends React.Component {
     }
 
     selectFilter(filter) {
-        this.setState({matchFilter: filter});
+        this.setState({matchFilter: filter, loadedMatches: false});
         this.updateMatches();
     }
 
@@ -105,36 +115,55 @@ class Main extends React.Component {
 
 
     onTournamentRequestSuccess(requestStatus, tournament) {
-        this.setState({metaStatus: requestStatus, tournamentMeta: tournament});
+        this.setState({metaStatus: requestStatus, tournamentMeta: tournament, loadedMeta: true});
     }
 
     onTournamentRequestError(error) {
         if (error.response) {
-            this.setState({metaStatus: error.response.status});
+            this.setState({metaStatus: error.response.status, loadedMeta: true});
         } else {
-            this.setState({metaStatus: -1});
+            this.setState({metaStatus: -1, loadedMeta: true});
         }
     }
 
     onTournamentMatchesRequestSuccess(requestStatus, matches) {
-        this.setState({matchesStatus: requestStatus, matches: matches});
+        this.setState({matchesStatus: requestStatus, matches: matches, loadedMatches: true});
     }
 
     onTournamentMatchesRequestError(error) {
         if (error.response) {
-            this.setState({matchesStatus: error.response.status});
+            this.setState({matchesStatus: error.response.status, loadedMatches: true});
         } else {
-            this.setState({matchesStatus: -1});
+            this.setState({matchesStatus: -1, loadedMatches: true});
         }
     }
 
 
     render() {
-        const {metaStatus, tournamentMeta, matches} = this.state;
+        const {metaStatus, matchesStatus, tournamentMeta, matches} = this.state;
         const filter = {
             selected: this.state.matchFilter, select: this.selectFilter
         };
-        if (metaStatus === 200) {
+        if (!this.state.loadedMeta) {
+            return (<div>
+                <Head>
+                    <title>Vollbild-Ansicht: turnie.re</title>
+                </Head>
+                <Container className='p-5 text-center text-secondary'>
+                    <Spinner animation='border' role='status' size='sm'/>
+                    <span className='ml-3'>lade Vollbild-Ansicht</span>
+                </Container>
+            </div>);
+        }
+        if (!this.state.loadedMatches) {
+            return (<div>
+                <Head>
+                    <title>{tournamentMeta.name}: turnie.re</title>
+                </Head>
+                <FullscreenPage tournamentMeta={tournamentMeta} matches={null} filter={filter}/>
+            </div>);
+        }
+        if (metaStatus === 200 && matchesStatus === 200) {
             return (<div>
                 <Head>
                     <title>{tournamentMeta.name}: turnie.re</title>
