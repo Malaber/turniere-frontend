@@ -40,7 +40,7 @@ export function getTournamentMatches(tournamentId, successCallback, errorCallbac
     }
     getRequest(getState(), '/tournaments/' + tournamentId + '/matches' + matchFilter)
         .then(response => {
-            successCallback(response.status, response.data);
+            successCallback(response.status, response.data.map(match => convertMatch(match)));
         })
         .catch(errorCallback);
 }

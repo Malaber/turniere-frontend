@@ -5,26 +5,25 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import '../static/css/everypage.css';
 import '../static/css/tournament-fullscreen.css';
 import {getTournamentMatches, getTournamentMeta} from '../js/redux/tournamentApi';
-import {Navbar, NavbarBrand, NavItem} from 'reactstrap';
+import {Col, Navbar, NavbarBrand, NavItem, Row} from 'reactstrap';
+import {Match} from '../js/components/Match';
 
 
 function FullscreenPage(props) {
     return (<div>
         <FullscreenPageHeader title={props.tournamentMeta.name} code={props.tournamentMeta.code}/>
-        {JSON.stringify(props.tournamentMeta)}
         <Matches matches={props.matches}/>
     </div>);
 }
 
 function Matches(props) {
-    return (<div>
-        {props.matches.map(match => <Match key={match.id} match={match}/>)}
+    return (<div className='mx-4 h5'>
+        <Row>
+            {props.matches.map(match => <Col md='auto'><Match key={match.id} match={match}/></Col>)}
+        </Row>
     </div>);
 }
 
-function Match(props) {
-    return <div>{JSON.stringify(props.match)}</div>;
-}
 
 function FullscreenPageHeader(props) {
     return (<Navbar color='light' className='mb-4 border-bottom py-0'>
