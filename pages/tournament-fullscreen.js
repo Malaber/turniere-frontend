@@ -26,6 +26,8 @@ function Matches(props) {
             <Spinner animation='border' role='status' size='sm'/>
             <span className='ml-3'>lade Matches</span>
         </div>);
+    } else if (props.matches.length === 0) {
+        matches = (<div className='text-center text-secondary font-italic'>keine Matches</div>);
     } else {
         matches = (<Row>
             {props.matches.map(match => <Col md='auto'><Match key={match.id} match={match}/></Col>)}
