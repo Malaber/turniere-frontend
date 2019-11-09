@@ -94,7 +94,7 @@ function GroupScoresTableRow(props) {
     return (<tr>
         <td>{props.score.team.name}</td>
         <td>{props.score.group_points}</td>
-        <td>{props.score.received_points}</td>
         <td>{props.score.scored_points}</td>
+        <td>{props.score.received_points}</td>
     </tr>);
 }
