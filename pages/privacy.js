@@ -29,11 +29,11 @@ function PrivacyText() {
             Verantwortlicher für die Erhebung, Verarbeitung und Nutzung Ihrer personenbezogenen Daten im Sinne von Art.
             4 Nr. 7 DSGVO ist </p>
         <p>
-            Jonas Seydel<br/>
-            August-Euler-Weg 3<br/>
-            76133 Karlsruhe<br/>
+            Beerpong Culture GbR<br/>
+            Zum Ordenswald 106<br/>
+            67435 Neustadt<br/>
             Germany<br/>
-            jon@s-seydel.de<br/>
+            info@beerpong-culture.de<br/>
         </p>
         <p>
             Sofern Sie der Erhebung, Verarbeitung oder Nutzung Ihrer Daten durch uns nach Maßgabe dieser
@@ -375,11 +375,11 @@ function PrivacyText() {
             Datenschutzbeauftragten:
         </p>
         <p>
-            Jonas Seydel<br/>
-            August-Euler-Weg 3<br/>
-            76133 Karlsruhe<br/>
+            Beerpong Culture GbR<br/>
+            Zum Ordenswald 106<br/>
+            67435 Neustadt<br/>
             Germany<br/>
-            jon@s-seydel.de </p>
+            info@beerpong-culture.de</p>
     </Container>);
 }
 
