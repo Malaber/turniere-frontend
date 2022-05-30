@@ -21,18 +21,18 @@ function ImprintText() {
                 Angaben gemäß §5 TMG:
         </h3>
         <p>
-                Jonas Seydel<br/>
-                August-Euler-Weg 3<br/>
-                76133 Karlsruhe<br/>
+                Beerpong Culture GbR<br/>
+                Zum Ordenswald 106<br/>
+                67435 Neustadt<br/>
                 Germany<br/>
         </p>
         <p>
             <strong>Vertreten durch</strong><br/>
-                Jonas Seydel
+                Moritz Kramm
         </p>
         <p>
             <strong>Kontakt</strong><br/>
-                jon@s-seydel.de
+                info@beerpong-culture.de
         </p>
         <h3>Haftungsausschluss</h3>
         <h4>Haftung für Inhalte</h4>
