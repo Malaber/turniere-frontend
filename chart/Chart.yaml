@@ -1,0 +1,6 @@
+apiVersion: v2
+name: turniere-frontend
+description: turnie.re frontend
+type: application
+version: 0.1.0
+appVersion: "latest"
