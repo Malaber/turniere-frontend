@@ -1,25 +1,17 @@
-
-.group-card {
+.group_card {
     margin-top: 15px;
     margin-right: 15px;
     display: inline-block;
     vertical-align: top;
 }
 
-.team-item {
+.team_item {
     display: inline-block;
+    margin: .5rem;
 }
 
-.grouped-team-item {
+.grouped_team_item {
     display: block;
     margin-bottom: .5rem;
     border-radius: .25rem;
-}
-
-.grouped-team-item:last-child {
-    margin-bottom: 0px;
-}
-
-.grouped-team-item > .m-2 {
-    margin: 0 !important;
 }

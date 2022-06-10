@@ -10,7 +10,6 @@ import {verifyCredentials} from '../js/api.js';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 import '../public/static/css/errormessages.css';
-import '../public/static/css/editablestringlist.css';
 import '../public/static/css/everypage.css';
 import '../public/static/css/error.css';
 import '../public/static/css/numericinput.css';
