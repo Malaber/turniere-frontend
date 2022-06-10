@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import React, {Component} from 'react';
-import {Button, Container, Form, Input, InputGroup, InputGroupAddon, Table} from 'reactstrap';
+import {Button, Container, Form, Input, InputGroup, Table} from 'reactstrap';
 
 import {TurniereNavigation} from '../js/components/Navigation';
 import {BigImage} from '../js/components/BigImage';
@@ -87,9 +87,7 @@ class NewMailAddressInput extends Component {
             <InputGroup>
                 <Input type='email' placeholder={this.props.email} onChange={this.onChange} value={this.state.email}
                     required/>
-                <InputGroupAddon addonType='append'>
-                    <Button color='primary' type='submit'>eintragen</Button>
-                </InputGroupAddon>
+                <Button color='primary' type='submit'>eintragen</Button>
             </InputGroup>
         </Form>);
     }

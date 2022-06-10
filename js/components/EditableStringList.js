@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    Alert, Button, Card, CardBody, CardTitle, Input, InputGroup, InputGroupAddon
+    Alert, Button, Card, CardBody, CardTitle, Input, InputGroup
 } from 'reactstrap';
 
 export default class EditableStringList extends React.Component {
@@ -231,10 +231,8 @@ class StringInput extends React.Component {
                         return false;
                     }
                 }}/>
-            <InputGroupAddon addonType="append">
-                <Button color="success" outline={true}
-                    onClick={() => this.submit()}>{this.props.addButtonText}</Button>
-            </InputGroupAddon>
+            <Button color="success" outline={true}
+                onClick={() => this.submit()}>{this.props.addButtonText}</Button>
         </InputGroup>);
     }
 
