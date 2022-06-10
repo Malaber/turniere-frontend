@@ -3,8 +3,6 @@ import {
     Alert, Button, Card, CardBody, CardTitle, Input, InputGroup, InputGroupAddon
 } from 'reactstrap';
 
-import '../../static/css/editablestringlist.css';
-
 export default class EditableStringList extends React.Component {
     constructor(props) {
         super(props);

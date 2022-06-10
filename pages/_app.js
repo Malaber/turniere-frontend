@@ -7,6 +7,15 @@ import Favicon from 'react-favicon';
 import withReduxStore from '../js/redux/reduxStoreBinder';
 import {verifyCredentials} from '../js/api.js';
 
+import '../public/static/css/errormessages.css';
+import '../public/static/css/editablestringlist.css';
+import '../public/static/css/everypage.css';
+import '../public/static/css/error.css';
+import '../public/static/css/numericinput.css';
+import '../public/static/css/index.css';
+import '../public/static/css/profile.css';
+import '../public/static/css/tournament.css';
+
 class TurniereApp extends App {
     componentDidMount() {
         verifyCredentials();

@@ -8,8 +8,6 @@ import {Footer} from '../js/components/Footer';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-import '../static/css/everypage.css';
-import '../static/css/profile.css';
 import {connect} from 'react-redux';
 import {changeMail} from '../js/api';
 import {notify} from 'react-notify-toast';

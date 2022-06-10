@@ -13,9 +13,6 @@ import {TurniereNavigation} from '../js/components/Navigation';
 import {Footer} from '../js/components/Footer';
 import {register} from '../js/api';
 
-import '../static/css/errormessages.css';
-import '../static/css/everypage.css';
-
 export default class RegisterPage extends React.Component {
     render() {
         return (<div className="main generic-fullpage-bg">

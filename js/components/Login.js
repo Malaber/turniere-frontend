@@ -5,7 +5,6 @@ import Router from 'next/router';
 
 import {login} from '../api';
 
-import '../../static/css/errormessages.css';
 import {notify} from 'react-notify-toast';
 
 export function Login(props) {

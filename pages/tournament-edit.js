@@ -17,8 +17,6 @@ import {updateTeamName} from '../js/api';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-import '../static/css/everypage.css';
-import '../static/css/index.css';
 import {LoadingPage} from '../js/components/LoadingPage';
 
 class EditTournamentPage extends React.Component {

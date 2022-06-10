@@ -23,7 +23,6 @@ import {createTournament} from '../js/api';
 import {WarningPopup} from '../js/components/WarningPopup';
 import Router from 'next/router';
 
-import '../static/css/everypage.css';
 import RequireLogin from '../js/components/RequireLogin';
 import NumericInput from '../js/components/NumericInput';
 

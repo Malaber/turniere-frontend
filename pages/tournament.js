@@ -10,8 +10,6 @@ import {TurniereNavigation} from '../js/components/Navigation';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-import '../static/css/everypage.css';
-import '../static/css/tournament.css';
 import {PlayoffStages} from '../js/components/PlayoffStages';
 import GroupStage from '../js/components/GroupStage';
 import {TournamentBigImage} from '../js/components/TournamentBigImage';

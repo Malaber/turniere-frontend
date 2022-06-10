@@ -1,7 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import {Button, InputGroup, InputGroupAddon, Input} from 'reactstrap';
-import '../../static/css/numericinput.css';
 
 export default class NumericInput extends React.Component {
     render() {
