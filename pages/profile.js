@@ -6,8 +6,6 @@ import {TurniereNavigation} from '../js/components/Navigation';
 import {BigImage} from '../js/components/BigImage';
 import {Footer} from '../js/components/Footer';
 
-import 'bootstrap/dist/css/bootstrap.min.css';
-
 import {connect} from 'react-redux';
 import {changeMail} from '../js/api';
 import {notify} from 'react-notify-toast';
