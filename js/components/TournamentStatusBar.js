@@ -1,6 +1,8 @@
+import React from 'react';
 import Navbar from 'react-bootstrap/Navbar';
 import {Container} from 'reactstrap';
-import React from 'react';
+
+import {LinkButton} from './LinkButton';
 
 export function TournamentStatusBar(props) {
     return (<Navbar sticky='top' bg='light' className='border-bottom border-top'>
@@ -10,19 +12,13 @@ export function TournamentStatusBar(props) {
     </Navbar>);
 }
 
-export function TournamentStatusBarButton(props) {
-    return (<a href={props.href} className='ml-3 btn btn-outline-secondary default-font-family'>
-        {props.children}
-    </a>);
-}
-
 export function EditButton(props) {
     const {tournamentId, isOwner, isSignedIn} = props;
 
     if (isSignedIn && isOwner) {
-        return (<TournamentStatusBarButton href={'/t/' + tournamentId + '/edit'}>
+        return (<LinkButton href={'/t/' + tournamentId + '/edit'}>
             Turnier bearbeiten
-        </TournamentStatusBarButton>);
+        </LinkButton>);
     } else {
         return null;
     }

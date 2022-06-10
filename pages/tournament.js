@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import React from 'react';
 import {connect} from 'react-redux';
-import Navbar from 'react-bootstrap/Navbar';
+import {ButtonGroup, NavbarBrand} from 'reactstrap';
 
 
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
@@ -11,7 +11,8 @@ import {TurniereNavigation} from '../js/components/Navigation';
 import {PlayoffStages} from '../js/components/PlayoffStages';
 import GroupStage from '../js/components/GroupStage';
 import {TournamentBigImage} from '../js/components/TournamentBigImage';
-import {EditButton, TournamentStatusBar, TournamentStatusBarButton} from '../js/components/TournamentStatusBar';
+import {EditButton, TournamentStatusBar} from '../js/components/TournamentStatusBar';
+import {LinkButton} from '../js/components/LinkButton';
 import {LoadingPage} from '../js/components/LoadingPage';
 import {getTournament} from '../js/redux/tournamentApi';
 
@@ -37,18 +38,18 @@ class PrivateTournamentPage extends React.Component {
 
 function StatusBar(props) {
     return (<TournamentStatusBar>
-        <Navbar.Brand>
-            {props.tournament.name}
+        <NavbarBrand>{props.tournament.name}</NavbarBrand>
+        <ButtonGroup className='me-auto'>
             <EditButton tournamentId={props.tournament.id} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
             <StatisticsButton tournamentId={props.tournament.id}/>
-        </Navbar.Brand>
+        </ButtonGroup>
     </TournamentStatusBar>);
 }
 
 function StatisticsButton(props) {
-    return (<TournamentStatusBarButton href={'/t/' + props.tournamentId + '/statistics'}>
+    return (<LinkButton href={'/t/' + props.tournamentId + '/statistics'}>
         Statistiken
-    </TournamentStatusBarButton>);
+    </LinkButton>);
 }
 
 
