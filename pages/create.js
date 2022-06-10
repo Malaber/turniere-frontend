@@ -9,7 +9,6 @@ import {
     Col,
     Collapse,
     Container,
-    CustomInput,
     Form,
     FormGroup,
     Input,
@@ -101,14 +100,23 @@ class CreateTournamentForm extends React.Component {
                     <Input type="text" name="description" size="255" value={this.state.description}
                         onChange={this.handleDescriptionInput}/>
                 </FormGroup>
-                <FormGroup>
-                    <CustomInput type="checkbox" id="public"
-                        label="Turnier öffentlich anzeigen (schreibgeschützt)" checked={this.state.public}
-                        onChange={this.handlePublicInput}/>
-                    <CustomInput type="checkbox" id="mix-teams" label="Teams mischen"/>
-                    <CustomInput type="checkbox" id="group-phase" label="Gruppenphase"
-                        checked={this.state.groupPhaseEnabled}
-                        onChange={this.handleGroupPhaseEnabledInput}/>
+                <FormGroup tag="fieldset">
+                    <FormGroup check>
+                        <Label for="public" check>Turnier öffentlich anzeigen (schreibgeschützt)</Label>
+                        <Input type="checkbox" id="public"
+                            checked={this.state.public}
+                            onChange={this.handlePublicInput}/>
+                    </FormGroup>
+                    <FormGroup check>
+                        <Label for="mix-teams" check>Teams mischen</Label>
+                        <Input type="checkbox" id="mix-teams"/>
+                    </FormGroup>
+                    <FormGroup check>
+                        <Label for="group-phase" check>Gruppenphase</Label>
+                        <Input type="checkbox" id="group-phase"
+                            checked={this.state.groupPhaseEnabled}
+                            onChange={this.handleGroupPhaseEnabledInput}/>
+                    </FormGroup>
                 </FormGroup>
                 <Collapse isOpen={this.state.groupPhaseEnabled}>
                     <FormGroup>
