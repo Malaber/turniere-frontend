@@ -1,12 +1,11 @@
 import React from 'react';
-import Navbar from 'react-bootstrap/Navbar';
-import {Container} from 'reactstrap';
+import {Container, Navbar} from 'reactstrap';
 
 import {LinkButton} from './LinkButton';
 
 export function TournamentStatusBar(props) {
-    return (<Navbar sticky='top' bg='light' className='border-bottom border-top'>
-        <Container className='px-3'>
+    return (<Navbar color='light' light className='border-bottom border-top'>
+        <Container>
             {props.children}
         </Container>
     </Navbar>);
