@@ -30,7 +30,9 @@ export class TurniereNavigation extends React.Component {
             <NavbarToggler onClick={this.toggle}/>
             <Collapse isOpen={!this.state.collapsed} navbar>
                 <NavLinks/>
-                <LoginLogoutButtons/>
+                <div className='ms-auto me-0'>
+                    <LoginLogoutButtons/>
+                </div>
             </Collapse>
         </Navbar>);
     }
