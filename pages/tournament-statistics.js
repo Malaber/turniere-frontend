@@ -37,7 +37,6 @@ class StatisticsTournamentPage extends React.Component {
                 <TurniereNavigation/>
                 <TournamentBigImage {...tournamentStatistics}/>
                 <TournamentStatusBar>
-                    <NavbarBrand>{tournamentStatistics.name}</NavbarBrand>
                     <ButtonGroup className='me-auto'>
                         <EditButton tournamentId={tournamentStatistics.id}
                             isOwner={this.props.username === tournamentStatistics.ownerUsername}

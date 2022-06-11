@@ -38,7 +38,6 @@ class PrivateTournamentPage extends React.Component {
 
 function StatusBar(props) {
     return (<TournamentStatusBar>
-        <NavbarBrand>{props.tournament.name}</NavbarBrand>
         <ButtonGroup className='me-auto'>
             <EditButton tournamentId={props.tournament.id} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
             <StatisticsButton tournamentId={props.tournament.id}/>
