@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import React from 'react';
 import {connect} from 'react-redux';
-import {ButtonGroup, NavbarBrand} from 'reactstrap';
+import {ButtonGroup} from 'reactstrap';
 
 
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
