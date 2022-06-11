@@ -36,7 +36,7 @@ export function MatchTable(props) {
                     <td className={'border-top-0 ' + team1Class}>{props.match.team1.name}</td>
                 </tr>
                 <tr>
-                    <td className={props.borderColor + ' ' + team2Class}>kein Gegner</td>
+                    <td className={'border-bottom-0 ' + props.borderColor + ' ' + team2Class}>kein Gegner</td>
                 </tr>
             </tbody>
         </Table>);
@@ -48,8 +48,10 @@ export function MatchTable(props) {
                     <td className={'border-top-0 ' + team1Class}>{props.match.team1.name}</td>
                 </tr>
                 <tr>
-                    <th className={'stage ' + props.borderColor}>{props.match.team2.score}</th>
-                    <td className={props.borderColor + ' ' + team2Class}>{props.match.team2.name}</td>
+                    <th className={'stage border-bottom-0 ' + props.borderColor}>{props.match.team2.score}</th>
+                    <td className={'border-bottom-0 ' + props.borderColor + ' ' + team2Class}>
+                        {props.match.team2.name}
+                    </td>
                 </tr>
             </tbody>
         </Table>);
