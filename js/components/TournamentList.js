@@ -1,6 +1,6 @@
 import React from 'react';
 import {requestTournamentList} from '../api';
-import {Spinner} from 'react-bootstrap';
+import {Spinner} from 'reactstrap';
 
 export default class TournamentList extends React.Component {
     constructor(props) {
@@ -25,7 +25,7 @@ export default class TournamentList extends React.Component {
     render() {
         if (!this.state.loaded) {
             return (<EmptyList>
-                <Spinner animation='border' role='status' size='sm'/>
+                <Spinner size='sm'/>
                 <span className='ml-3'>lade Turnier-Liste</span>
             </EmptyList>);
         }
