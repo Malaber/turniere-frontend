@@ -1,10 +1,10 @@
 ### STAGE 1: Build ###
-FROM node:8-alpine as build
+FROM node:16-alpine as build
 WORKDIR /srv
 COPY js /srv/js
 COPY pages /srv/pages
-COPY static /srv/static
-COPY next.config.js package.json package-lock.json server.js yarn.lock /srv/
+COPY public /srv/public
+COPY next.config.js package.json server.js yarn.lock /srv/
 RUN yarn install
 RUN yarn build
 RUN yarn cache clean
