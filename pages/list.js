@@ -1,12 +1,13 @@
 import Head from 'next/head';
 import React from 'react';
-import {Card, CardBody, Container} from 'reactstrap';
+import {ButtonGroup, Card, CardBody, Container} from 'reactstrap';
 
 import {TurniereNavigation} from '../js/components/Navigation';
 import {Footer} from '../js/components/Footer';
 
 import TournamentList from '../js/components/TournamentList';
 import {connect} from 'react-redux';
+import {LinkButton} from '../js/components/LinkButton';
 
 export default class PublicTournamentsPage extends React.Component {
     render() {
@@ -37,8 +38,10 @@ function PublicTournaments(props) {
                 <PublicTournamentsCard/>
             </Container>
             <Container className="pb-5 pt-3">
-                <a href='/private' className="btn btn-primary shadow">zu den privaten Turnieren</a>
-                <a href='/create' className="ml-3 btn btn-success shadow">neues Turnier erstellen</a>
+                <ButtonGroup>
+                    <LinkButton href="/private" outline={false} color='primary'>zu den privaten Turnieren</LinkButton>
+                    <LinkButton href="/private" outline={false} color='success'>neues Turnier erstellen</LinkButton>
+                </ButtonGroup>
             </Container>
         </div>);
     } else {
