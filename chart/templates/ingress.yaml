@@ -1,0 +1,19 @@
+{{- $fullName := include "chart.fullname" . -}}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $fullName }}
+spec:
+  entryPoints:
+    - websecure
+  routes:
+{{ range $host := .Values.ingress.hosts }}
+    - match: Host(`{{ $host }}`)
+      kind: Rule
+      services:
+        - name: {{ $fullName }}
+          port: {{ $.Values.service.port }}
+{{ end }}
+  tls:
+    certResolver: leresolver
