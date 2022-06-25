@@ -1,15 +1,15 @@
 import Head from 'next/head';
 import React from 'react';
 import {connect} from 'react-redux';
-import {Col, Container, Row} from 'reactstrap';
+import {ButtonGroup, Col, Container, Row, NavbarBrand} from 'reactstrap';
 
 import {TurniereNavigation} from '../js/components/Navigation';
 import {StandingsTable} from '../js/components/StandingsTable';
 import {DominanceShower} from '../js/components/DominanceShower';
 import {Footer} from '../js/components/Footer';
 import {requestTournamentStatistics} from '../js/api';
-import {EditButton, TournamentStatusBar, TournamentStatusBarButton} from '../js/components/TournamentStatusBar';
-import Navbar from 'react-bootstrap/Navbar';
+import {EditButton, TournamentStatusBar} from '../js/components/TournamentStatusBar';
+import {LinkButton} from '../js/components/LinkButton';
 import {TournamentBigImage} from '../js/components/TournamentBigImage';
 import {LoadingPage} from '../js/components/LoadingPage';
 
@@ -37,15 +37,14 @@ class StatisticsTournamentPage extends React.Component {
                 <TurniereNavigation/>
                 <TournamentBigImage {...tournamentStatistics}/>
                 <TournamentStatusBar>
-                    <Navbar.Brand>
-                        {tournamentStatistics.name}
+                    <ButtonGroup className='me-auto'>
                         <EditButton tournamentId={tournamentStatistics.id}
                             isOwner={this.props.username === tournamentStatistics.ownerUsername}
                             isSignedIn={this.props.isSignedIn}/>
-                        <TournamentStatusBarButton href={'/t/' + tournamentStatistics.id}>
+                        <LinkButton href={'/t/' + tournamentStatistics.id}>
                             zurück zum Turnier
-                        </TournamentStatusBarButton>
-                    </Navbar.Brand>
+                        </LinkButton>
+                    </ButtonGroup>
                 </TournamentStatusBar>
                 <div className='pb-5'>
                     <StatisticsView tournamentStatistics={tournamentStatistics} />

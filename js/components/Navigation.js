@@ -1,5 +1,5 @@
 import {
-    Badge, Button, ButtonGroup, Collapse, Nav, Navbar, NavbarBrand, NavbarToggler, NavItem, NavLink
+    Button, ButtonGroup, Collapse, Nav, Navbar, NavbarBrand, NavbarToggler, NavItem, NavLink
 } from 'reactstrap';
 import {connect} from 'react-redux';
 import React from 'react';
@@ -27,11 +27,12 @@ export class TurniereNavigation extends React.Component {
     render() {
         return (<Navbar color="light" light expand="lg">
             <NavbarBrand href="/">turnie.re</NavbarBrand>
-            <Betabadge/>
             <NavbarToggler onClick={this.toggle}/>
             <Collapse isOpen={!this.state.collapsed} navbar>
                 <NavLinks/>
-                <LoginLogoutButtons/>
+                <div className='ms-auto me-0'>
+                    <LoginLogoutButtons/>
+                </div>
             </Collapse>
         </Navbar>);
     }
@@ -52,10 +53,6 @@ class SmartNavLinks extends React.Component {
             <Navlink target="/faq" text="FAQ"/>
         </Nav>);
     }
-}
-
-function Betabadge() {
-    return (<Badge color="danger" className="mr-2">BETA</Badge>);
 }
 
 class InvisibleLoginLogoutButtons extends React.Component {

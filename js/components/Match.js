@@ -5,6 +5,7 @@ import {notify} from 'react-notify-toast';
 import {MatchModal} from './MatchModal';
 import {MatchTable} from './MatchTable';
 
+import styles from './Match.module.css';
 
 export class Match extends React.Component {
     constructor(props) {
@@ -89,23 +90,23 @@ export class Match extends React.Component {
     }
 
     render() {
-        let cardClass;
+        let cardClass = '';
         let smallMessage;
-        let borderClass;
+        let borderClass = '';
         // possible states: single_team not_ready not_started in_progress finished
         switch (this.state.match.state) {
         case 'in_progress':
-            cardClass = 'table-warning';
+            cardClass = 'bg-warning';
             borderClass = 'border-warning';
             smallMessage = 'Spiel läuft';
             break;
         case 'finished':
-            cardClass = 'table-success';
+            cardClass = 'bg-success';
             borderClass = 'border-success';
             smallMessage = this.getMatchFinishedMessage();
             break;
         case 'single_team':
-            cardClass = 'table-success';
+            cardClass = 'bg-success';
             borderClass = 'border-success';
             smallMessage = 'kein Gegner, Team kommt weiter';
             break;
@@ -117,8 +118,8 @@ export class Match extends React.Component {
             break;
         }
         return (<div className='mb-3'>
-            <Card className='shadow-sm match' onClick={this.toggleModal}>
-                <CardBody className={borderClass + ' border py-2 ' + cardClass}>
+            <Card className={'shadow-sm match '} onClick={this.toggleModal}>
+                <CardBody className={borderClass + ' border py-2 ' + cardClass + ' ' + styles.match_bg}>
                     <MatchTable match={this.state.match} borderColor={borderClass}/>
                 </CardBody>
             </Card>
@@ -128,4 +129,3 @@ export class Match extends React.Component {
         </div>);
     }
 }
-

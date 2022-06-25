@@ -1,15 +1,11 @@
 import Head from 'next/head';
 import React, {Component} from 'react';
-import {Button, Container, Form, Input, InputGroup, InputGroupAddon, Table} from 'reactstrap';
+import {Button, Container, Form, Input, InputGroup, Table} from 'reactstrap';
 
 import {TurniereNavigation} from '../js/components/Navigation';
 import {BigImage} from '../js/components/BigImage';
 import {Footer} from '../js/components/Footer';
 
-import 'bootstrap/dist/css/bootstrap.min.css';
-
-import '../static/css/everypage.css';
-import '../static/css/profile.css';
 import {connect} from 'react-redux';
 import {changeMail} from '../js/api';
 import {notify} from 'react-notify-toast';
@@ -91,9 +87,7 @@ class NewMailAddressInput extends Component {
             <InputGroup>
                 <Input type='email' placeholder={this.props.email} onChange={this.onChange} value={this.state.email}
                     required/>
-                <InputGroupAddon addonType='append'>
-                    <Button color='primary' type='submit'>eintragen</Button>
-                </InputGroupAddon>
+                <Button color='primary' type='submit'>eintragen</Button>
             </InputGroup>
         </Form>);
     }

@@ -2,14 +2,14 @@ import Head from 'next/head';
 import React from 'react';
 import {connect} from 'react-redux';
 
-import {Card, CardBody, Container} from 'reactstrap';
+import {ButtonGroup, Card, CardBody, Container} from 'reactstrap';
 
 import {TurniereNavigation} from '../js/components/Navigation';
 import {Footer} from '../js/components/Footer';
 
-import '../static/css/everypage.css';
 import TournamentList from '../js/components/TournamentList';
 import RequireLogin from '../js/components/RequireLogin';
+import { LinkButton } from '../js/components/LinkButton';
 
 class PrivateTournamentsPage extends React.Component {
     render() {
@@ -41,8 +41,13 @@ function PrivateTournamentsPageContent(props) {
             <PrivateTournamentsCard/>
         </Container>
         <Container className="pb-5 pt-3">
-            <a href='/list' className="btn btn-primary shadow">zu den öffentlichen Turnieren</a>
-            {props.isSignedIn && <a href='/create' className="ml-3 btn btn-success shadow">neues Turnier erstellen</a>}
+            <ButtonGroup>
+                <LinkButton href="/list" outline={false} color='primary'>zu den öffentlichen Turnieren</LinkButton>
+                {
+                    props.isSignedIn &&
+                    <LinkButton href="/create" outline={false} color='success'>neues Turnier erstellen</LinkButton>
+                }
+            </ButtonGroup>
         </Container>
     </div>);
 }

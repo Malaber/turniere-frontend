@@ -1,5 +1,5 @@
 import React from 'react';
-import {Button, Input, InputGroup, InputGroupAddon, Table} from 'reactstrap';
+import {Button, Input, InputGroup, Table} from 'reactstrap';
 
 export function EditableMatchTable(props) {
     return (<Table className='mb-0'>
@@ -49,12 +49,10 @@ class ScoreInput extends React.Component {
 
     render() {
         return (<InputGroup>
-            <InputGroupAddon addonType="prepend"><Button onClick={this.decreaseScore} color='danger'
-                outline={true}>-1</Button></InputGroupAddon>
+            <Button onClick={this.decreaseScore} color='danger' outline={true}>-1</Button>
             <Input className='font-weight-bold' value={this.state.score} onChange={this.inputScore} type='number'
                 step='1' placeholder='0'/>
-            <InputGroupAddon addonType="append"><Button onClick={this.increaseScore}
-                color='success'>+1</Button></InputGroupAddon>
+            <Button onClick={this.increaseScore} color='success'>+1</Button>
         </InputGroup>);
     }
 }

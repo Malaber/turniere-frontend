@@ -1,9 +1,9 @@
 import React from 'react';
 import {
-    Alert, Button, Card, CardBody, CardTitle, Input, InputGroup, InputGroupAddon
+    Alert, Button, Card, CardBody, CardTitle, Input, InputGroup
 } from 'reactstrap';
 
-import '../../static/css/editablestringlist.css';
+import styles from './EditableStringList.module.css';
 
 export default class EditableStringList extends React.Component {
     constructor(props) {
@@ -173,11 +173,11 @@ class GroupView extends React.Component {
 
     render() {
         return (<div>
-            {this.props.groups.map((group, groupindex) => (<Card className="group-card" key={groupindex}>
+            {this.props.groups.map((group, groupindex) => (<Card className={styles.group_card} key={groupindex}>
                 <CardBody>
                     <CardTitle>Group {groupindex + 1}</CardTitle>
                     {group.map((team, teamindex) => (<div key={team} draggable droppable="droppable"
-                        className="grouped-team-item"
+                        className={styles.grouped_team_item}
                         onDragStart={e => this.onDragStart(e, groupindex, teamindex)}
                         onDragOver={e => this.onDragOver(e)}
                         onDrop={e => this.onDrop(e, groupindex, teamindex)}>
@@ -225,7 +225,7 @@ class StringInput extends React.Component {
     }
 
     render() {
-        return (<InputGroup className="mb-3">
+        return (<InputGroup>
             <Input placeholder={this.props.placeholder} type="text" size="255" value={this.state.value} required
                 onChange={this.handleChange} onKeyPress={e => {
                     if (e.key === 'Enter') {
@@ -233,10 +233,8 @@ class StringInput extends React.Component {
                         return false;
                     }
                 }}/>
-            <InputGroupAddon addonType="append">
-                <Button color="success" outline={true}
-                    onClick={() => this.submit()}>{this.props.addButtonText}</Button>
-            </InputGroupAddon>
+            <Button color="success" outline={true}
+                onClick={() => this.submit()}>{this.props.addButtonText}</Button>
         </InputGroup>);
     }
 
@@ -262,7 +260,9 @@ class Item extends React.Component {
     }
 
     render() {
-        return (<Alert className="team-item m-2" color="info" isOpen={this.state.visible} toggle={this.onDismiss}>
+        return (<Alert
+            className={styles.team_item} color="info" isOpen={this.state.visible} toggle={this.onDismiss}
+        >
             {this.props.text}
         </Alert>);
     }

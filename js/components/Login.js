@@ -5,7 +5,6 @@ import Router from 'next/router';
 
 import {login} from '../api';
 
-import '../../static/css/errormessages.css';
 import {notify} from 'react-notify-toast';
 
 export function Login(props) {
@@ -16,7 +15,7 @@ export function Login(props) {
                 <Hint hint={props.hint}/>
                 <LoginForm/>
                 <div className="mt-3">
-                    <a href="/register" className="mr-3">Account anlegen</a>
+                    <a href="/register" className="me-3">Account anlegen</a>
                     <a href="/register#account-requirement">Warum ist ein Account nötig?</a>
                 </div>
             </CardBody>

@@ -11,7 +11,7 @@ export function TournamentBigImage(props) {
 }
 
 function TournamentProperties(props) {
-    return (<ListGroup className='text-dark text-left shadow'>
+    return (<ListGroup className='text-dark text-start shadow'>
         {props.description && <ListGroupItem>{props.description}</ListGroupItem>}
         <ListGroupItem>
             {props.isPublic ? 'Das Turnier ist öffentlich.' : 'Das Turnier ist privat.'}

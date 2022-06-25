@@ -5,8 +5,6 @@ import {TurniereNavigation} from '../js/components/Navigation';
 import {Footer} from '../js/components/Footer';
 import {Login} from '../js/components/Login';
 
-import '../static/css/everypage.css';
-
 export default class LoginPage extends React.Component {
     render() {
         return (<div className="main generic-fullpage-bg">
