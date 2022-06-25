@@ -42,6 +42,7 @@ function StatusBar(props) {
             <EditButton tournamentId={props.tournament.id} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
             <StatisticsButton tournamentId={props.tournament.id}/>
             <FullscreenButton tournamentId={props.tournament.id}/>
+            <LinkButton href={'/t/' + props.tournament.id + '/fullscreen-groups'}>Vollbild-Ansicht Gruppen</LinkButton>
         </ButtonGroup>
     </TournamentStatusBar>);
 }

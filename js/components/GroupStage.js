@@ -35,7 +35,7 @@ function ShowMatchesToggleButton(props) {
     </Button>);
 }
 
-class Group extends Component {
+export class Group extends Component {
     constructor(props) {
         super(props);
         this.state = props.group;

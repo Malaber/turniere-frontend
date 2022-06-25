@@ -21,6 +21,12 @@ app.prepare()
             app.render(req, res, actualPage, queryParam);
         });
 
+        server.get('/t/:code/fullscreen-groups', (req, res) => {
+            const actualPage = '/tournament-fullscreen-groups';
+            const queryParam = {code: req.params.code};
+            app.render(req, res, actualPage, queryParam);
+        });
+
         server.get('/t/:code/edit', (req, res) => {
             const actualPage = '/tournament-edit';
             const queryParam = {code: req.params.code};
