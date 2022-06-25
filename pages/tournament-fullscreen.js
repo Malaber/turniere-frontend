@@ -1,15 +1,12 @@
 import Head from 'next/head';
 import React from 'react';
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import '../static/css/everypage.css';
-import '../static/css/tournament-fullscreen.css';
 import {getTournamentMatches, getTournamentMeta} from '../js/redux/tournamentApi';
 import {
-    Col, Container, DropdownItem, DropdownMenu, DropdownToggle, Navbar, NavbarBrand, NavItem, Row, UncontrolledDropdown
+    Col, Container, DropdownItem, DropdownMenu, DropdownToggle, Navbar, NavbarBrand, NavItem, Row, UncontrolledDropdown,
+    Spinner
 } from 'reactstrap';
 import {Match} from '../js/components/Match';
-import {Spinner} from 'react-bootstrap';
 
 
 function FullscreenPage(props) {
@@ -153,7 +150,7 @@ class Main extends React.Component {
                     <title>Vollbild-Ansicht: turnie.re</title>
                 </Head>
                 <Container className='p-5 text-center text-secondary'>
-                    <Spinner animation='border' role='status' size='sm'/>
+                    <Spinner size='sm'/>
                     <span className='ml-3'>lade Vollbild-Ansicht</span>
                 </Container>
             </div>);

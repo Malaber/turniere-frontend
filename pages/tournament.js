@@ -53,9 +53,9 @@ function StatisticsButton(props) {
 }
 
 function FullscreenButton(props) {
-    return (<TournamentStatusBarButton href={'/t/' + props.tournamentId + '/fullscreen'}>
+    return (<LinkButton href={'/t/' + props.tournamentId + '/fullscreen'}>
         Vollbild-Ansicht
-    </TournamentStatusBarButton>);
+    </LinkButton>);
 }
 
 

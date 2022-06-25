@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import React from 'react';
 import {connect} from 'react-redux';
-import {ButtonGroup, Col, Container, Row, NavbarBrand} from 'reactstrap';
+import {ButtonGroup, Col, Container, Row} from 'reactstrap';
 
 import {TurniereNavigation} from '../js/components/Navigation';
 import {StandingsTable} from '../js/components/StandingsTable';
