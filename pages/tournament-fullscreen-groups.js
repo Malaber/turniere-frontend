@@ -6,16 +6,23 @@ import {
     Col,
     Container, Navbar, NavbarBrand, NavItem, Row, Spinner
 } from 'reactstrap';
+import {QRCodeSVG} from 'qrcode.react';
 import {Group} from '../js/components/GroupStage';
 
 
 function FullscreenPage(props) {
     return (<div>
-        <FullscreenPageHeader title={props.tournament.name} code={props.tournament.code}/>
+        <FullscreenPageHeader title={props.tournament.name} page={props.page + 1} maxPage={props.maxPage + 1}/>
         <Container className='fs-5' fluid>
             <Row className='row-cols-4'>
                 {props.groups.map(group => <Col className='mb-2'><Group group={group} key={group.id}/></Col>)}
-                <Col>Hallo Welt</Col>
+                <Col>
+                    <QRCodeSVG
+                        className='shadow'
+                        value={'https://turnie.re/t/' + props.tournament.id}
+                        size="300"
+                    />
+                </Col>
             </Row>
         </Container>
     </div>);
@@ -24,9 +31,7 @@ function FullscreenPage(props) {
 function FullscreenPageHeader(props) {
     return (<Navbar color='light' className='mb-4 border-bottom py-0'>
         <NavbarBrand>{props.title}</NavbarBrand>
-        <NavItem className='text-secondary'>
-            turnie.re
-        </NavItem>
+        {props.page}/{props.maxPage}
     </Navbar>);
 }
 
@@ -38,35 +43,33 @@ class Main extends React.Component {
 
     constructor(props) {
         super(props);
-        this.maxPage = 2;
+        this.groupsPerPage = 8;
+        this.pages = 3;
 
         this.state = {
             groups: [], tournament: null, loadedTournament: false, loadingStatus: null, page: 0
         };
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
-        this.updateTournament = this.updateTournament.bind(this);
         this.increasePage = this.increasePage.bind(this);
     }
 
     componentDidMount() {
         this.updateTournament();
-        const intervalId = setInterval(this.updateTournament, 3000);
         const intervalIdPage = setInterval(this.increasePage, 10000);
-        this.setState({intervalId: intervalId});
         this.setState({intervalIdPage: intervalIdPage});
     }
 
     increasePage() {
-        if (this.state.page >= this.maxPage) {
+        if (this.state.page >= this.pages) {
             this.setState({page: 0});
         } else {
             this.setState({page: this.state.page + 1});
         }
+        this.updateTournament();
     }
 
     componentWillUnmount() {
-        clearInterval(this.state.intervalId);
         clearInterval(this.state.intervalIdPage);
     }
 
@@ -77,11 +80,12 @@ class Main extends React.Component {
     onTournamentRequestSuccess(requestStatus, tournament) {
         // filter groups by page
         const groups = tournament.groupStage.groups;
-        const offset = this.state.page * 12;
+        const start = this.state.page * this.groupsPerPage;
+        const end = (this.state.page + 1) * this.groupsPerPage;
 
         this.setState({
             loadingStatus: requestStatus, tournament: tournament,
-            groups: groups.slice(offset, offset + 11), loadedTournament: true
+            groups: groups.slice(start, end), loadedTournament: true
         });
     }
 
@@ -111,7 +115,7 @@ class Main extends React.Component {
                 <Head>
                     <title>{tournament.name}: turnie.re</title>
                 </Head>
-                <FullscreenPage tournament={tournament} groups={groups}/>
+                <FullscreenPage tournament={tournament} groups={groups} page={this.state.page} maxPage={this.pages}/>
             </div>);
         } else {
             return <ErrorPageComponent code={loadingStatus}/>;
