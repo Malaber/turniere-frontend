@@ -74,8 +74,6 @@ class InvisibleLoginLogoutButtons extends React.Component {
             return (<ButtonGroup className="nav-item">
                 <Button outline color="success" href="/login"
                     className="navbar-btn my-2 my-sm-0 px-5">Login</Button>
-                <Button outline color="success" href="/register"
-                    className="navbar-btn my-2 my-sm-0 px-5">Registrieren</Button>
             </ButtonGroup>);
         }
     }
