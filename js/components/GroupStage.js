@@ -16,9 +16,9 @@ export default class GroupStage extends Component {
     }
 
     render() {
-        return (<div className='py-5 px-5'>
+        return (<div className='py-2 px-1'>
             <h1 className='custom-font'>
-                Gruppenphase
+                <span className='px-2'>Gruppenphase</span>
                 <ShowMatchesToggleButton show={this.state.showMatches} toggle={this.toggleShowMatches}/>
             </h1>
             <Row className='mt-3'>
@@ -57,7 +57,7 @@ export class Group extends Component {
     }
 
     render() {
-        return (<Col className='minw-25'>
+        return (<Col className='minw-25 py-2'>
             <Card>
                 <CardBody>
                     <h3 className='custom-font'>Gruppe {this.state.number}</h3>
