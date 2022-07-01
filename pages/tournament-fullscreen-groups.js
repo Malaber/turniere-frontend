@@ -23,11 +23,13 @@ function FullscreenPage(props) {
             <Row className='row-cols-4'>
                 {props.groups.map(group => <Col className='mb-2'><Group group={group} key={group.id}/></Col>)}
                 <Col>
-                    <QRCodeSVG
-                        className='shadow mx-auto'
-                        value='https://qr.bpwstr.de/2'
-                        size="300"
-                    />
+                    <div className="d-flex justify-content-center align-items-center">
+                        <QRCodeSVG
+                            className='shadow mx-auto'
+                            value='https://qr.bpwstr.de/2'
+                            size="350"
+                        />
+                    </div>
                 </Col>
                 {logo}
             </Row>
