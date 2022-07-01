@@ -34,7 +34,7 @@ class Register extends React.Component {
         return (<Container className="py-5">
             <Card className="shadow">
                 <CardBody>
-                    <h1 className="custom-font">Account anlegen</h1>
+                    <h1 className="custom-font">Registrierung aktuell nicht möglich!</h1>
                     <RegisterForm/>
                     <div className="mt-3">
                         <a href="/login" className="mr-3">Ich habe bereits einen Account!</a>
@@ -100,7 +100,7 @@ class RegisterForm extends React.Component {
                     Du akzeptierst die <a href="/privacy">Datenschutzbestimmungen</a>, wenn du auf Registrieren klickst.
             </FormText>
             <Button onClick={() => this.registerUser()}
-                color="success" size="lg" className="w-100 shadow-sm">Registrieren</Button>
+                color="success" size="lg" className="w-100 shadow-sm disabled">Registrieren</Button>
             <VisibleRegisterErrorList/>
         </Form>);
     }
