@@ -53,9 +53,11 @@ class Main extends React.Component {
         this.groupsPerPage = 11;
         this.pages = 2;
         this.page = 0;
+        this.backgroundColors = ['#a8e6cf', '#dcedc1', '#ffd3b6'];
 
         this.state = {
-            groups: [], tournament: null, loadedTournament: false, loadingStatus: null, page: 0, showLogo: false
+            groups: [], tournament: null, loadedTournament: false, loadingStatus: null, page: 0,
+            showLogo: false, backgroundColor: 'white'
         };
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
@@ -94,7 +96,8 @@ class Main extends React.Component {
         this.setState({
             loadingStatus: requestStatus, tournament: tournament,
             groups: groups.slice(start, end), loadedTournament: true,
-            page: this.page, showLogo: this.page == this.pages
+            page: this.page, showLogo: this.page == this.pages,
+            backgroundColor: this.backgroundColors[this.page]
         });
     }
 
@@ -107,7 +110,7 @@ class Main extends React.Component {
     }
 
     render() {
-        const {groups, tournament, loadedTournament, loadingStatus, page, showLogo} = this.state;
+        const {groups, tournament, loadedTournament, loadingStatus, page, showLogo, backgroundColor} = this.state;
         if (!loadedTournament) {
             return (<div>
                 <Head>
@@ -128,6 +131,11 @@ class Main extends React.Component {
                     tournament={tournament} groups={groups} page={page} maxPage={this.pages}
                     showLogo={showLogo}
                 />
+                <style global jsx>{`
+                    body {
+                        background: ${backgroundColor};
+                    }
+                `}</style>
             </div>);
         } else {
             return <ErrorPageComponent code={loadingStatus}/>;
