@@ -78,9 +78,9 @@ function GroupScoresTable(props) {
         <thead>
             <tr>
                 <th>Team</th>
-                <th>Punkte</th>
-                <th>Becher geworfen</th>
-                <th>Becher kassiert</th>
+                <th>Pkt.</th>
+                <th>Gew.</th>
+                <th>Kas.</th>
             </tr>
         </thead>
         <tbody>

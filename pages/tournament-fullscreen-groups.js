@@ -15,14 +15,13 @@ function FullscreenPage(props) {
     if (props.showLogo) {
         logo = <Col>
                    <div className="d-flex justify-content-center align-items-center">
-                       <img height='350' width='350' src='/static/images/bpwstr_logo.png'></img>
+                       <img height='300' width='300' src='/static/images/bpwstr_logo.png'></img>
                    </div>
                </Col>;
     } else {
         logo = <div />;
     }
     return (<div>
-        <FullscreenPageHeader title={props.tournament.name} page={props.page + 1} maxPage={props.maxPage + 1}/>
         <Container className='fs-5' fluid>
             <Row className='row-cols-4'>
                 {props.groups.map(group => <Col className='mb-2'><Group group={group} key={group.id}/></Col>)}
@@ -31,7 +30,7 @@ function FullscreenPage(props) {
                         <QRCodeSVG
                             className='shadow mx-auto'
                             value='https://qr.bpwstr.de/2'
-                            size="350"
+                            size="300"
                         />
                     </div>
                 </Col>
