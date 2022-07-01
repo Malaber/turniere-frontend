@@ -11,6 +11,12 @@ import {Group} from '../js/components/GroupStage';
 
 
 function FullscreenPage(props) {
+    let logo;
+    if (props.showLogo) {
+        logo = <Col><img height='300' width='300' src='/static/images/bpwstr_logo.png'></img></Col>;
+    } else {
+        logo = <div />;
+    }
     return (<div>
         <FullscreenPageHeader title={props.tournament.name} page={props.page + 1} maxPage={props.maxPage + 1}/>
         <Container className='fs-5' fluid>
@@ -23,6 +29,7 @@ function FullscreenPage(props) {
                         size="300"
                     />
                 </Col>
+                {logo}
             </Row>
         </Container>
     </div>);
@@ -43,11 +50,12 @@ class Main extends React.Component {
 
     constructor(props) {
         super(props);
-        this.groupsPerPage = 8;
-        this.pages = 3;
+        this.groupsPerPage = 11;
+        this.pages = 2;
+        this.page = 0;
 
         this.state = {
-            groups: [], tournament: null, loadedTournament: false, loadingStatus: null, page: 0
+            groups: [], tournament: null, loadedTournament: false, loadingStatus: null, page: 0, showLogo: false
         };
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
@@ -56,15 +64,15 @@ class Main extends React.Component {
 
     componentDidMount() {
         this.updateTournament();
-        const intervalIdPage = setInterval(this.increasePage, 10000);
+        const intervalIdPage = setInterval(this.increasePage, 3000);
         this.setState({intervalIdPage: intervalIdPage});
     }
 
     increasePage() {
-        if (this.state.page >= this.pages) {
-            this.setState({page: 0});
+        if (this.page >= this.pages) {
+            this.page = 0;
         } else {
-            this.setState({page: this.state.page + 1});
+            this.page = this.page + 1;
         }
         this.updateTournament();
     }
@@ -80,12 +88,13 @@ class Main extends React.Component {
     onTournamentRequestSuccess(requestStatus, tournament) {
         // filter groups by page
         const groups = tournament.groupStage.groups;
-        const start = this.state.page * this.groupsPerPage;
-        const end = (this.state.page + 1) * this.groupsPerPage;
+        const start = this.page * this.groupsPerPage;
+        const end = (this.page + 1) * this.groupsPerPage;
 
         this.setState({
             loadingStatus: requestStatus, tournament: tournament,
-            groups: groups.slice(start, end), loadedTournament: true
+            groups: groups.slice(start, end), loadedTournament: true,
+            page: this.page, showLogo: this.page == this.pages
         });
     }
 
@@ -98,7 +107,7 @@ class Main extends React.Component {
     }
 
     render() {
-        const {groups, tournament, loadedTournament, loadingStatus} = this.state;
+        const {groups, tournament, loadedTournament, loadingStatus, page, showLogo} = this.state;
         if (!loadedTournament) {
             return (<div>
                 <Head>
@@ -115,7 +124,10 @@ class Main extends React.Component {
                 <Head>
                     <title>{tournament.name}: turnie.re</title>
                 </Head>
-                <FullscreenPage tournament={tournament} groups={groups} page={this.state.page} maxPage={this.pages}/>
+                <FullscreenPage
+                    tournament={tournament} groups={groups} page={page} maxPage={this.pages}
+                    showLogo={showLogo}
+                />
             </div>);
         } else {
             return <ErrorPageComponent code={loadingStatus}/>;
