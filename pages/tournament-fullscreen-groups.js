@@ -13,7 +13,11 @@ import {Group} from '../js/components/GroupStage';
 function FullscreenPage(props) {
     let logo;
     if (props.showLogo) {
-        logo = <Col><img height='300' width='300' src='/static/images/bpwstr_logo.png'></img></Col>;
+        logo = <Col>
+                   <div className="d-flex justify-content-center align-items-center">
+                       <img height='350' width='350' src='/static/images/bpwstr_logo.png'></img>
+                   </div>
+               </Col>;
     } else {
         logo = <div />;
     }
