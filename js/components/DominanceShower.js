@@ -22,8 +22,8 @@ export class DominanceShower extends React.Component {
                                 <td className="h4 text-danger text-right pb-0">{this.props.stats.points_received}</td>
                             </tr>
                             <tr>
-                                <td className="smaller pt-0">Punkte erzielt</td>
-                                <td className="text-right smaller pt-0">Punkte kassiert</td>
+                                <td className="smaller pt-0">Becher geworfen</td>
+                                <td className="text-right smaller pt-0">Becher kassiert</td>
                             </tr>
                         </tbody>
                     </Table>
