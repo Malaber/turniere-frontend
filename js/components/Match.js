@@ -119,9 +119,12 @@ export class Match extends React.Component {
         }
         return (<div className='mb-3'>
             <Card className={'shadow-sm match '} onClick={this.toggleModal}>
-                <CardBody className={borderClass + ' border py-2 ' + cardClass + ' ' + styles.match_bg}>
-                    <MatchTable match={this.state.match} borderColor={borderClass}/>
-                </CardBody>
+                <div className="d-flex flex-row">
+                    <CardBody className={borderClass + ' border py-2 ' + cardClass + ' ' + styles.match_bg}>
+                        <MatchTable match={this.state.match} borderColor={borderClass}/>
+                    </CardBody>
+                    <span className="badge bg-secondary align-items-center">{this.state.match.position}</span>
+                </div>
             </Card>
             <small className='text-muted'>{smallMessage}</small>
             <MatchModal title='Match' isOpen={this.state.modal} toggle={this.toggleModal} match={this.state.match}
