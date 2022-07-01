@@ -25,6 +25,27 @@ export function getStage(stageId, successCallback, errorCallback) {
         .catch(errorCallback);
 }
 
+export function getTournamentMeta(tournamentId, successCallback, errorCallback) {
+    getRequest(getState(), '/tournaments/' + tournamentId + '?simple=true')
+        .then(response => {
+            successCallback(response.status, response.data);
+        })
+        .catch(errorCallback);
+}
+
+export function getTournamentMatches(tournamentId, successCallback, errorCallback, matchState=null) {
+    let matchFilter = '';
+    if (matchState) {
+        matchFilter = '?state=' + matchState;
+    }
+    getRequest(getState(), '/tournaments/' + tournamentId + '/matches' + matchFilter)
+        .then(response => {
+            successCallback(response.status, response.data.sort((a, b) => a.position > b.position).map(match => convertMatch(match)));
+        })
+        .catch(errorCallback);
+}
+
+
 function convertTournament(apiTournament) {
     let groupStage = null;
     const playoffStages = [];
@@ -51,7 +72,7 @@ function convertTournament(apiTournament) {
 
 function convertPlayoffStage(apiStage) {
     return {
-        id: apiStage.id, level: apiStage.level, matches: apiStage.matches.map(match => convertMatch(match, false))
+        id: apiStage.id, level: apiStage.level, matches: apiStage.matches.sort((a, b) => a.position > b.position).map(match => convertMatch(match, false))
     };
 }
 
@@ -59,8 +80,8 @@ function convertGroup(apiGroup) {
     return {
         id: apiGroup.id,
         number: apiGroup.number,
-        scores: apiGroup.group_scores,
-        matches: apiGroup.matches.map(match => convertMatch(match, true))
+        scores: apiGroup.group_scores.sort((a, b) => b.group_points > a.group_points),
+        matches: apiGroup.matches.sort((a, b) => a.position > b.position).map(match => convertMatch(match, true))
     };
 }
 

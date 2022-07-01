@@ -16,9 +16,9 @@ export default class GroupStage extends Component {
     }
 
     render() {
-        return (<div className='py-5 px-5'>
+        return (<div className='py-2 px-1'>
             <h1 className='custom-font'>
-                Gruppenphase
+                <span className='px-2'>Gruppenphase</span>
                 <ShowMatchesToggleButton show={this.state.showMatches} toggle={this.toggleShowMatches}/>
             </h1>
             <Row className='mt-3'>
@@ -35,7 +35,7 @@ function ShowMatchesToggleButton(props) {
     </Button>);
 }
 
-class Group extends Component {
+export class Group extends Component {
     constructor(props) {
         super(props);
         this.state = props.group;
@@ -57,7 +57,7 @@ class Group extends Component {
     }
 
     render() {
-        return (<Col className='minw-25'>
+        return (<Col className='minw-25 py-2'>
             <Card>
                 <CardBody>
                     <h3 className='custom-font'>Gruppe {this.state.number}</h3>
@@ -78,9 +78,9 @@ function GroupScoresTable(props) {
         <thead>
             <tr>
                 <th>Team</th>
-                <th>Punkte</th>
-                <th>Becher geworfen</th>
-                <th>Becher kassiert</th>
+                <th>Pkt.</th>
+                <th>Gew.</th>
+                <th>Kas.</th>
             </tr>
         </thead>
         <tbody>
@@ -94,7 +94,7 @@ function GroupScoresTableRow(props) {
     return (<tr>
         <td>{props.score.team.name}</td>
         <td>{props.score.group_points}</td>
-        <td>{props.score.received_points}</td>
         <td>{props.score.scored_points}</td>
+        <td>{props.score.received_points}</td>
     </tr>);
 }

@@ -3,7 +3,7 @@ import React from 'react';
 
 export function TournamentBigImage(props) {
     return (<div className="big-image mb-0">
-        <h1 className="display-1">{props.name}</h1>
+        <h2 className="display-1">{props.name}</h2>
         <Container>
             <TournamentProperties {...props}/>
         </Container>

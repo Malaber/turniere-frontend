@@ -41,6 +41,8 @@ function StatusBar(props) {
         <ButtonGroup className='me-auto'>
             <EditButton tournamentId={props.tournament.id} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
             <StatisticsButton tournamentId={props.tournament.id}/>
+            <FullscreenButton tournamentId={props.tournament.id}/>
+            <LinkButton href={'/t/' + props.tournament.id + '/fullscreen-groups'}>Vollbild-Ansicht Gruppen</LinkButton>
         </ButtonGroup>
     </TournamentStatusBar>);
 }
@@ -48,6 +50,12 @@ function StatusBar(props) {
 function StatisticsButton(props) {
     return (<LinkButton href={'/t/' + props.tournamentId + '/statistics'}>
         Statistiken
+    </LinkButton>);
+}
+
+function FullscreenButton(props) {
+    return (<LinkButton href={'/t/' + props.tournamentId + '/fullscreen'}>
+        Vollbild-Ansicht
     </LinkButton>);
 }
 
