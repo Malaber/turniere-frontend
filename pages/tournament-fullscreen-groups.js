@@ -24,8 +24,8 @@ function FullscreenPage(props) {
                 {props.groups.map(group => <Col className='mb-2'><Group group={group} key={group.id}/></Col>)}
                 <Col>
                     <QRCodeSVG
-                        className='shadow'
-                        value={'https://turnie.re/t/' + props.tournament.id}
+                        className='shadow mx-auto'
+                        value='https://qr.bpwstr.de/2'
                         size="300"
                     />
                 </Col>
