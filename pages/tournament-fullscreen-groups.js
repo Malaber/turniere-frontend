@@ -71,7 +71,7 @@ class Main extends React.Component {
 
     componentDidMount() {
         this.updateTournament();
-        const intervalIdPage = setInterval(this.increasePage, 3000);
+        const intervalIdPage = setInterval(this.increasePage, 15000);
         this.setState({intervalIdPage: intervalIdPage});
     }
 
