@@ -53,11 +53,8 @@ function FilterDropdown(props) {
 
 function FullscreenPageHeader(props) {
     return (<Navbar color='light' className='mb-4 border-bottom py-0'>
-        <NavItem><FilterDropdown {...props.filter}/></NavItem>
+        <FilterDropdown {...props.filter}/>
         <NavbarBrand>{props.title}</NavbarBrand>
-        <NavItem className='text-secondary'>
-            Turnier-Code: <b className='text-primary text-monospace'>{props.code}</b>
-        </NavItem>
     </Navbar>);
 }
 
@@ -99,7 +96,7 @@ class Main extends React.Component {
         const tournamentId = this.props.query.code;
         getTournamentMeta(tournamentId, this.onTournamentRequestSuccess, this.onTournamentRequestError);
         this.updateMatches();
-        const intervalId = setInterval(this.updateMatches, 3000);
+        const intervalId = setInterval(this.updateMatches, 10000);
         this.setState({intervalId: intervalId});
     }
 
