@@ -80,7 +80,7 @@ function convertGroup(apiGroup) {
     return {
         id: apiGroup.id,
         number: apiGroup.number,
-        scores: apiGroup.group_scores.sort((a, b) => b.group_points > a.group_points),
+        scores: apiGroup.group_scores.sort((a, b) => b.group_points > a.group_points || b.difference_in_points > a.difference_in_points || b.scored_points > a.scored_points),
         matches: apiGroup.matches.sort((a, b) => a.position > b.position).map(match => convertMatch(match, true))
     };
 }
