@@ -80,7 +80,19 @@ function convertGroup(apiGroup) {
     return {
         id: apiGroup.id,
         number: apiGroup.number,
-        scores: apiGroup.group_scores.sort((a, b) => b.group_points > a.group_points || b.difference_in_points > a.difference_in_points || b.scored_points > a.scored_points),
+        scores: apiGroup.group_scores.sort((a, b) => {
+            if (a.group_points > b.group_points) { return -1 }
+            else if(a.group_points < b.group_points) { return 1 }
+            else {
+                if (a.difference_in_points > b.difference_in_points) { return -1 }
+                else if (a.difference_in_points < b.difference_in_points) { return 1 }
+                else {
+                    if (a.scored_points > b.scored_points) { return -1 }
+                    else if (a.scored_points < b.scored_points) { return 1 }
+                    else { return 0 }
+                }
+            }
+        }),
         matches: apiGroup.matches.sort((a, b) => a.position > b.position).map(match => convertMatch(match, true))
     };
 }
