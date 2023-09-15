@@ -3,6 +3,7 @@ import {Match} from './Match';
 import React, {Component} from 'react';
 import {getGroup} from '../redux/tournamentApi';
 import {notify} from 'react-notify-toast';
+import {sortMatchesByPositionAscending} from '../utils/sorting';
 
 export default class GroupStage extends Component {
     constructor(props) {
@@ -35,6 +36,7 @@ function ShowMatchesToggleButton(props) {
     </Button>);
 }
 
+
 export class Group extends Component {
     constructor(props) {
         super(props);
@@ -62,7 +64,7 @@ export class Group extends Component {
                 <CardBody>
                     <h3 className='custom-font'>Gruppe {this.state.number}</h3>
                     <Collapse isOpen={this.props.showMatches}>
-                        {this.state.matches.map((match => (
+                        {this.state.matches.sort(sortMatchesByPositionAscending()).map((match => (
                             <Match match={match} isSignedIn={this.props.isSignedIn} isOwner={this.props.isOwner}
                                 onChange={this.reload} key={match.id}/>)))}
                     </Collapse>

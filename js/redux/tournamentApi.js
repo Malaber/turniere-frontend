@@ -1,5 +1,6 @@
 import {getRequest} from './backendApi';
 import {getState} from '../api';
+import {sortMatchesByPositionAscending} from '../utils/sorting';
 
 export function getTournament(code, successCallback, errorCallback) {
     getRequest(getState(), '/tournaments/' + code)
@@ -72,15 +73,13 @@ function convertTournament(apiTournament) {
 
 function convertPlayoffStage(apiStage) {
     return {
-        id: apiStage.id, level: apiStage.level, matches: apiStage.matches.sort((a, b) => {
-            if (a.position < b.position) {
-                return -1
-            } else if (a.position > b.position) {
-                return 1
-            } else {
-                return 0
-            }
-        }).map(match => convertMatch(match, false))
+        id: apiStage.id,
+        level: apiStage.level,
+        matches: apiStage.matches.sort(
+            sortMatchesByPositionAscending()
+        ).map(
+            match => convertMatch(match, false)
+        )
     };
 }
 
