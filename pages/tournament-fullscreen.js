@@ -7,6 +7,7 @@ import {
     Spinner
 } from 'reactstrap';
 import {Match} from '../js/components/Match';
+import {sortMatchesByPositionAscending} from '../js/utils/sorting';
 
 
 function FullscreenPage(props) {
@@ -27,7 +28,9 @@ function Matches(props) {
         matches = (<div className='text-center text-secondary font-italic'>keine Matches</div>);
     } else {
         matches = (<Row>
-            {props.matches.map(match => <Col md='auto'><Match key={match.id} match={match}/></Col>)}
+            {props.matches.sort(sortMatchesByPositionAscending()).map(
+                match => <Col md='auto'><Match key={match.id} match={match}/></Col>
+            )}
         </Row>);
     }
     return (<div className='mx-4 h5'>
