@@ -35,6 +35,18 @@ function ShowMatchesToggleButton(props) {
     </Button>);
 }
 
+function sortMatchesByPositionAscending() {
+    return (a, b) => {
+        if (a.position < b.position) {
+            return -1;
+        } else if (a.position > b.position) {
+            return 1;
+        } else {
+            return 0;
+        }
+    };
+}
+
 export class Group extends Component {
     constructor(props) {
         super(props);
@@ -62,7 +74,7 @@ export class Group extends Component {
                 <CardBody>
                     <h3 className='custom-font'>Gruppe {this.state.number}</h3>
                     <Collapse isOpen={this.props.showMatches}>
-                        {this.state.matches.map((match => (
+                        {this.state.matches.sort(sortMatchesByPositionAscending()).map((match => (
                             <Match match={match} isSignedIn={this.props.isSignedIn} isOwner={this.props.isOwner}
                                 onChange={this.reload} key={match.id}/>)))}
                     </Collapse>

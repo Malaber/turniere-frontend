@@ -7,6 +7,7 @@ import {MatchTable} from './MatchTable';
 
 import styles from './Match.module.css';
 
+
 export class Match extends React.Component {
     constructor(props) {
         super(props);
