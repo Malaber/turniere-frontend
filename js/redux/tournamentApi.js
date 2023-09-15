@@ -106,7 +106,9 @@ function convertGroup(apiGroup) {
 
 function convertMatch(apiMatch, allowUndecided) {
     const result = {
-        id: apiMatch.id, state: apiMatch.state, allowUndecided: allowUndecided,
+        id: apiMatch.id,
+        state: apiMatch.state,
+        allowUndecided: allowUndecided,
         winnerTeamId: apiMatch.winner === null ? null : apiMatch.winner.id,
         position: apiMatch.position + 1
     };
