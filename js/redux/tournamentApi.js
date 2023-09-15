@@ -110,7 +110,8 @@ function convertMatch(apiMatch, allowUndecided) {
         state: apiMatch.state,
         allowUndecided: allowUndecided,
         winnerTeamId: apiMatch.winner === null ? null : apiMatch.winner.id,
-        position: apiMatch.position + 1
+        position: apiMatch.position + 1,
+        group: apiMatch.group ? {id: apiMatch.group.id, number: apiMatch.group.number} : null
     };
 
     if (apiMatch.match_scores.length === 2) {

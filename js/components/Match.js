@@ -118,13 +118,21 @@ export class Match extends React.Component {
             smallMessage = 'Spiel kann gestartet werden';
             break;
         }
+
+        const groupInformation = this.state.match.group ?
+            <div className="mb-2 mt-2">Gr. {this.state.match.group.number}</div> :
+            '';
+
         return (<div className='mb-3'>
             <Card className={'shadow-sm match '} onClick={this.toggleModal}>
                 <div className="d-flex flex-row">
                     <CardBody className={borderClass + ' border py-2 ' + cardClass + ' ' + styles.match_bg}>
                         <MatchTable match={this.state.match} borderColor={borderClass}/>
                     </CardBody>
-                    <span className="badge bg-secondary align-items-center">{this.state.match.position}</span>
+                    <span className="badge bg-secondary align-items-center">
+                        {groupInformation}
+                        <div className="mb-2 mt-2">Sp. {this.state.match.position}</div>
+                    </span>
                 </div>
             </Card>
             <small className='text-muted'>{smallMessage}</small>
