@@ -30,7 +30,7 @@ $ TURNIERE_API_URL=https://api.example.com yarn run dev
 ```
 The environment variable `TURNIERE_API_URL` must contain an valid url to a [turniere backend server](https://github.com/turniere/turniere-backend).
  
-In production environment the server runs on port 80, otherwise on port 3000.
+In production environment the server runs on port 80, otherwise on port 3001.
 
 ## Production Setup: Build the Docker Container
 

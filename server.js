@@ -43,7 +43,7 @@ app.prepare()
             return handle(req, res);
         });
 
-        server.listen(dev ? 3000 : 80, err => {
+        server.listen(dev ? 3001 : 80, err => {
             if (err) throw err;
         });
     })
