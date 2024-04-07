@@ -34,7 +34,7 @@ export function getTournamentMeta(tournamentId, successCallback, errorCallback) 
         .catch(errorCallback);
 }
 
-export function getTournamentMatches(tournamentId, successCallback, errorCallback, matchState=null) {
+export function getTournamentMatches(tournamentId, successCallback, errorCallback, matchState = null) {
     let matchFilter = '';
     if (matchState) {
         matchFilter = '?state=' + matchState;
@@ -88,16 +88,12 @@ function convertGroup(apiGroup) {
         id: apiGroup.id,
         number: apiGroup.number,
         scores: apiGroup.group_scores.sort((a, b) => {
-            if (a.group_points > b.group_points) { return -1 }
-            else if(a.group_points < b.group_points) { return 1 }
-            else {
-                if (a.difference_in_points > b.difference_in_points) { return -1 }
-                else if (a.difference_in_points < b.difference_in_points) { return 1 }
-                else {
-                    if (a.scored_points > b.scored_points) { return -1 }
-                    else if (a.scored_points < b.scored_points) { return 1 }
-                    else { return 0 }
-                }
+            if (a.position > b.position) {
+                return 1;
+            } else if (a.position < b.position) {
+                return -1;
+            } else {
+                return 0;
             }
         }),
         matches: apiGroup.matches.sort((a, b) => a.position > b.position).map(match => convertMatch(match, true))

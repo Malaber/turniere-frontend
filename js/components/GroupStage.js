@@ -79,10 +79,11 @@ function GroupScoresTable(props) {
     return (<Table className='mt-4' striped size='sm' responsive>
         <thead>
             <tr>
+                <th>Position</th>
                 <th>Team</th>
                 <th><span title="Punkte">Pkt.</span></th>
+                <th><span title="Becherdifferenz">Dif.</span></th>
                 <th><span title="Getroffene Becher (Geworfen)">Gew.</span></th>
-                <th><span title="Erhaltene Becher (Kassiert)">Kas.</span></th>
             </tr>
         </thead>
         <tbody>
@@ -94,9 +95,10 @@ function GroupScoresTable(props) {
 
 function GroupScoresTableRow(props) {
     return (<tr>
+        <td>{props.score.position}</td>
         <td>{props.score.team.name}</td>
         <td>{props.score.group_points}</td>
+        <td>{props.score.difference_in_points}</td>
         <td>{props.score.scored_points}</td>
-        <td>{props.score.received_points}</td>
     </tr>);
 }
