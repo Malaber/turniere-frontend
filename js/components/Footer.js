@@ -14,7 +14,7 @@ export function Footer() {
 }
 
 function Copyright() {
-    return <span>&copy; 2022 turnie.re</span>;
+    return <span>&copy; 2024 turnie.re</span>;
 }
 
 function Privacy() {
