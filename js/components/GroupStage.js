@@ -79,7 +79,7 @@ function GroupScoresTable(props) {
     return (<Table className='mt-4' striped size='sm' responsive>
         <thead>
             <tr>
-                <th>Position</th>
+                <th>#</th>
                 <th>Team</th>
                 <th><span title="Punkte">Pkt.</span></th>
                 <th><span title="Becherdifferenz">Dif.</span></th>
