@@ -49,7 +49,7 @@ export function getTournamentMatches(tournamentId, successCallback, errorCallbac
 export function getTournamentTimerEnd(tournamentId, successCallback, errorCallback) {
     getRequest(getState(), '/tournaments/' + tournamentId + '/timer_end')
         .then(response => {
-            const timerEndDate = new Date(response.data);
+            const timerEndDate = new Date(response.data.timer_end);
             successCallback(response.status, timerEndDate);
         })
         .catch(errorCallback);
