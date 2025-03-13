@@ -26,7 +26,9 @@ $ yarn install
 
 Then you can run the development server by executing:
 ```
-$ TURNIERE_API_URL=https://api.example.com yarn run dev
+$ TURNIERE_API_URL=https://api.turnie.re yarn run dev
+
+$ TURNIERE_API_URL=http://localhost:3000 yarn run dev
 ```
 The environment variable `TURNIERE_API_URL` must contain an valid url to a [turniere backend server](https://github.com/turniere/turniere-backend).
  
