@@ -46,6 +46,14 @@ export function getTournamentMatches(tournamentId, successCallback, errorCallbac
         .catch(errorCallback);
 }
 
+export function getTournamentTimerEnd(tournamentId, successCallback, errorCallback) {
+    getRequest(getState(), '/tournaments/' + tournamentId + '/timer_end')
+        .then(response => {
+            const timerEndDate = new Date(response.data);
+            successCallback(response.status, timerEndDate);
+        })
+        .catch(errorCallback);
+}
 
 function convertTournament(apiTournament) {
     let groupStage = null;
