@@ -15,7 +15,7 @@ export function Timer({timerEnd}) {
     }, [timerEnd]);
 
     const formatTimeLeft = timeLeft => {
-        if (timeLeft === null) return '';
+        if (timeLeft === 0) return 'Spiel vorbei!';
         const hours = Math.floor(timeLeft / (1000 * 60 * 60));
         const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
