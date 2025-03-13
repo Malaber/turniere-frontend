@@ -8,11 +8,13 @@ import {
 } from 'reactstrap';
 import {Match} from '../js/components/Match';
 import {sortMatchesByPositionAscending} from '../js/utils/sorting';
+import {Timer} from '../js/components/Timer';
 
 
 function FullscreenPage(props) {
     return (<div>
-        <FullscreenPageHeader title={props.tournamentMeta.name} code={props.tournamentMeta.code} filter={props.filter} timerEnd={props.timerEnd}/>
+        <FullscreenPageHeader title={props.tournamentMeta.name} code={props.tournamentMeta.code} filter={props.filter}
+                              timerEnd={props.timerEnd}/>
         <Matches matches={props.matches}/>
     </div>);
 }
@@ -20,20 +22,20 @@ function FullscreenPage(props) {
 function Matches(props) {
     let matches;
     if (props.matches == null) {
-        matches = (<div className='text-center text-secondary'>
-            <Spinner animation='border' role='status' size='sm'/>
-            <span className='ml-3'>lade Matches</span>
+        matches = (<div className="text-center text-secondary">
+            <Spinner animation="border" role="status" size="sm"/>
+            <span className="ml-3">lade Matches</span>
         </div>);
     } else if (props.matches.length === 0) {
-        matches = (<div className='text-center text-secondary font-italic'>keine Matches</div>);
+        matches = (<div className="text-center text-secondary font-italic">keine Matches</div>);
     } else {
         matches = (<Row>
             {props.matches.sort(sortMatchesByPositionAscending()).map(
-                match => <Col md='auto'><Match key={match.id} match={match}/></Col>
+                match => <Col md="auto"><Match key={match.id} match={match}/></Col>
             )}
         </Row>);
     }
-    return (<div className='mx-4 h5'>
+    return (<div className="mx-4 h5">
         {matches}
     </div>);
 }
@@ -41,7 +43,7 @@ function Matches(props) {
 function FilterDropdown(props) {
     return (<UncontrolledDropdown>
         <i>Match-Filter: </i>
-        <DropdownToggle color='light' caret>
+        <DropdownToggle color="light" caret>
             {props.selected.label}
         </DropdownToggle>
         <DropdownMenu>
@@ -55,39 +57,14 @@ function FilterDropdown(props) {
 
 
 function FullscreenPageHeader(props) {
-    const [timeLeft, setTimeLeft] = React.useState(null);
-
-    React.useEffect(() => {
-        if (props.timerEnd) {
-            const intervalId = setInterval(() => {
-                const now = new Date();
-                const timeLeft = props.timerEnd - now;
-                setTimeLeft(timeLeft > 0 ? timeLeft : 0);
-            }, 1000);
-            return () => clearInterval(intervalId);
-        }
-    }, [props.timerEnd]);
-
-    const formatTimeLeft = timeLeft => {
-        if (timeLeft === null) return '';
-        const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-        const formattedSeconds = seconds < 10 ? '0' + seconds : seconds;
-
-        let formattedTimeLeft = '';
-        if (hours > 0) {
-            formattedTimeLeft += hours + 'h ';
-        }
-        formattedTimeLeft += minutes + ':' + formattedSeconds;
-        return formattedTimeLeft;
-    };
-
-    return (<Navbar color='light' className='mb-4 border-bottom py-0'>
-        <FilterDropdown {...props.filter}/>
-        <NavbarBrand>{props.title}</NavbarBrand>
-        {props.timerEnd && <div className='ml-auto'>Spielzeit: <NavbarBrand>{formatTimeLeft(timeLeft)}</NavbarBrand></div>}
-    </Navbar>);
+    return (
+        <Navbar color="light" className="mb-4 border-bottom py-0">
+            <FilterDropdown {...props.filter} />
+            <NavbarBrand>{props.title}</NavbarBrand>
+            {props.timerEnd &&
+                <div className="ml-auto">Spielzeit: <NavbarBrand><Timer timerEnd={props.timerEnd}/></NavbarBrand></div>}
+        </Navbar>
+    );
 }
 
 const matchFilters = {
@@ -195,9 +172,9 @@ class Main extends React.Component {
                 <Head>
                     <title>Vollbild-Ansicht: turnie.re</title>
                 </Head>
-                <Container className='p-5 text-center text-secondary'>
-                    <Spinner size='sm'/>
-                    <span className='ml-3'>lade Vollbild-Ansicht</span>
+                <Container className="p-5 text-center text-secondary">
+                    <Spinner size="sm"/>
+                    <span className="ml-3">lade Vollbild-Ansicht</span>
                 </Container>
             </div>);
         }
