@@ -86,7 +86,7 @@ function FullscreenPageHeader(props) {
     return (<Navbar color='light' className='mb-4 border-bottom py-0'>
         <FilterDropdown {...props.filter}/>
         <NavbarBrand>{props.title}</NavbarBrand>
-        {props.timerEnd && <div className='ml-auto'>Spielzeit: {formatTimeLeft(timeLeft)}</div>}
+        {props.timerEnd && <div className='ml-auto'>Spielzeit: <NavbarBrand>{formatTimeLeft(timeLeft)}</NavbarBrand></div>}
     </Navbar>);
 }
 
