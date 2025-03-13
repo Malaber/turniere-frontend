@@ -68,18 +68,25 @@ function FullscreenPageHeader(props) {
         }
     }, [props.timerEnd]);
 
-    const formatTimeLeft = (timeLeft) => {
+    const formatTimeLeft = timeLeft => {
         if (timeLeft === null) return '';
         const hours = Math.floor(timeLeft / (1000 * 60 * 60));
         const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-        return `${hours}h ${minutes}m ${seconds}s`;
+        const formattedSeconds = seconds < 10 ? '0' + seconds : seconds;
+
+        let formattedTimeLeft = '';
+        if (hours > 0) {
+            formattedTimeLeft += hours + 'h ';
+        }
+        formattedTimeLeft += minutes + ':' + formattedSeconds;
+        return formattedTimeLeft;
     };
 
     return (<Navbar color='light' className='mb-4 border-bottom py-0'>
         <FilterDropdown {...props.filter}/>
         <NavbarBrand>{props.title}</NavbarBrand>
-        {props.timerEnd && <div className='ml-auto'>Timer: {formatTimeLeft(timeLeft)}</div>}
+        {props.timerEnd && <div className='ml-auto'>Spielzeit: {formatTimeLeft(timeLeft)}</div>}
     </Navbar>);
 }
 
@@ -124,12 +131,14 @@ class Main extends React.Component {
         getTournamentMeta(tournamentId, this.onTournamentRequestSuccess, this.onTournamentRequestError);
         this.updateMatches();
         this.updateTimerEnd();
-        const intervalId = setInterval(this.updateMatches, 10000);
-        this.setState({intervalId: intervalId});
+        const matchesIntervalId = setInterval(this.updateMatches, 10000);
+        const timerEndIntervalId = setInterval(this.updateTimerEnd, 10000);
+        this.setState({matchesIntervalId: matchesIntervalId, timerEndIntervalId: timerEndIntervalId});
     }
 
     componentWillUnmount() {
-        clearInterval(this.state.intervalId);
+        clearInterval(this.state.matchesIntervalId);
+        clearInterval(this.state.timerEndIntervalId);
     }
 
     updateMatches() {
