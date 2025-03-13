@@ -141,7 +141,12 @@ class Main extends React.Component {
     updateTimerEnd() {
         const tournamentId = this.props.query.code;
         getTournamentTimerEnd(tournamentId, (status, timerEnd) => {
-            this.setState({timerEnd: timerEnd});
+            const now = new Date();
+            if (timerEnd > now) {
+                this.setState({timerEnd: timerEnd});
+            } else {
+                this.setState({timerEnd: null});
+            }
         }, error => {
             console.error('Failed to fetch timer end:', error);
         });
