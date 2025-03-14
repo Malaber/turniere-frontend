@@ -41,13 +41,16 @@ export function MatchTable(props) {
             </tbody>
         </Table>);
     } else {
+        const team1Id = `favorite-team-level-${props.stageLevel}-${props.match.team1.id}`;
+        const team2Id = `favorite-team-level-${props.stageLevel}-${props.match.team1.id}`;
+
         return (<Table className='mb-0'>
             <tbody>
-                <tr>
+                <tr id={team1Id}>
                     <th className='stage border-top-0'>{props.match.team1.score}</th>
                     <td className={'border-top-0 ' + team1Class}>{props.match.team1.name}</td>
                 </tr>
-                <tr>
+                <tr id={team2Id}>
                     <th className={'stage border-bottom-0 ' + props.borderColor}>{props.match.team2.score}</th>
                     <td className={'border-bottom-0 ' + props.borderColor + ' ' + team2Class}>
                         {props.match.team2.name}

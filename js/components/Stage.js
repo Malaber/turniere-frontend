@@ -3,15 +3,22 @@ import {Match} from './Match';
 import React from 'react';
 
 export function Stage(props) {
-    const {isSignedIn, isOwner, updateNextStage} = props;
+    const {isSignedIn, isOwner, updateNextStage, stageLevel} = props;
 
     return (<div>
         <Container className='py-5'>
             <h1 className='custom-font'>{props.level}</h1>
             <Row>
                 {props.matches.map((match => (
-                    <Col className='minw-25' key={match.id}><Match match={match} isSignedIn={isSignedIn}
-                        isOwner={isOwner} onFinish={updateNextStage}/></Col>)))}
+                    <Col className='minw-25' key={match.id}>
+                        <Match
+                            match={match}
+                            isSignedIn={isSignedIn}
+                            isOwner={isOwner}
+                            onFinish={updateNextStage}
+                            stageLevel={stageLevel}
+                        />
+                    </Col>)))}
             </Row>
         </Container>
     </div>);
