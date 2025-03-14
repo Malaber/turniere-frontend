@@ -46,13 +46,34 @@ export function FavoriteBar({teams}) {
     };
 
     const scrollToFavorite = () => {
-        if (favorite) {
-            const el = document.getElementById(`favorite-team-groupstage-${favorite.id}`);
-            if (el) {
-                el.scrollIntoView({behavior: 'smooth', block: 'end'});
-            }
-            setIsPulsing(false); // Stop pulsing when the button is clicked
+        if (!favorite) {
+            return;
         }
+
+        const stageElements = document.querySelectorAll(`[id^='favorite-team-level-'][id$='-${favorite.id}']`);
+        let lowestStageEl = null;
+        let lowestStageNum = Infinity;
+
+        stageElements.forEach(el => {
+            const match = el.id.match(/^favorite-team-level-(\d+)-(\d+)$/);
+            if (match) {
+                const stage = parseInt(match[1]);
+                if (stage < lowestStageNum) {
+                    lowestStageNum = stage;
+                    lowestStageEl = el;
+                }
+            }
+        });
+
+        if (lowestStageEl) {
+            lowestStageEl.scrollIntoView({behavior: 'smooth', block: 'end'});
+        } else {
+            const groupEl = document.getElementById(`favorite-team-groupstage-${favorite.id}`);
+            if (groupEl) {
+                groupEl.scrollIntoView({behavior: 'smooth', block: 'end'});
+            }
+        }
+        setIsPulsing(false);
     };
 
     if (isLoading) {
