@@ -65,8 +65,8 @@ export function FavoriteBar({teams}) {
         <div className="favorites border-bottom py-2 px-1">
             <div style={{display: 'flex', alignItems: 'center'}}>
                 <h1 className="custom-font px-2" ref={headingRef}>Favorit:</h1>
-                <p>{favorite ? favorite.name : ''}</p>
-                <ButtonGroup>
+                <p className="m-2">{favorite ? favorite.name : ''}</p>
+                <ButtonGroup className="m-2">
                     <Button title="Favorit Auswahlmenü öffnen/schließen" onClick={() => setIsVisible(!isVisible)}>
                         <FontAwesomeIcon icon={faHeartCirclePlus}/>
                     </Button>
