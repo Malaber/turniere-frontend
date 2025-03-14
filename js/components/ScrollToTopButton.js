@@ -8,7 +8,7 @@ export function ScrollToTopButton() {
 
     useEffect(() => {
         const handleScroll = () => {
-            if (window.scrollY > 2 * window.innerHeight) {
+            if (window.scrollY > 1.5 * window.innerHeight) {
                 setIsVisible(true);
             } else {
                 setIsVisible(false);
@@ -23,23 +23,22 @@ export function ScrollToTopButton() {
     };
 
     return (
-        <>
-            {isVisible && (
-                <Button
-                    onClick={scrollToTop}
-                    style={{
-                        position: 'fixed',
-                        bottom: '20px',
-                        right: '20px',
-                        borderRadius: '50%',
-                        width: '50px',
-                        height: '50px',
-                        zIndex: 999
-                    }}
-                >
-                    <FontAwesomeIcon icon={faArrowUp} />
-                </Button>
-            )}
-        </>
+        <Button
+            onClick={scrollToTop}
+            style={{
+                position: 'fixed',
+                bottom: '20px',
+                right: '20px',
+                borderRadius: '50%',
+                width: '50px',
+                height: '50px',
+                zIndex: 999,
+                transition: 'opacity 0.5s ease-in-out',
+                opacity: isVisible ? 0.7 : 0,
+                pointerEvents: isVisible ? 'auto' : 'none'
+            }}
+        >
+            <FontAwesomeIcon icon={faArrowUp} />
+        </Button>
     );
 }
