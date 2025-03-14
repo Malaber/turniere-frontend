@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {Button, ButtonGroup} from 'reactstrap';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {faStar as filledStar} from '@fortawesome/free-solid-svg-icons';
@@ -10,6 +10,7 @@ export function FavoriteBar({teams}) {
     const [isVisible, setIsVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isPulsing, setIsPulsing] = useState(false);
+    const headingRef = useRef(null);
 
     useEffect(() => {
         const savedFavorite = localStorage.getItem('favoriteTeam');
@@ -30,6 +31,7 @@ export function FavoriteBar({teams}) {
             setFavorite(team);
             localStorage.setItem('favoriteTeam', team.id);
             setIsPulsing(true);
+            headingRef.current.scrollIntoView({behavior: 'smooth', block: 'center'});
         }
         setIsVisible(false); // Close the favorite menu
     };
@@ -53,7 +55,7 @@ export function FavoriteBar({teams}) {
     return (
         <div className="favorites border-bottom py-2 px-1">
             <div style={{display: 'flex', alignItems: 'center'}}>
-                <h1 className="custom-font px-2">Favorit:</h1>
+                <h1 className="custom-font px-2" ref={headingRef}>Favorit:</h1>
                 <p>{favorite ? favorite.name : ''}</p>
                 <ButtonGroup>
                     <Button title="Favorit Auswahlmenü öffnen/schließen" onClick={() => setIsVisible(!isVisible)}>
