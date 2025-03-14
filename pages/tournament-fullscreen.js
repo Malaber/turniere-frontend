@@ -33,7 +33,7 @@ function Matches(props) {
             )}
         </Row>);
     }
-    return (<div className='mx-4 h5'>
+    return (<div className='mx-4 h5 disable-hover'>
         {matches}
     </div>);
 }
@@ -55,7 +55,7 @@ function FilterDropdown(props) {
 
 
 function FullscreenPageHeader(props) {
-    return (<Navbar color='light' className='mb-4 border-bottom py-0'>
+    return (<Navbar color='light' className='mb-4 border-bottom py-0 show-cursor'>
         <FilterDropdown {...props.filter}/>
         <NavbarBrand>{props.title}</NavbarBrand>
     </Navbar>);
@@ -96,6 +96,7 @@ class Main extends React.Component {
     }
 
     componentDidMount() {
+        document.body.classList.add('hide-cursor');
         const tournamentId = this.props.query.code;
         getTournamentMeta(tournamentId, this.onTournamentRequestSuccess, this.onTournamentRequestError);
         this.updateMatches();
