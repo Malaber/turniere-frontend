@@ -1,9 +1,9 @@
 import React, {useState, useEffect} from 'react';
-import {Button} from 'reactstrap';
+import {Button, ButtonGroup} from 'reactstrap';
 import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
 import {faStar as filledStar} from '@fortawesome/free-solid-svg-icons';
 import {faStar as emptyStar} from '@fortawesome/free-regular-svg-icons';
-import {faHeartCirclePlus} from '@fortawesome/free-solid-svg-icons';
+import {faHeartCirclePlus, faArrowCircleRight} from '@fortawesome/free-solid-svg-icons';
 
 export function FavoriteBar({teams}) {
     const [favorite, setFavorite] = useState(null);
@@ -47,22 +47,23 @@ export function FavoriteBar({teams}) {
     const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
 
     return (
-        <div>
+        <div class="favorites border-bottom py-2 px-1">
             <div style={{display: 'flex', alignItems: 'center'}}>
-                <h2>Favorit:</h2>
+                <h1 class="custom-font px-2">Favorit:</h1>
                 <p>{favorite ? favorite.name : ''}</p>
-                <Button onClick={() => setIsVisible(!isVisible)}>
-                    <FontAwesomeIcon icon={faHeartCirclePlus}/>
-                </Button>
-                {favorite && (
-                    <Button onClick={scrollToFavorite}>
-                        Jump to Favorite Team's Last Game
+                <ButtonGroup>
+                    <Button onClick={() => setIsVisible(!isVisible)}>
+                        <FontAwesomeIcon icon={faHeartCirclePlus}/>
                     </Button>
-                )}
+                    {favorite && (
+                        <Button onClick={scrollToFavorite}>
+                            <FontAwesomeIcon icon={faArrowCircleRight}/>
+                        </Button>
+                    )}
+                </ButtonGroup>
             </div>
             {isVisible && (
                 <div className="favorite-bar">
-                    <h3>All Teams</h3>
                     <div>
                         {sortedTeams.map(team => (
                             <div key={team.id} style={{display: 'flex', alignItems: 'center'}}>
