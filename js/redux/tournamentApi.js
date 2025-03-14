@@ -67,7 +67,8 @@ function convertTournament(apiTournament) {
         isPublic: apiTournament.public,
         ownerUsername: apiTournament.owner_username,
         groupStage: groupStage,
-        playoffStages: playoffStages
+        playoffStages: playoffStages,
+        teams: apiTournament.teams
     };
 }
 
