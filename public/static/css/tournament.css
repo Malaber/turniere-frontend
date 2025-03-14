@@ -28,6 +28,11 @@
 }
 
 .timer-container {
-    min-width: 20%; /* Adjust the percentage as needed */
-    text-align: right; /* Optional: Align text to the right */
+    min-width: 20%;
+    text-align: right;
+}
+
+.dropdown-container {
+    min-width: 20%;
+    text-align: left;
 }
