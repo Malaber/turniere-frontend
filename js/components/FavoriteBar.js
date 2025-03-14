@@ -11,6 +11,7 @@ export function FavoriteBar({teams}) {
     const [isLoading, setIsLoading] = useState(true);
     const [isPulsing, setIsPulsing] = useState(false);
     const headingRef = useRef(null);
+    const favoriteBarRef = useRef(null);
 
     useEffect(() => {
         const savedFavorite = localStorage.getItem('favoriteTeam');
@@ -22,6 +23,14 @@ export function FavoriteBar({teams}) {
         }
         setIsLoading(false);
     }, [teams]);
+
+    useEffect(() => {
+        if (isVisible && favoriteBarRef.current) {
+            favoriteBarRef.current.style.maxHeight = `${favoriteBarRef.current.scrollHeight}px`;
+        } else if (favoriteBarRef.current) {
+            favoriteBarRef.current.style.maxHeight = '0';
+        }
+    }, [isVisible]);
 
     const toggleFavorite = team => {
         if (favorite && favorite.id === team.id) {
@@ -72,24 +81,22 @@ export function FavoriteBar({teams}) {
                     )}
                 </ButtonGroup>
             </div>
-            {isVisible && (
-                <div className="favorite-bar">
-                    <div>
-                        {sortedTeams.map(team => (
-                            <div key={team.id} style={{display: 'flex', alignItems: 'center'}}>
-                                <Button onClick={() => toggleFavorite(team)} style={{marginRight: '10px'}}>
-                                    <FontAwesomeIcon
-                                        icon={favorite && favorite.id === team.id ? filledStar : emptyStar}
-                                    />
-                                </Button>
-                                <span>
-                                    {team.name}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
+            <div className={`favorite-bar ${isVisible ? 'visible' : ''}`} ref={favoriteBarRef}>
+                <div>
+                    {sortedTeams.map(team => (
+                        <div key={team.id} style={{display: 'flex', alignItems: 'center'}}>
+                            <Button onClick={() => toggleFavorite(team)} style={{marginRight: '10px'}}>
+                                <FontAwesomeIcon
+                                    icon={favorite && favorite.id === team.id ? filledStar : emptyStar}
+                                />
+                            </Button>
+                            <span>
+                                {team.name}
+                            </span>
+                        </div>
+                    ))}
                 </div>
-            )}
+            </div>
         </div>
     );
 }

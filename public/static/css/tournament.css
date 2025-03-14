@@ -19,7 +19,7 @@
 }
 
 .match:hover {
-    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15) !important;
 }
 
 .match:hover > div {
@@ -45,4 +45,14 @@
 
 .pulse-animation {
     animation: pulse 1s infinite;
+}
+
+.favorite-bar {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.7s ease-in-out;
+}
+
+.favorite-bar.visible {
+    max-height: none;
 }
