@@ -16,6 +16,7 @@ import {LinkButton} from '../js/components/LinkButton';
 import {LoadingPage} from '../js/components/LoadingPage';
 import {getTournament} from '../js/redux/tournamentApi';
 import {FavoriteBar} from '../js/components/FavoriteBar';
+import {ScrollToTopButton} from '../js/components/ScrollToTopButton';
 
 class PrivateTournamentPage extends React.Component {
     render() {
@@ -23,18 +24,21 @@ class PrivateTournamentPage extends React.Component {
         const {isSignedIn, username} = this.props;
         const isOwner = username === ownerUsername;
 
-        return (<div className='pb-5'>
-            <TournamentBigImage {...this.props.tournament}/>
-            <StatusBar tournament={this.props.tournament} isOwner={isOwner} isSignedIn={isSignedIn}/>
-            <FavoriteBar teams={this.props.tournament.teams}/>
-            <div className='stages'>
-                {groupStage != null &&
-                <div><GroupStage groups={groupStage.groups} isSignedIn={isSignedIn} isOwner={isOwner}
-                    showMatches={playoffStages !== null}/></div>}
-                <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
-                    isOwner={isOwner}/>
+        return (
+            <div className='pb-5'>
+                <TournamentBigImage {...this.props.tournament}/>
+                <StatusBar tournament={this.props.tournament} isOwner={isOwner} isSignedIn={isSignedIn}/>
+                <FavoriteBar teams={this.props.tournament.teams}/>
+                <div className='stages'>
+                    {groupStage != null &&
+                    <div><GroupStage groups={groupStage.groups} isSignedIn={isSignedIn} isOwner={isOwner}
+                        showMatches={playoffStages !== null}/></div>}
+                    <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
+                        isOwner={isOwner}/>
+                </div>
+                <ScrollToTopButton />
             </div>
-        </div>);
+        );
     }
 }
 
