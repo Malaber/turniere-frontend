@@ -94,11 +94,14 @@ function GroupScoresTable(props) {
 
 
 function GroupScoresTableRow(props) {
-    return (<tr>
-        <td>{props.score.position}</td>
-        <td>{props.score.team.name}</td>
-        <td>{props.score.group_points}</td>
-        <td>{props.score.difference_in_points}</td>
-        <td>{props.score.scored_points}</td>
-    </tr>);
+    const teamId = `favorite-team-groupstage-${props.score.team.id}`;
+    return (
+        <tr id={teamId}>
+            <td>{props.score.position}</td>
+            <td>{props.score.team.name}</td>
+            <td>{props.score.group_points}</td>
+            <td>{props.score.difference_in_points}</td>
+            <td>{props.score.scored_points}</td>
+        </tr>
+    );
 }
