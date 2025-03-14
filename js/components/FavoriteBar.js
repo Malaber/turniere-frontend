@@ -1,9 +1,14 @@
-import React, {useState, useEffect} from 'react';
-import {Button} from 'reactstrap';
+import React, { useState, useEffect } from 'react';
+import { Button } from 'reactstrap';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faStar as filledStar } from '@fortawesome/free-solid-svg-icons';
+import { faStar as emptyStar } from '@fortawesome/free-regular-svg-icons';
+import { faHeartCirclePlus } from '@fortawesome/free-solid-svg-icons';
 
-export function FavoriteBar({teams}) {
+export function FavoriteBar({ teams }) {
     const [favorite, setFavorite] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const savedFavorite = localStorage.getItem('favoriteTeam');
@@ -13,6 +18,7 @@ export function FavoriteBar({teams}) {
                 setFavorite(team);
             }
         }
+        setIsLoading(false);
     }, [teams]);
 
     const toggleFavorite = team => {
@@ -25,26 +31,36 @@ export function FavoriteBar({teams}) {
         }
     };
 
+    if (isLoading) {
+        return <div>Loading...</div>;
+    }
+
     return (
         <div>
-            <Button onClick={() => setIsVisible(!isVisible)}>
-                {isVisible ? 'Hide Favorite Bar' : 'Show Favorite Bar'}
-            </Button>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+                <h2 style={{ marginRight: '10px' }}>Favorit:</h2>
+                <p style={{ marginRight: '10px' }}>{favorite ? favorite.name : ''}</p>
+                <Button onClick={() => setIsVisible(!isVisible)}>
+                    <FontAwesomeIcon icon={faHeartCirclePlus} />
+                </Button>
+            </div>
             {isVisible && (
                 <div className="favorite-bar">
-                    <h2>Favorite Team</h2>
-                    {favorite ? <p>{favorite.name}</p> : <p>No favorite team selected</p>}
                     <h3>All Teams</h3>
-                    <ul>
+                    <div>
                         {teams.map(team => (
-                            <li key={team.id}>
-                                {team.name} {favorite && favorite.id === team.id && <span>(Favorite)</span>}
-                                <Button onClick={() => toggleFavorite(team)}>
-                                    {favorite && favorite.id === team.id ? 'Remove from Favorites' : 'Add to Favorites'}
+                            <div key={team.id} style={{ display: 'flex', alignItems: 'center' }}>
+                                <Button onClick={() => toggleFavorite(team)} style={{ marginRight: '10px' }}>
+                                    <FontAwesomeIcon
+                                        icon={favorite && favorite.id === team.id ? filledStar : emptyStar}
+                                    />
                                 </Button>
-                            </li>
+                                <span>
+                                    {team.name} {favorite && favorite.id === team.id && <span>(Favorite)</span>}
+                                </span>
+                            </div>
                         ))}
-                    </ul>
+                    </div>
                 </div>
             )}
         </div>
