@@ -9,6 +9,7 @@ export function FavoriteBar({teams}) {
     const [favorite, setFavorite] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isPulsing, setIsPulsing] = useState(false);
 
     useEffect(() => {
         const savedFavorite = localStorage.getItem('favoriteTeam');
@@ -28,7 +29,9 @@ export function FavoriteBar({teams}) {
         } else {
             setFavorite(team);
             localStorage.setItem('favoriteTeam', team.id);
+            setIsPulsing(true);
         }
+        setIsVisible(false); // Close the favorite menu
     };
 
     const scrollToFavorite = () => {
@@ -37,6 +40,7 @@ export function FavoriteBar({teams}) {
             if (el) {
                 el.scrollIntoView({behavior: 'smooth', block: 'end'});
             }
+            setIsPulsing(false); // Stop pulsing when the button is clicked
         }
     };
 
@@ -47,16 +51,20 @@ export function FavoriteBar({teams}) {
     const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
 
     return (
-        <div class="favorites border-bottom py-2 px-1">
+        <div className="favorites border-bottom py-2 px-1">
             <div style={{display: 'flex', alignItems: 'center'}}>
-                <h1 class="custom-font px-2">Favorit:</h1>
+                <h1 className="custom-font px-2">Favorit:</h1>
                 <p>{favorite ? favorite.name : ''}</p>
                 <ButtonGroup>
-                    <Button onClick={() => setIsVisible(!isVisible)}>
+                    <Button title="Favorit Auswahlmenü öffnen/schließen" onClick={() => setIsVisible(!isVisible)}>
                         <FontAwesomeIcon icon={faHeartCirclePlus}/>
                     </Button>
                     {favorite && (
-                        <Button onClick={scrollToFavorite}>
+                        <Button
+                            title="Zum aktuellen Spiel springen"
+                            onClick={scrollToFavorite}
+                            className={isPulsing ? 'pulse-animation' : ''}
+                        >
                             <FontAwesomeIcon icon={faArrowCircleRight}/>
                         </Button>
                     )}
