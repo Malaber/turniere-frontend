@@ -3,13 +3,10 @@ import {useRouter} from 'next/router';
 import React from 'react';
 
 class LinkButtonComponent extends React.Component {
-    constructor(props) {
-        super(props);
-        this.defaultProps = {
-            outline: true,
-            color: 'secondary'
-        };
-    }
+    static defaultProps = {
+        outline: true,
+        color: 'secondary'
+    };
 
     handleClick(e) {
         e.preventDefault();
@@ -25,14 +22,7 @@ class LinkButtonComponent extends React.Component {
     }
 }
 
-LinkButtonComponent.defaultProps = {
-    outline: true,
-    color: 'secondary'
-};
-
-// export default withRouter(LinkButton);
-
 export function LinkButton(props) {
     const router = useRouter();
-    return (<LinkButtonComponent {...props} router={router} />);
+    return (<LinkButtonComponent {...props} router={router}/>);
 }
