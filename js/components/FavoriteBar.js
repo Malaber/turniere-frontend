@@ -44,6 +44,8 @@ export function FavoriteBar({teams}) {
         return <div>Loading...</div>;
     }
 
+    const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+
     return (
         <div>
             <div style={{display: 'flex', alignItems: 'center'}}>
@@ -62,7 +64,7 @@ export function FavoriteBar({teams}) {
                 <div className="favorite-bar">
                     <h3>All Teams</h3>
                     <div>
-                        {teams.map(team => (
+                        {sortedTeams.map(team => (
                             <div key={team.id} style={{display: 'flex', alignItems: 'center'}}>
                                 <Button onClick={() => toggleFavorite(team)} style={{marginRight: '10px'}}>
                                     <FontAwesomeIcon
