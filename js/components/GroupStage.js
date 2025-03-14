@@ -23,8 +23,16 @@ export default class GroupStage extends Component {
                 <ShowMatchesToggleButton show={this.state.showMatches} toggle={this.toggleShowMatches}/>
             </h1>
             <Row className='mt-3'>
-                {this.props.groups.map(group => <Group group={group} key={group.id} isSignedIn={this.props.isSignedIn}
-                    isOwner={this.props.isOwner} showMatches={this.state.showMatches}/>)}
+                {this.props.groups.map(group => (
+                    <Group
+                        group={group}
+                        key={group.id}
+                        isSignedIn={this.props.isSignedIn}
+                        isOwner={this.props.isOwner}
+                        showMatches={this.state.showMatches}
+                        teams={this.props.teams}
+                    />
+                ))}
             </Row>
         </div>);
     }
@@ -64,11 +72,17 @@ export class Group extends Component {
                 <CardBody>
                     <h3 className='custom-font'>Gruppe {this.state.number}</h3>
                     <Collapse isOpen={this.props.showMatches}>
-                        {this.state.matches.sort(sortMatchesByPositionAscending()).map((match => (
-                            <Match match={match} isSignedIn={this.props.isSignedIn} isOwner={this.props.isOwner}
-                                onChange={this.reload} key={match.id}/>)))}
+                        {this.state.matches.sort(sortMatchesByPositionAscending()).map(match => (
+                            <Match
+                                match={match}
+                                isSignedIn={this.props.isSignedIn}
+                                isOwner={this.props.isOwner}
+                                onChange={this.reload}
+                                key={match.id}
+                            />
+                        ))}
                     </Collapse>
-                    <GroupScoresTable scores={this.state.scores}/>
+                    <GroupScoresTable scores={this.state.scores} teams={this.props.teams} />
                 </CardBody>
             </Card>
         </Col>);
@@ -76,8 +90,9 @@ export class Group extends Component {
 }
 
 function GroupScoresTable(props) {
-    return (<Table className='mt-4' striped size='sm' responsive>
-        <thead>
+    return (
+        <Table className='mt-4' striped size='sm' responsive>
+            <thead>
             <tr>
                 <th>#</th>
                 <th>Team</th>
@@ -85,20 +100,31 @@ function GroupScoresTable(props) {
                 <th><span title="Becherdifferenz">Dif.</span></th>
                 <th><span title="Getroffene Becher (Geworfen)">Gew.</span></th>
             </tr>
-        </thead>
-        <tbody>
-            {props.scores.map(groupScore => <GroupScoresTableRow score={groupScore} key={groupScore.id}/>)}
-        </tbody>
-    </Table>);
+            </thead>
+            <tbody>
+            {props.scores.map(groupScore => (
+                <GroupScoresTableRow
+                    score={groupScore}
+                    key={groupScore.id}
+                    teams={props.teams}
+                />
+            ))}
+            </tbody>
+        </Table>
+    );
 }
 
-
 function GroupScoresTableRow(props) {
-    return (<tr>
-        <td>{props.score.position}</td>
-        <td>{props.score.team.name}</td>
-        <td>{props.score.group_points}</td>
-        <td>{props.score.difference_in_points}</td>
-        <td>{props.score.scored_points}</td>
-    </tr>);
+    const advancingTeam = props.teams?.find(team => team.id === props.score.team.id && team.advancing_from_group_stage);
+    const rowClass = advancingTeam ? 'table-success' : '';
+
+    return (
+        <tr className={rowClass}>
+            <td>{props.score.position}</td>
+            <td>{props.score.team.name}</td>
+            <td>{props.score.group_points}</td>
+            <td>{props.score.difference_in_points}</td>
+            <td>{props.score.scored_points}</td>
+        </tr>
+    );
 }
