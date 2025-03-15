@@ -34,10 +34,13 @@ export function ScrollToTopButton() {
                 zIndex: 999,
                 transition: 'opacity 0.5s ease-in-out',
                 opacity: isVisible ? 0.7 : 0,
-                pointerEvents: isVisible ? 'auto' : 'none'
+                pointerEvents: isVisible ? 'auto' : 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
             }}
         >
-            <FaCircleArrowUp/>
+            <FaCircleArrowUp style={{fontSize: '36px'}}/>
         </Button>
     );
 }
