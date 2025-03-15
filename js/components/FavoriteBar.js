@@ -30,6 +30,12 @@ export function FavoriteBar({teams}) {
         }
     }, [isVisible]);
 
+    useEffect(() => {
+        if (favoriteBarRef.current) {
+            favoriteBarRef.current.style.maxHeight = `${favoriteBarRef.current.scrollHeight}px`;
+        }
+    }, [searchQuery]);
+
     const toggleFavorite = team => {
         if (favorite && favorite.id === team.id) {
             setFavorite(null);
