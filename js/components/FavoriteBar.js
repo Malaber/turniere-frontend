@@ -1,9 +1,6 @@
 import React, {useState, useEffect, useRef} from 'react';
 import {Button, ButtonGroup} from 'reactstrap';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
-import {faStar as filledStar} from '@fortawesome/free-solid-svg-icons';
-import {faStar as emptyStar} from '@fortawesome/free-regular-svg-icons';
-import {faHeartCirclePlus, faArrowCircleRight} from '@fortawesome/free-solid-svg-icons';
+import {FaHeartCirclePlus, FaRegHeart, FaHeart, FaArrowTurnDown} from 'react-icons/fa6';
 
 export function FavoriteBar({teams}) {
     const [favorite, setFavorite] = useState(null);
@@ -89,7 +86,7 @@ export function FavoriteBar({teams}) {
                 <p className="m-2">{favorite ? favorite.name : ''}</p>
                 <ButtonGroup className="m-2">
                     <Button title="Favorit Auswahlmenü öffnen/schließen" onClick={() => setIsVisible(!isVisible)}>
-                        <FontAwesomeIcon icon={faHeartCirclePlus}/>
+                        <FaHeartCirclePlus />
                     </Button>
                     {favorite && (
                         <Button
@@ -97,7 +94,7 @@ export function FavoriteBar({teams}) {
                             onClick={scrollToFavorite}
                             className={isPulsing ? 'pulse-animation' : ''}
                         >
-                            <FontAwesomeIcon icon={faArrowCircleRight}/>
+                            <FaArrowTurnDown />
                         </Button>
                     )}
                 </ButtonGroup>
@@ -107,9 +104,7 @@ export function FavoriteBar({teams}) {
                     {sortedTeams.map(team => (
                         <div key={team.id} style={{display: 'flex', alignItems: 'center'}}>
                             <Button onClick={() => toggleFavorite(team)} style={{marginRight: '10px'}}>
-                                <FontAwesomeIcon
-                                    icon={favorite && favorite.id === team.id ? filledStar : emptyStar}
-                                />
+                                {favorite && favorite.id === team.id ? <FaHeart /> : <FaRegHeart />}
                             </Button>
                             <span>
                                 {team.name}

@@ -8,8 +8,6 @@ import {
 import {TurniereNavigation} from '../js/components/Navigation';
 import {BigImage} from '../js/components/BigImage';
 import {Footer} from '../js/components/Footer';
-import '@fortawesome/fontawesome-svg-core/styles.css';
-import {config} from '@fortawesome/fontawesome-svg-core';
 
 config.autoAddCss = false;
 

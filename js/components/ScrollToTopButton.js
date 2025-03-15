@@ -1,7 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {Button} from 'reactstrap';
-import {FontAwesomeIcon} from '@fortawesome/react-fontawesome';
-import {faArrowUp} from '@fortawesome/free-solid-svg-icons';
+import {FaCircleArrowUp} from 'react-icons/fa6';
 
 export function ScrollToTopButton() {
     const [isVisible, setIsVisible] = useState(false);
@@ -38,7 +37,7 @@ export function ScrollToTopButton() {
                 pointerEvents: isVisible ? 'auto' : 'none'
             }}
         >
-            <FontAwesomeIcon icon={faArrowUp} />
+            <FaCircleArrowUp/>
         </Button>
     );
 }
