@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useRef} from 'react';
-import {Button, ButtonGroup} from 'reactstrap';
+import {Button, ButtonGroup, Input} from 'reactstrap';
 import {FaHeartCirclePlus, FaRegHeart, FaHeart, FaArrowTurnDown} from 'react-icons/fa6';
 
 export function FavoriteBar({teams}) {
@@ -7,6 +7,7 @@ export function FavoriteBar({teams}) {
     const [isVisible, setIsVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isPulsing, setIsPulsing] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
     const headingRef = useRef(null);
     const favoriteBarRef = useRef(null);
 
@@ -78,6 +79,7 @@ export function FavoriteBar({teams}) {
     }
 
     const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+    const filteredTeams = sortedTeams.filter(team => team.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     return (
         <div className="favorites border-bottom py-2 px-1">
@@ -100,8 +102,17 @@ export function FavoriteBar({teams}) {
                 </ButtonGroup>
             </div>
             <div className={`favorite-bar ${isVisible ? 'visible' : ''}`} ref={favoriteBarRef}>
+                {sortedTeams.length > 5 && (
+                    <Input
+                        type="text"
+                        placeholder="Search teams..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="mb-2"
+                    />
+                )}
                 <div>
-                    {sortedTeams.map(team => (
+                    {filteredTeams.map(team => (
                         <div key={team.id} style={{display: 'flex', alignItems: 'center'}}>
                             <Button onClick={() => toggleFavorite(team)} style={{marginRight: '10px'}}>
                                 {favorite && favorite.id === team.id ? <FaHeart /> : <FaRegHeart />}
