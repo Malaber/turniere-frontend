@@ -41,9 +41,14 @@ export function MatchTable(props) {
             </tbody>
         </Table>);
     } else {
-        const team1Id = props.stageLevel !== undefined ? `favorite-team-level-${props.stageLevel}-${props.match.team1.id}` : undefined;
-        const team2Id = props.stageLevel !== undefined ? `favorite-team-level-${props.stageLevel}-${props.match.team2.id}` : undefined;
-
+        let team1Id; let team2Id;
+        if (props.stageLevel !== undefined) {
+            team1Id = `favorite-team-level-${props.stageLevel}-${props.match.team1.id}`;
+            team2Id = `favorite-team-level-${props.stageLevel}-${props.match.team2.id}`;
+        } else {
+            team1Id = undefined;
+            team2Id = undefined;
+        }
         return (<Table className='mb-0'>
             <tbody>
                 <tr id={team1Id}>

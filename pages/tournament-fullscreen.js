@@ -3,7 +3,7 @@ import React from 'react';
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import {getTournamentMatches, getTournamentMeta} from '../js/redux/tournamentApi';
 import {
-    Col, Container, DropdownItem, DropdownMenu, DropdownToggle, Navbar, NavbarBrand, NavItem, Row, UncontrolledDropdown,
+    Col, Container, DropdownItem, DropdownMenu, DropdownToggle, Navbar, NavbarBrand, Row, UncontrolledDropdown,
     Spinner
 } from 'reactstrap';
 import {Match} from '../js/components/Match';

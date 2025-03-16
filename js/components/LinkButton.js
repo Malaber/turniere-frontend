@@ -3,11 +3,6 @@ import {useRouter} from 'next/router';
 import React from 'react';
 
 class LinkButtonComponent extends React.Component {
-    static defaultProps = {
-        outline: true,
-        color: 'secondary'
-    };
-
     handleClick(e) {
         e.preventDefault();
         this.props.router.push(this.props.href);
@@ -21,6 +16,11 @@ class LinkButtonComponent extends React.Component {
         );
     }
 }
+
+LinkButtonComponent.defaultProps = {
+    outline: true,
+    color: 'secondary'
+};
 
 export function LinkButton(props) {
     const router = useRouter();

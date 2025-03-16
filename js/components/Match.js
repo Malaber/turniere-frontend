@@ -127,7 +127,11 @@ export class Match extends React.Component {
             <Card className={'shadow-sm match '} onClick={this.toggleModal}>
                 <div className="d-flex flex-row">
                     <CardBody className={borderClass + ' border py-2 ' + cardClass + ' ' + styles.match_bg}>
-                        <MatchTable match={this.state.match} stageLevel={this.props.stageLevel} borderColor={borderClass}/>
+                        <MatchTable
+                            match={this.state.match}
+                            stageLevel={this.props.stageLevel}
+                            borderColor={borderClass}
+                        />
                     </CardBody>
                     <span className="badge bg-secondary align-items-center">
                         {groupInformation}
