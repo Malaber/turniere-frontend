@@ -87,20 +87,24 @@ export function FavoriteBar({teams}) {
                 }
             });
         }
-        scrollTo.scrollIntoView({behavior: 'smooth', block: 'center'}); // Smoothly scroll to the target element
 
         let scrollTimeout;
-        // Add a scroll event listener to start the highlighting after scrolling only
-        window.addEventListener('scroll', function() {
+        const handleScroll = () => {
             clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(function() {
+            scrollTimeout = setTimeout(() => {
                 setIsPulsing(false);
                 scrollTo.classList.add('scroll-to-highlight');
                 setTimeout(() => {
                     scrollTo.classList.remove('scroll-to-highlight');
                 }, 2000);
+                window.removeEventListener('scroll', handleScroll);
             }, 100);
-        }, {once: true});
+        };
+
+        scrollTo.scrollIntoView({behavior: 'smooth', block: 'center'}); // Smoothly scroll to the target element
+
+        // Add a scroll event listener to start the highlighting after scrolling only
+        window.addEventListener('scroll', handleScroll);
     };
 
     if (isLoading) {
