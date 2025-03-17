@@ -114,7 +114,7 @@ export function FavoriteBar({teams}) {
                 {sortedTeams.length > 5 && (
                     <Input
                         type="text"
-                        placeholder="Search teams..."
+                        placeholder="Team suchen..."
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         className="mb-2"
