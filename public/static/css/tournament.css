@@ -47,6 +47,10 @@
     animation: pulse 1s infinite;
 }
 
+.scroll-to-highlight {
+    animation: pulse 1s ease-in-out;
+}
+
 .favorite-bar {
     max-height: 0;
     overflow: hidden;
@@ -68,19 +72,4 @@
 .button-no-focus:active {
     outline: none !important;
     box-shadow: none !important;
-}
-@keyframes blink {
-    0% {
-        background-color: transparent;
-    }
-    50% {
-        background-color: yellow;
-    }
-    100% {
-        background-color: transparent;
-    }
-}
-
-.scroll-to-highlight {
-    animation: blink 1s ease-in-out;
 }

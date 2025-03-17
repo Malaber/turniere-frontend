@@ -122,9 +122,20 @@ export class Match extends React.Component {
         const groupInformation = this.state.match.group ?
             <div className="mb-2 mt-2">Gr. {this.state.match.group.number}</div> :
             '';
-
+        let team1Id; let team2Id;
+        if (this.props.stageLevel !== undefined) {
+            team1Id = `${this.props.stageLevel}-${this.props.match.team1.id}`;
+            team2Id = `${this.props.stageLevel}-${this.props.match.team2.id}`;
+        } else {
+            team1Id = undefined;
+            team2Id = undefined;
+        }
         return (<div className='mb-3'>
-            <Card className={'shadow-sm match '} onClick={this.toggleModal}>
+            <Card
+                className={'shadow-sm match'}
+                onClick={this.toggleModal}
+                data-team-level-ids={`${team1Id},${team2Id}`}
+            >
                 <div className="d-flex flex-row">
                     <CardBody className={borderClass + ' border py-2 ' + cardClass + ' ' + styles.match_bg}>
                         <MatchTable

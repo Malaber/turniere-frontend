@@ -58,24 +58,24 @@ export function FavoriteBar({teams}) {
             return;
         }
 
-        const stageElements = document.querySelectorAll(`[id^='favorite-team-level-'][id$='-${favorite.id}']`);
-        let lowestStageEl = null;
+        const matchesWithFavoriteParticipation = document.querySelectorAll(`[data-team-level-ids*='-${favorite.id}']`);
+        let lowestMatch = null; // lowest means lowest stage number > latest game of the favorite
         let lowestStageNum = Infinity;
 
-        stageElements.forEach(el => {
-            const match = el.id.match(/^favorite-team-level-(\d+)-(\d+)$/);
-            if (match) {
-                const stage = parseInt(match[1]);
-                if (stage < lowestStageNum) {
+        matchesWithFavoriteParticipation.forEach(el => {
+            const dataTeamLevelIds = el.getAttribute('data-team-level-ids').split(',');
+            dataTeamLevelIds.forEach(pair => {
+                const [stage, teamId] = pair.split('-').map(Number);
+                if (teamId === favorite.id && stage < lowestStageNum) {
                     lowestStageNum = stage;
-                    lowestStageEl = el;
+                    lowestMatch = el;
                 }
-            }
+            });
         });
 
         let scrollTo;
-        if (lowestStageEl) {
-            scrollTo = lowestStageEl;
+        if (lowestMatch) {
+            scrollTo = lowestMatch;
         } else {
             const groupElements = document.querySelectorAll('[data-teams]');
             groupElements.forEach(groupEl => {
