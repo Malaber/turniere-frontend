@@ -94,7 +94,7 @@ export function FavoriteBar({teams}) {
     return (
         <div className="favorites border-bottom py-2 px-1">
             <div className="d-flex align-items-center">
-                <h1 className="custom-font px-2" ref={headingRef}>Favorit:</h1>
+                <h1 className="custom-font m-2 px-2" ref={headingRef}>Favorit:</h1>
                 <p className="m-2">{favorite ? favorite.name : ''}</p>
                 <ButtonGroup className="m-2">
                     <Button
