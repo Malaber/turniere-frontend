@@ -44,6 +44,7 @@ function ShowMatchesToggleChevron(props) {
             color="link"
             onClick={props.toggle}
             className="position-absolute top-0 end-0 m-2 mt-1 button-no-focus"
+            title={props.show ? 'Matches ausblenden' : 'Matches einblenden'}
         >
             <FaChevronDown className={`my-chevron ${toggleClass}`}/>
         </Button>
