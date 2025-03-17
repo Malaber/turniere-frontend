@@ -4,6 +4,7 @@ import React, {Component} from 'react';
 import {getGroup} from '../redux/tournamentApi';
 import {notify} from 'react-notify-toast';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
+import {FaChevronDown, FaChevronUp} from 'react-icons/fa6';
 
 export default class GroupStage extends Component {
     constructor(props) {
@@ -20,22 +21,26 @@ export default class GroupStage extends Component {
         return (<div className='py-2 px-1'>
             <h1 className='custom-font'>
                 <span className='px-2'>Gruppenphase</span>
-                <ShowMatchesToggleButton show={this.state.showMatches} toggle={this.toggleShowMatches}/>
             </h1>
             <Row className='mt-3'>
-                {this.props.groups.map(group => <Group group={group} key={group.id} isSignedIn={this.props.isSignedIn}
-                    isOwner={this.props.isOwner} showMatches={this.state.showMatches}/>)}
+                {this.props.groups.map(group => <Group
+                    group={group}
+                    key={group.id}
+                    isSignedIn={this.props.isSignedIn}
+                    isOwner={this.props.isOwner}
+                    showMatches={this.state.showMatches}
+                    showMatchesToggle={this.toggleShowMatches}
+                />)}
             </Row>
         </div>);
     }
 }
 
-function ShowMatchesToggleButton(props) {
-    return (<Button onClick={props.toggle} className='float-right default-font-family'>
-        {props.show ? 'Spiele ausblenden' : 'Spiele anzeigen'}
+function ShowMatchesToggleChevron(props) {
+    return (<Button color='link' onClick={props.toggle} className="position-absolute top-0 end-0 m-2">
+        {props.show ? <FaChevronUp /> : <FaChevronDown />}
     </Button>);
 }
-
 
 export class Group extends Component {
     constructor(props) {
@@ -61,8 +66,11 @@ export class Group extends Component {
     render() {
         return (<Col className='minw-25 py-2'>
             <Card>
-                <CardBody>
-                    <h3 className='custom-font'>Gruppe {this.state.number}</h3>
+                <CardBody className="position-relative">
+                    <h3 className='custom-font'>
+                        Gruppe {this.state.number}
+                    </h3>
+                    <ShowMatchesToggleChevron show={this.props.showMatches} toggle={this.props.showMatchesToggle}/>
                     <Collapse isOpen={this.props.showMatches}>
                         {this.state.matches.sort(sortMatchesByPositionAscending()).map((match => (
                             <Match match={match} isSignedIn={this.props.isSignedIn} isOwner={this.props.isOwner}
