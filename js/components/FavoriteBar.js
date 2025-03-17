@@ -73,22 +73,31 @@ export function FavoriteBar({teams}) {
             }
         });
 
+        let scrollTo;
         if (lowestStageEl) {
-            lowestStageEl.scrollIntoView({behavior: 'smooth', block: 'end'});
+            scrollTo = lowestStageEl;
         } else {
             const groupElements = document.querySelectorAll('[data-teams]');
             groupElements.forEach(groupEl => {
                 const teamIds = groupEl.getAttribute('data-teams').split(',').map(id => parseInt(id, 10));
                 if (teamIds.includes(favorite.id)) {
-                    groupEl.scrollIntoView({behavior: 'smooth', block: 'center'});
-                    groupEl.classList.add('highlight');
-                    setTimeout(() => {
-                        groupEl.classList.remove('highlight');
-                    }, 2000);
+                    scrollTo = groupEl;
                 }
             });
         }
-        setIsPulsing(false);
+        scrollTo.scrollIntoView({behavior: 'smooth', block: 'center'});
+
+        let scrollTimeout;
+        window.addEventListener('scroll', function() {
+            clearTimeout(scrollTimeout);
+            scrollTimeout = setTimeout(function() {
+                setIsPulsing(false);
+                scrollTo.classList.add('scroll-to-highlight');
+                setTimeout(() => {
+                    scrollTo.classList.remove('scroll-to-highlight');
+                }, 2000);
+            }, 100);
+        }, {once: true});
     };
 
     if (isLoading) {

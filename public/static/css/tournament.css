@@ -81,6 +81,6 @@
     }
 }
 
-.highlight {
+.scroll-to-highlight {
     animation: blink 1s ease-in-out;
 }
