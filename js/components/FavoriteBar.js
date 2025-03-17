@@ -55,13 +55,14 @@ export function FavoriteBar({teams}) {
 
     const scrollToFavorite = () => {
         if (!favorite) {
-            return;
+            return; // Exit if there is no favorite team selected
         }
 
         const matchesWithFavoriteParticipation = document.querySelectorAll(`[data-team-level-ids*='-${favorite.id}']`);
         let lowestMatch = null; // lowest means lowest stage number > latest game of the favorite
         let lowestStageNum = Infinity;
 
+        // Iterate over each element to find the match with the lowest stage number
         matchesWithFavoriteParticipation.forEach(el => {
             const dataTeamLevelIds = el.getAttribute('data-team-level-ids').split(',');
             dataTeamLevelIds.forEach(pair => {
@@ -77,17 +78,19 @@ export function FavoriteBar({teams}) {
         if (lowestMatch) {
             scrollTo = lowestMatch;
         } else {
+            // If no match is found, look for group elements that contain the favorite team's ID
             const groupElements = document.querySelectorAll('[data-teams]');
             groupElements.forEach(groupEl => {
                 const teamIds = groupEl.getAttribute('data-teams').split(',').map(id => parseInt(id, 10));
                 if (teamIds.includes(favorite.id)) {
-                    scrollTo = groupEl;
+                    scrollTo = groupEl; // Update the scroll target to the group element
                 }
             });
         }
-        scrollTo.scrollIntoView({behavior: 'smooth', block: 'center'});
+        scrollTo.scrollIntoView({behavior: 'smooth', block: 'center'}); // Smoothly scroll to the target element
 
         let scrollTimeout;
+        // Add a scroll event listener to start the highlighting after scrolling only
         window.addEventListener('scroll', function() {
             clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(function() {
