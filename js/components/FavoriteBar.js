@@ -89,20 +89,23 @@ export function FavoriteBar({teams}) {
 
     return (
         <div className="favorites border-bottom py-2 px-1">
-            <div style={{display: 'flex', alignItems: 'center'}}>
+            <div className="d-flex align-items-center">
                 <h1 className="custom-font px-2" ref={headingRef}>Favorit:</h1>
                 <p className="m-2">{favorite ? favorite.name : ''}</p>
                 <ButtonGroup className="m-2">
-                    <Button title="Favorit Auswahlmenü öffnen/schließen" onClick={() => setIsVisible(!isVisible)}>
-                        <FaHeartCirclePlus/>
+                    <Button
+                        title="{isVisible ? 'Favoriten schließen' : 'Favoriten öffnen'}"
+                        onClick={() => setIsVisible(!isVisible)}
+                    >
+                        <FaHeartCirclePlus />
                     </Button>
                     {favorite && (
                         <Button
-                            title="Zum aktuellen Spiel springen"
+                            title="Zum aktuellen Spiel des Favoriten springen"
                             onClick={scrollToFavorite}
                             className={isPulsing ? 'pulse-animation' : ''}
                         >
-                            <FaArrowTurnDown/>
+                            <FaArrowTurnDown />
                         </Button>
                     )}
                 </ButtonGroup>
