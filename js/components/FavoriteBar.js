@@ -10,6 +10,7 @@ export function FavoriteBar({teams}) {
     const [searchQuery, setSearchQuery] = useState('');
     const headingRef = useRef(null);
     const favoriteBarRef = useRef(null);
+    const scrollButtonRef = useRef(null);
 
     useEffect(() => {
         const savedFavorite = localStorage.getItem('favoriteTeam');
@@ -45,6 +46,9 @@ export function FavoriteBar({teams}) {
             localStorage.setItem('favoriteTeam', team.id);
             setIsPulsing(true);
             headingRef.current.scrollIntoView({behavior: 'smooth', block: 'center'});
+            if (scrollButtonRef.current) {
+                scrollButtonRef.current.focus();
+            }
         }
         setIsVisible(false); // Close the favorite menu
     };
@@ -104,6 +108,7 @@ export function FavoriteBar({teams}) {
                             title="Zum aktuellen Spiel des Favoriten springen"
                             onClick={scrollToFavorite}
                             className={isPulsing ? 'pulse-animation' : ''}
+                            innerRef={scrollButtonRef}
                         >
                             <FaArrowTurnDown />
                         </Button>
