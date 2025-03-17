@@ -65,7 +65,7 @@ export class Group extends Component {
     }
 
     handleToggle() {
-        this.setState(prevState => ({ showMatches: !prevState.showMatches }));
+        this.setState(prevState => ({showMatches: !prevState.showMatches}));
         if (this.props.groupRef.current) {
             this.props.groupRef.current.scrollIntoView({behavior: 'smooth', block: 'center'});
         }
@@ -84,9 +84,15 @@ export class Group extends Component {
     }
 
     render() {
+        const teamIds = new Set();
+        this.state.matches.forEach(match => {
+            teamIds.add(match.team1.id);
+            teamIds.add(match.team2.id);
+        });
+        const teamIdsString = Array.from(teamIds).join(',');
         return (
-            <Col className="minw-25 py-2" ref={this.props.groupRef}>
-                <Card>
+            <Col className="minw-25 py-2">
+                <Card ref={this.props.groupRef} data-teams={teamIdsString}>
                     <CardBody className="position-relative">
                         <h3 className="custom-font">
                             Gruppe {this.state.number}
@@ -118,16 +124,16 @@ function GroupScoresTable(props) {
     return (
         <Table className="mt-4" striped size="sm" responsive>
             <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Team</th>
-                    <th><span title="Punkte">Pkt.</span></th>
-                    <th><span title="Becherdifferenz">Dif.</span></th>
-                    <th><span title="Getroffene Becher (Geworfen)">Gew.</span></th>
-                </tr>
+            <tr>
+                <th>#</th>
+                <th>Team</th>
+                <th><span title="Punkte">Pkt.</span></th>
+                <th><span title="Becherdifferenz">Dif.</span></th>
+                <th><span title="Getroffene Becher (Geworfen)">Gew.</span></th>
+            </tr>
             </thead>
             <tbody>
-                {props.scores.map(groupScore => <GroupScoresTableRow score={groupScore} key={groupScore.id}/>)}
+            {props.scores.map(groupScore => <GroupScoresTableRow score={groupScore} key={groupScore.id}/>)}
             </tbody>
         </Table>
     );

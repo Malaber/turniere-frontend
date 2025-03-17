@@ -76,10 +76,17 @@ export function FavoriteBar({teams}) {
         if (lowestStageEl) {
             lowestStageEl.scrollIntoView({behavior: 'smooth', block: 'end'});
         } else {
-            const groupEl = document.getElementById(`favorite-team-groupstage-${favorite.id}`);
-            if (groupEl) {
-                groupEl.scrollIntoView({behavior: 'smooth', block: 'end'});
-            }
+            const groupElements = document.querySelectorAll('[data-teams]');
+            groupElements.forEach(groupEl => {
+                const teamIds = groupEl.getAttribute('data-teams').split(',').map(id => parseInt(id, 10));
+                if (teamIds.includes(favorite.id)) {
+                    groupEl.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    groupEl.classList.add('highlight');
+                    setTimeout(() => {
+                        groupEl.classList.remove('highlight');
+                    }, 2000);
+                }
+            });
         }
         setIsPulsing(false);
     };
@@ -101,7 +108,7 @@ export function FavoriteBar({teams}) {
                         title="{isVisible ? 'Favoriten schließen' : 'Favoriten öffnen'}"
                         onClick={() => setIsVisible(!isVisible)}
                     >
-                        <FaHeartCirclePlus />
+                        <FaHeartCirclePlus/>
                     </Button>
                     {favorite && (
                         <Button
@@ -110,7 +117,7 @@ export function FavoriteBar({teams}) {
                             className={isPulsing ? 'pulse-animation' : ''}
                             innerRef={scrollButtonRef}
                         >
-                            <FaArrowTurnDown />
+                            <FaArrowTurnDown/>
                         </Button>
                     )}
                 </ButtonGroup>
