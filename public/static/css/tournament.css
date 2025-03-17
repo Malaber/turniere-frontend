@@ -59,7 +59,13 @@
 
 .my-chevron {
     transition: transform 0.3s ease;
+    color: gray;
 }
 .my-chevron.rotate {
     transform: rotate(180deg);
+}
+.button-no-focus:focus:not(:focus-visible),
+.button-no-focus:active {
+    outline: none !important;
+    box-shadow: none !important;
 }

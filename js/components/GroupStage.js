@@ -4,7 +4,7 @@ import React, {Component} from 'react';
 import {getGroup} from '../redux/tournamentApi';
 import {notify} from 'react-notify-toast';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
-import {FaChevronDown, FaChevronUp} from 'react-icons/fa6';
+import {FaChevronDown} from 'react-icons/fa6';
 
 export default class GroupStage extends Component {
     constructor(props) {
@@ -42,7 +42,7 @@ function ShowMatchesToggleChevron(props) {
         <Button
             color='link'
             onClick={props.toggle}
-            className='position-absolute top-0 end-0 m-2'
+            className='position-absolute top-0 end-0 m-2 button-no-focus'
         >
             <FaChevronDown className={`my-chevron ${toggleClass}`} />
         </Button>
