@@ -94,7 +94,7 @@ export function FavoriteBar({teams}) {
                 <p className="m-2">{favorite ? favorite.name : ''}</p>
                 <ButtonGroup className="m-2">
                     <Button title="Favorit Auswahlmenü öffnen/schließen" onClick={() => setIsVisible(!isVisible)}>
-                        <FaHeartCirclePlus />
+                        <FaHeartCirclePlus/>
                     </Button>
                     {favorite && (
                         <Button
@@ -102,7 +102,7 @@ export function FavoriteBar({teams}) {
                             onClick={scrollToFavorite}
                             className={isPulsing ? 'pulse-animation' : ''}
                         >
-                            <FaArrowTurnDown />
+                            <FaArrowTurnDown/>
                         </Button>
                     )}
                 </ButtonGroup>
@@ -119,13 +119,21 @@ export function FavoriteBar({teams}) {
                 )}
                 <div>
                     {filteredTeams.map(team => (
-                        <div key={team.id} style={{display: 'flex', alignItems: 'center'}}>
-                            <Button onClick={() => toggleFavorite(team)} style={{marginRight: '10px'}}>
-                                {favorite && favorite.id === team.id ? <FaHeart /> : <FaRegHeart />}
+                        <div
+                            key={team.id}
+                            onClick={() => toggleFavorite(team)}
+                            style={{display: 'flex', alignItems: 'center', cursor: 'pointer'}}
+                        >
+                            <Button
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    toggleFavorite(team);
+                                }}
+                                style={{marginRight: '10px'}}
+                            >
+                                {favorite && favorite.id === team.id ? <FaHeart/> : <FaRegHeart/>}
                             </Button>
-                            <span>
-                                {team.name}
-                            </span>
+                            <span>{team.name}</span>
                         </div>
                     ))}
                 </div>
