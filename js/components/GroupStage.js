@@ -9,16 +9,10 @@ import {FaChevronDown} from 'react-icons/fa6';
 export default class GroupStage extends Component {
     constructor(props) {
         super(props);
-        this.state = {showMatches: this.props.showMatches};
-        this.toggleShowMatches = this.toggleShowMatches.bind(this);
         this.groupRefs = this.props.groups.reduce((acc, group) => {
             acc[group.id] = React.createRef();
             return acc;
         }, {});
-    }
-
-    toggleShowMatches() {
-        this.setState({showMatches: !this.state.showMatches});
     }
 
     render() {
@@ -34,8 +28,6 @@ export default class GroupStage extends Component {
                             key={group.id}
                             isSignedIn={this.props.isSignedIn}
                             isOwner={this.props.isOwner}
-                            showMatches={this.state.showMatches}
-                            showMatchesToggle={this.toggleShowMatches}
                             groupRef={this.groupRefs[group.id]}
                         />
                     ))}
@@ -61,7 +53,10 @@ function ShowMatchesToggleChevron(props) {
 export class Group extends Component {
     constructor(props) {
         super(props);
-        this.state = props.group;
+        this.state = {
+            ...props.group,
+            showMatches: false
+        };
         this.reload = this.reload.bind(this);
         this.handleToggle = this.handleToggle.bind(this);
         this.onReloadSuccess = this.onReloadSuccess.bind(this);
@@ -69,7 +64,7 @@ export class Group extends Component {
     }
 
     handleToggle() {
-        this.props.showMatchesToggle();
+        this.setState(prevState => ({ showMatches: !prevState.showMatches }));
         if (this.props.groupRef.current) {
             this.props.groupRef.current.scrollIntoView({behavior: 'smooth', block: 'center'});
         }
@@ -96,10 +91,10 @@ export class Group extends Component {
                             Gruppe {this.state.number}
                         </h3>
                         <ShowMatchesToggleChevron
-                            show={this.props.showMatches}
+                            show={this.state.showMatches}
                             toggle={this.handleToggle}
                         />
-                        <Collapse isOpen={this.props.showMatches}>
+                        <Collapse isOpen={this.state.showMatches}>
                             {this.state.matches.sort(sortMatchesByPositionAscending()).map(match => (
                                 <Match
                                     match={match}
