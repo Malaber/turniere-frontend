@@ -56,3 +56,10 @@
 .favorite-bar.visible {
     max-height: none;
 }
+
+.my-chevron {
+    transition: transform 0.3s ease;
+}
+.my-chevron.rotate {
+    transform: rotate(180deg);
+}

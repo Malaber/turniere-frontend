@@ -37,9 +37,16 @@ export default class GroupStage extends Component {
 }
 
 function ShowMatchesToggleChevron(props) {
-    return (<Button color='link' onClick={props.toggle} className="position-absolute top-0 end-0 m-2">
-        {props.show ? <FaChevronUp /> : <FaChevronDown />}
-    </Button>);
+    const toggleClass = props.show ? 'rotate' : '';
+    return (
+        <Button
+            color='link'
+            onClick={props.toggle}
+            className='position-absolute top-0 end-0 m-2'
+        >
+            <FaChevronDown className={`my-chevron ${toggleClass}`} />
+        </Button>
+    );
 }
 
 export class Group extends Component {
