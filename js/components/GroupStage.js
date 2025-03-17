@@ -11,6 +11,10 @@ export default class GroupStage extends Component {
         super(props);
         this.state = {showMatches: this.props.showMatches};
         this.toggleShowMatches = this.toggleShowMatches.bind(this);
+        this.groupRefs = this.props.groups.reduce((acc, group) => {
+            acc[group.id] = React.createRef();
+            return acc;
+        }, {});
     }
 
     toggleShowMatches() {
@@ -18,21 +22,26 @@ export default class GroupStage extends Component {
     }
 
     render() {
-        return (<div className='py-2 px-1'>
-            <h1 className='custom-font m-2'>
-                <span className='px-2'>Gruppenphase</span>
-            </h1>
-            <Row className=''>
-                {this.props.groups.map(group => <Group
-                    group={group}
-                    key={group.id}
-                    isSignedIn={this.props.isSignedIn}
-                    isOwner={this.props.isOwner}
-                    showMatches={this.state.showMatches}
-                    showMatchesToggle={this.toggleShowMatches}
-                />)}
-            </Row>
-        </div>);
+        return (
+            <div className="py-2 px-1">
+                <h1 className="custom-font m-2">
+                    <span className="px-2">Gruppenphase</span>
+                </h1>
+                <Row className="">
+                    {this.props.groups.map(group => (
+                        <Group
+                            group={group}
+                            key={group.id}
+                            isSignedIn={this.props.isSignedIn}
+                            isOwner={this.props.isOwner}
+                            showMatches={this.state.showMatches}
+                            showMatchesToggle={this.toggleShowMatches}
+                            groupRef={this.groupRefs[group.id]}
+                        />
+                    ))}
+                </Row>
+            </div>
+        );
     }
 }
 
@@ -40,11 +49,11 @@ function ShowMatchesToggleChevron(props) {
     const toggleClass = props.show ? 'rotate' : '';
     return (
         <Button
-            color='link'
+            color="link"
             onClick={props.toggle}
-            className='position-absolute top-0 end-0 m-2 mt-1 button-no-focus'
+            className="position-absolute top-0 end-0 m-2 mt-1 button-no-focus"
         >
-            <FaChevronDown className={`my-chevron ${toggleClass}`} />
+            <FaChevronDown className={`my-chevron ${toggleClass}`}/>
         </Button>
     );
 }
@@ -54,8 +63,16 @@ export class Group extends Component {
         super(props);
         this.state = props.group;
         this.reload = this.reload.bind(this);
+        this.handleToggle = this.handleToggle.bind(this);
         this.onReloadSuccess = this.onReloadSuccess.bind(this);
         this.onReloadError = this.onReloadError.bind(this);
+    }
+
+    handleToggle() {
+        this.props.showMatchesToggle();
+        if (this.props.groupRef.current) {
+            this.props.groupRef.current.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
     }
 
     reload() {
@@ -71,42 +88,54 @@ export class Group extends Component {
     }
 
     render() {
-        return (<Col className='minw-25 py-2'>
-            <Card>
-                <CardBody className="position-relative">
-                    <h3 className='custom-font'>
-                        Gruppe {this.state.number}
-                    </h3>
-                    <ShowMatchesToggleChevron show={this.props.showMatches} toggle={this.props.showMatchesToggle}/>
-                    <Collapse isOpen={this.props.showMatches}>
-                        {this.state.matches.sort(sortMatchesByPositionAscending()).map((match => (
-                            <Match match={match} isSignedIn={this.props.isSignedIn} isOwner={this.props.isOwner}
-                                onChange={this.reload} key={match.id}/>)))}
-                    </Collapse>
-                    <GroupScoresTable scores={this.state.scores}/>
-                </CardBody>
-            </Card>
-        </Col>);
+        return (
+            <Col className="minw-25 py-2" ref={this.props.groupRef}>
+                <Card>
+                    <CardBody className="position-relative">
+                        <h3 className="custom-font">
+                            Gruppe {this.state.number}
+                        </h3>
+                        <ShowMatchesToggleChevron
+                            show={this.props.showMatches}
+                            toggle={this.handleToggle}
+                        />
+                        <Collapse isOpen={this.props.showMatches}>
+                            {this.state.matches.sort(sortMatchesByPositionAscending()).map(match => (
+                                <Match
+                                    match={match}
+                                    isSignedIn={this.props.isSignedIn}
+                                    isOwner={this.props.isOwner}
+                                    onChange={this.reload}
+                                    key={match.id}
+                                />
+                            ))}
+                        </Collapse>
+                        <GroupScoresTable scores={this.state.scores}/>
+                    </CardBody>
+                </Card>
+            </Col>
+        );
     }
 }
 
 function GroupScoresTable(props) {
-    return (<Table className='mt-4' striped size='sm' responsive>
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Team</th>
-                <th><span title="Punkte">Pkt.</span></th>
-                <th><span title="Becherdifferenz">Dif.</span></th>
-                <th><span title="Getroffene Becher (Geworfen)">Gew.</span></th>
-            </tr>
-        </thead>
-        <tbody>
-            {props.scores.map(groupScore => <GroupScoresTableRow score={groupScore} key={groupScore.id}/>)}
-        </tbody>
-    </Table>);
+    return (
+        <Table className="mt-4" striped size="sm" responsive>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th><span title="Punkte">Pkt.</span></th>
+                    <th><span title="Becherdifferenz">Dif.</span></th>
+                    <th><span title="Getroffene Becher (Geworfen)">Gew.</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {props.scores.map(groupScore => <GroupScoresTableRow score={groupScore} key={groupScore.id}/>)}
+            </tbody>
+        </Table>
+    );
 }
-
 
 function GroupScoresTableRow(props) {
     const teamId = `favorite-team-groupstage-${props.score.team.id}`;
