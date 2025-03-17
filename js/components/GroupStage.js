@@ -42,7 +42,7 @@ function ShowMatchesToggleChevron(props) {
         <Button
             color='link'
             onClick={props.toggle}
-            className='position-absolute top-0 end-0 m-2 button-no-focus'
+            className='position-absolute top-0 end-0 m-2 mt-1 button-no-focus'
         >
             <FaChevronDown className={`my-chevron ${toggleClass}`} />
         </Button>
