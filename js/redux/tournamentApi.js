@@ -41,7 +41,13 @@ export function getTournamentMatches(tournamentId, successCallback, errorCallbac
     }
     getRequest(getState(), '/tournaments/' + tournamentId + '/matches' + matchFilter)
         .then(response => {
-            successCallback(response.status, response.data.sort((a, b) => a.position > b.position).map(match => convertMatch(match)));
+            successCallback(
+                response.status, response.data.sort(
+                    (a, b) => a.position > b.position
+                ).map(
+                    match => convertMatch(match)
+                )
+            );
         })
         .catch(errorCallback);
 }

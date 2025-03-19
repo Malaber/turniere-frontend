@@ -39,3 +39,7 @@ $ docker build -t turniere-frontend .
 ```
 
 The built container exposes port 80.
+
+# Todo 
+
+Timer in topnav

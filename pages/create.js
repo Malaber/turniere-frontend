@@ -141,8 +141,8 @@ class CreateTournamentForm extends React.Component {
                             </Col>
                         </Row>
                         <WarningPopup
-                            text={'Füge bitte noch ' + (this.state.groupAdvance - this.state.teams.length)
-                            + ' Team(s) hinzu, um ' + this.state.groupAdvance + ' Team(s) im Playoff zu haben.'}
+                            text={'Füge bitte noch ' + (this.state.groupAdvance - this.state.teams.length) +
+                            ' Team(s) hinzu, um ' + this.state.groupAdvance + ' Team(s) im Playoff zu haben.'}
                             shown={this.state.teams.length < this.state.groupAdvance}/>
                     </FormGroup>
                 </Collapse>

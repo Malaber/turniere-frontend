@@ -15,6 +15,8 @@ import {EditButton, TournamentStatusBar} from '../js/components/TournamentStatus
 import {LinkButton} from '../js/components/LinkButton';
 import {LoadingPage} from '../js/components/LoadingPage';
 import {getTournament} from '../js/redux/tournamentApi';
+import {FavoriteBar} from '../js/components/FavoriteBar';
+import {ScrollToTopButton} from '../js/components/ScrollToTopButton';
 
 class PrivateTournamentPage extends React.Component {
     render() {
@@ -22,22 +24,26 @@ class PrivateTournamentPage extends React.Component {
         const {isSignedIn, username} = this.props;
         const isOwner = username === ownerUsername;
 
-        return (<div className='pb-5'>
-            <TournamentBigImage {...this.props.tournament}/>
-            <StatusBar tournament={this.props.tournament} isOwner={isOwner} isSignedIn={isSignedIn}/>
-            <div className='stages'>
-                {groupStage != null &&
-                <div><GroupStage
-                    groups={groupStage.groups}
-                    isSignedIn={isSignedIn}
-                    isOwner={isOwner}
-                    showMatches={playoffStages !== null}
-                    teams={this.props.tournament.teams}
-                /></div>}
-                <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
-                    isOwner={isOwner}/>
+        return (
+            <div className='pb-5'>
+                <TournamentBigImage {...this.props.tournament}/>
+                <StatusBar tournament={this.props.tournament} isOwner={isOwner} isSignedIn={isSignedIn}/>
+                <FavoriteBar teams={this.props.tournament.teams}/>
+                <div className='stages'>
+                    {groupStage != null &&
+                    <div><GroupStage
+                        groups={groupStage.groups}
+                        isSignedIn={isSignedIn}
+                        isOwner={isOwner}
+                        showMatches={playoffStages !== null}
+                        teams={this.props.tournament.teams}
+                    /></div>}
+                    <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
+                        isOwner={isOwner}/>
+                </div>
+                <ScrollToTopButton />
             </div>
-        </div>);
+        );
     }
 }
 
@@ -47,7 +53,6 @@ function StatusBar(props) {
             <EditButton tournamentId={props.tournament.id} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
             <StatisticsButton tournamentId={props.tournament.id}/>
             <FullscreenButton tournamentId={props.tournament.id}/>
-            <LinkButton href={'/t/' + props.tournament.id + '/fullscreen-groups'}>Vollbild-Ansicht Gruppen</LinkButton>
         </ButtonGroup>
     </TournamentStatusBar>);
 }
