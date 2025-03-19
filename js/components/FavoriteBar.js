@@ -72,6 +72,21 @@ export function FavoriteBar({teams}) {
         return lowestMatch;
     }
 
+    function findScrollToGroup(favoriteId) {
+        // Look for group elements that contain the favorite team's ID
+        const groupElements = document.querySelectorAll('[data-teams]');
+        const scrollToNotFound = null;
+
+        groupElements.forEach(groupEl => {
+            const teamIds = groupEl.getAttribute('data-teams').split(',').map(id => parseInt(id, 10));
+            if (teamIds.includes(favoriteId)) {
+                return groupEl;
+            }
+        });
+
+        return scrollToNotFound;
+    }
+
     const scrollToFavorite = () => {
         if (!favorite) {
             return; // Exit if there is no favorite team selected
@@ -83,14 +98,12 @@ export function FavoriteBar({teams}) {
         if (lowestMatch) {
             scrollTo = lowestMatch;
         } else {
-            // If no match is found, look for group elements that contain the favorite team's ID
-            const groupElements = document.querySelectorAll('[data-teams]');
-            groupElements.forEach(groupEl => {
-                const teamIds = groupEl.getAttribute('data-teams').split(',').map(id => parseInt(id, 10));
-                if (teamIds.includes(favorite.id)) {
-                    scrollTo = groupEl; // Update the scroll target to the group element
-                }
-            });
+            scrollTo = findScrollToGroup(favorite.id);
+        }
+
+        if (!scrollTo) {
+            console.error('No match or group found for the favorite team');
+            return;
         }
 
         let scrollTimeout;
