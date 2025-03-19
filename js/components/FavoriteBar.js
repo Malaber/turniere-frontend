@@ -77,12 +77,12 @@ export function FavoriteBar({teams}) {
         const groupElements = document.querySelectorAll('[data-teams]');
         const scrollToNotFound = null;
 
-        groupElements.forEach(groupEl => {
+        for (const groupEl of groupElements) {
             const teamIds = groupEl.getAttribute('data-teams').split(',').map(id => parseInt(id, 10));
             if (teamIds.includes(favoriteId)) {
                 return groupEl;
             }
-        });
+        }
 
         return scrollToNotFound;
     }
