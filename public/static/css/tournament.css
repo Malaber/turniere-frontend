@@ -107,3 +107,15 @@
         display: none;
     }
 }
+
+@media (max-width: 991.98px) {
+    .hide-below-992-w {
+        display: none;
+    }
+}
+
+@media (min-width: 992px) {
+    .hide-above-992-w {
+        display: none;
+    }
+}
