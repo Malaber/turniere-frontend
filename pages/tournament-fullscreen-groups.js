@@ -4,7 +4,7 @@ import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import {getTournament} from '../js/redux/tournamentApi';
 import {
     Col,
-    Container, Navbar, NavbarBrand, NavItem, Row, Spinner
+    Container, Row, Spinner
 } from 'reactstrap';
 import {QRCodeSVG} from 'qrcode.react';
 import {Group} from '../js/components/GroupStage';
@@ -14,22 +14,22 @@ function FullscreenPage(props) {
     let logo;
     if (props.showLogo) {
         logo = <Col>
-                   <div className="d-flex justify-content-center align-items-center">
-                       <img height='300' width='300' src='/static/images/bpwstr_logo.png'></img>
-                   </div>
-               </Col>;
+            <div className="d-flex justify-content-center align-items-center">
+                <img height="300" width="300" src="/static/images/bpwstr_logo.png"></img>
+            </div>
+        </Col>;
     } else {
-        logo = <div />;
+        logo = <div/>;
     }
     return (<div>
-        <Container className='fs-5' fluid>
-            <Row className='row-cols-4'>
-                {props.groups.map(group => <Col className='mb-2'><Group group={group} key={group.id}/></Col>)}
+        <Container className="fs-5" fluid>
+            <Row className="row-cols-4">
+                {props.groups.map(group => <Col className="mb-2"><Group group={group} key={group.id}/></Col>)}
                 <Col>
                     <div className="d-flex justify-content-center align-items-center">
                         <QRCodeSVG
-                            className='shadow mx-auto'
-                            value='https://qr.bpwstr.de/2'
+                            className="shadow mx-auto"
+                            value="https://qr.bpwstr.de/2"
                             size="300"
                         />
                     </div>
@@ -38,13 +38,6 @@ function FullscreenPage(props) {
             </Row>
         </Container>
     </div>);
-}
-
-function FullscreenPageHeader(props) {
-    return (<Navbar color='light' className='mb-4 border-bottom py-0'>
-        <NavbarBrand>{props.title}</NavbarBrand>
-        {props.page}/{props.maxPage}
-    </Navbar>);
 }
 
 
@@ -122,9 +115,9 @@ class Main extends React.Component {
                 <Head>
                     <title>Vollbild-Ansicht: turnie.re</title>
                 </Head>
-                <Container className='p-5 text-center text-secondary'>
-                    <Spinner size='sm'/>
-                    <span className='ml-3'>lade Vollbild-Ansicht</span>
+                <Container className="p-5 text-center text-secondary">
+                    <Spinner size="sm"/>
+                    <span className="ml-3">lade Vollbild-Ansicht</span>
                 </Container>
             </div>);
         }

@@ -71,8 +71,8 @@ function MainBottomSummary() {
             <div className="col-lg-6">
                 <h2>Ich habe einen Turniercode bekommen. Was nun?</h2>
                 <p>
-                    Der Turniercode führt dich direkt zu einem Turnier. Gebe dafür den Code <a className="text-success"
-                        href="#turniercode-form">oben</a> ein,
+                    Der Turniercode führt dich direkt zu einem Turnier. Gebe dafür den Code
+                    <a className="text-success" href="#turniercode-form">oben</a> ein,
                     dann wirst du sofort weitergeleitet. </p>
             </div>
         </div>
