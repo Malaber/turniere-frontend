@@ -10,12 +10,16 @@
     background-color: #f8f8f8;
 }
 
+.favorites {
+    background-color: #f8f8f8;
+}
+
 .minw-25 {
     min-width: 350px;
 }
 
 .match:hover {
-    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .15) !important;
 }
 
 .match:hover > div {
@@ -25,6 +29,61 @@
 
 .scoreInput {
     width: 11rem;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.pulse-animation {
+    animation: pulse 1s infinite;
+}
+
+.scroll-to-highlight {
+    animation: pulse 1s ease-in-out;
+}
+
+.favorite-bar {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.7s ease-in-out;
+}
+
+.favorite-bar.visible {
+    max-height: none;
+}
+
+.my-chevron {
+    transition: transform 0.3s ease;
+    color: gray;
+}
+.my-chevron.rotate {
+    transform: rotate(180deg);
+}
+.button-no-focus:focus:not(:focus-visible),
+.button-no-focus:active {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.hide-cursor {
+    cursor: none;
+}
+
+.show-cursor {
+    cursor: pointer;
+}
+
+.disable-hover {
+    pointer-events: none;
 }
 
 .timer-container {

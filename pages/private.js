@@ -9,11 +9,11 @@ import {Footer} from '../js/components/Footer';
 
 import TournamentList from '../js/components/TournamentList';
 import RequireLogin from '../js/components/RequireLogin';
-import { LinkButton } from '../js/components/LinkButton';
+import {LinkButton} from '../js/components/LinkButton';
 
 class PrivateTournamentsPage extends React.Component {
     render() {
-        return (<RequireLogin loginMessage='Sie müssen angemeldet sein, um Ihre privaten Turniere zu sehen.'>
+        return (<RequireLogin loginMessage="Sie müssen angemeldet sein, um Ihre privaten Turniere zu sehen.">
             <div className="main generic-fullpage-bg">
                 <Head>
                     <title>Private Turniere: turnie.re</title>
@@ -42,10 +42,10 @@ function PrivateTournamentsPageContent(props) {
         </Container>
         <Container className="pb-5 pt-3">
             <ButtonGroup>
-                <LinkButton href="/list" outline={false} color='primary'>zu den öffentlichen Turnieren</LinkButton>
+                <LinkButton href="/list" outline={false} color="primary">zu den öffentlichen Turnieren</LinkButton>
                 {
                     props.isSignedIn &&
-                    <LinkButton href="/create" outline={false} color='success'>neues Turnier erstellen</LinkButton>
+                    <LinkButton href="/create" outline={false} color="success">neues Turnier erstellen</LinkButton>
                 }
             </ButtonGroup>
         </Container>
@@ -57,7 +57,7 @@ class PrivateTournamentsCard extends React.Component {
         return (<Card className="shadow">
             <CardBody>
                 <h1 className="custom-font">Private Turniere</h1>
-                <TournamentList type='private'/>
+                <TournamentList type="private"/>
             </CardBody>
         </Card>);
     }

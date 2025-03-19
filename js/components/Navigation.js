@@ -10,22 +10,16 @@ import {notify} from 'react-notify-toast';
 export class TurniereNavigation extends React.Component {
     constructor(props) {
         super(props);
-
         this.toggle = this.toggle.bind(this);
-
-        this.state = {
-            collapsed: true
-        };
+        this.state = {collapsed: true};
     }
 
     toggle() {
-        this.setState({
-            collapsed: !this.state.collapsed
-        });
+        this.setState({collapsed: !this.state.collapsed});
     }
 
     render() {
-        return (<Navbar color="light" light expand="lg">
+        return (<Navbar color="light" light expand="lg" sticky="top">
             <NavbarBrand href="/">turnie.re</NavbarBrand>
             <NavbarToggler onClick={this.toggle}/>
             <Collapse isOpen={!this.state.collapsed} navbar>

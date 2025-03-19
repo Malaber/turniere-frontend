@@ -3,7 +3,7 @@ import React from 'react';
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import {getTournamentMatches, getTournamentMeta, getTournamentTimerEnd} from '../js/redux/tournamentApi';
 import {
-    Col, Container, DropdownItem, DropdownMenu, DropdownToggle, Navbar, NavbarBrand, NavItem, Row, UncontrolledDropdown,
+    Col, Container, DropdownItem, DropdownMenu, DropdownToggle, Navbar, NavbarBrand, Row, UncontrolledDropdown,
     Spinner
 } from 'reactstrap';
 import {Match} from '../js/components/Match';
@@ -13,8 +13,11 @@ import {Timer} from '../js/components/Timer';
 
 function FullscreenPage(props) {
     return (<div>
-        <FullscreenPageHeader title={props.tournamentMeta.name} code={props.tournamentMeta.code} filter={props.filter}
-                              timerEnd={props.timerEnd}/>
+        <FullscreenPageHeader
+            title={props.tournamentMeta.name}
+            code={props.tournamentMeta.code}
+            filter={props.filter}
+            timerEnd={props.timerEnd}/>
         <Matches matches={props.matches}/>
     </div>);
 }
@@ -35,7 +38,7 @@ function Matches(props) {
             )}
         </Row>);
     }
-    return (<div className="mx-4 h5">
+    return (<div className="mx-4 h5 disable-hover">
         {matches}
     </div>);
 }
@@ -58,11 +61,13 @@ function FilterDropdown(props) {
 
 function FullscreenPageHeader(props) {
     return (
-        <Navbar color="light" className="mb-4 border-bottom py-0">
+        <Navbar color="light" className="mb-4 border-bottom py-0 show-cursor">
             <div className="ml-auto dropdown-container"><FilterDropdown {...props.filter} /></div>
             <NavbarBrand>{props.title}</NavbarBrand>
             {props.timerEnd &&
-                <div className="ml-auto timer-container">Spielzeit: <NavbarBrand><Timer timerEnd={props.timerEnd}/></NavbarBrand></div>
+                <div className="ml-auto timer-container">
+                    Spielzeit: <NavbarBrand><Timer timerEnd={props.timerEnd}/></NavbarBrand>
+                </div>
             }
         </Navbar>
     );
@@ -105,6 +110,7 @@ class Main extends React.Component {
     }
 
     componentDidMount() {
+        document.body.classList.add('hide-cursor');
         const tournamentId = this.props.query.code;
         getTournamentMeta(tournamentId, this.onTournamentRequestSuccess, this.onTournamentRequestError);
         this.updateMatches();

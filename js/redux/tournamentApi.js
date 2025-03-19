@@ -41,7 +41,13 @@ export function getTournamentMatches(tournamentId, successCallback, errorCallbac
     }
     getRequest(getState(), '/tournaments/' + tournamentId + '/matches' + matchFilter)
         .then(response => {
-            successCallback(response.status, response.data.sort((a, b) => a.position > b.position).map(match => convertMatch(match)));
+            successCallback(
+                response.status, response.data.sort(
+                    (a, b) => a.position > b.position
+                ).map(
+                    match => convertMatch(match)
+                )
+            );
         })
         .catch(errorCallback);
 }
@@ -81,6 +87,7 @@ function convertTournament(apiTournament) {
         ownerUsername: apiTournament.owner_username,
         groupStage: groupStage,
         playoffStages: playoffStages,
+        teams: apiTournament.teams,
         timerEnd: apiTournament.timer_end ? new Date(apiTournament.timer_end) : null
     };
 }
