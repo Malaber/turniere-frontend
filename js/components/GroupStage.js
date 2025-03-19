@@ -17,11 +17,11 @@ export default class GroupStage extends Component {
 
     render() {
         return (
-            <div className="py-2 px-1">
-                <h1 className="custom-font m-2">
-                    <span className="px-2">Gruppenphase</span>
+            <div className='py-2 px-1'>
+                <h1 className='custom-font'>
+                    <span className='px-2'>Gruppenphase</span>
                 </h1>
-                <Row className="">
+                <Row className='mt-3 gx-0'>
                     {this.props.groups.map(group => (
                         <Group
                             group={group}
