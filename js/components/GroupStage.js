@@ -22,7 +22,7 @@ export default class GroupStage extends Component {
                 <span className='px-2'>Gruppenphase</span>
                 <ShowMatchesToggleButton show={this.state.showMatches} toggle={this.toggleShowMatches}/>
             </h1>
-            <Row className='mt-3'>
+            <Row className='mt-3 gx-0'>
                 {this.props.groups.map(group => (
                     <Group
                         group={group}

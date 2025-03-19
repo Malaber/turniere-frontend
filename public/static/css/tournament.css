@@ -26,3 +26,15 @@
 .scoreInput {
     width: 11rem;
 }
+
+.hide-cursor {
+    cursor: none;
+}
+
+.show-cursor {
+    cursor: pointer;
+}
+
+.disable-hover {
+    pointer-events: none;
+}
