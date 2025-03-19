@@ -35,7 +35,6 @@ class PrivateTournamentPage extends React.Component {
                         groups={groupStage.groups}
                         isSignedIn={isSignedIn}
                         isOwner={isOwner}
-                        showMatches={playoffStages !== null}
                         teams={this.props.tournament.teams}
                     /></div>}
                     <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
