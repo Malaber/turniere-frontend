@@ -22,21 +22,23 @@ export class TurniereNavigation extends React.Component {
     render() {
         const {tournament} = this.props;
 
-        return (<Navbar color="light" light expand="lg" sticky="top">
-            <NavbarBrand className={'hide-below-260-w'} href="/">turnie.re</NavbarBrand>
-            {tournament && tournament.timerEnd &&
-                <NavbarText className={'m-auto'}>
-                    <span className={'hide-below-340-w'}>Spielzeit: </span><Timer timerEnd={tournament.timerEnd} />
-                </NavbarText>
-            }
-            <NavbarToggler onClick={this.toggle}/>
-            <Collapse isOpen={!this.state.collapsed} navbar>
-                <NavLinks/>
-                <div className="ms-auto me-0">
-                    <LoginLogoutButtons/>
-                </div>
-            </Collapse>
-        </Navbar>);
+        return (
+            <Navbar color="light" light expand="lg" sticky="top">
+                <NavbarBrand className={'hide-below-260-w'} href="/">turnie.re</NavbarBrand>
+                {tournament && tournament.timerEnd &&
+                    <NavbarText className="m-auto">
+                        <span className={'hide-below-340-w'}>Spielzeit: </span><Timer timerEnd={tournament.timerEnd} />
+                    </NavbarText>
+                }
+                <NavbarToggler onClick={this.toggle}/>
+                <Collapse isOpen={!this.state.collapsed} navbar>
+                    <NavLinks/>
+                    <div className="ms-auto">
+                        <LoginLogoutButtons/>
+                    </div>
+                </Collapse>
+            </Navbar>
+        );
     }
 }
 
