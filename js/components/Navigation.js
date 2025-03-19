@@ -2,7 +2,7 @@ import {
     Button, ButtonGroup, Collapse, Nav, Navbar, NavbarBrand, NavbarText, NavbarToggler, NavItem, NavLink
 } from 'reactstrap';
 import {connect} from 'react-redux';
-import React from 'react';
+import React, {useRef, useEffect, useState} from 'react';
 
 import {logout} from '../api';
 import {notify} from 'react-notify-toast';
@@ -12,7 +12,32 @@ export class TurniereNavigation extends React.Component {
     constructor(props) {
         super(props);
         this.toggle = this.toggle.bind(this);
-        this.state = {collapsed: true};
+        this.togglerRef = React.createRef();
+        this.state = {
+            collapsed: true,
+            isToggleVisible: true
+        };
+    }
+
+    componentDidMount() {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                this.setState({isToggleVisible: entry.isIntersecting});
+            },
+            {threshold: 0.1}
+        );
+
+        if (this.togglerRef.current) {
+            observer.observe(this.togglerRef.current);
+        }
+
+        this.observer = observer;
+    }
+
+    componentWillUnmount() {
+        if (this.observer) {
+            this.observer.disconnect();
+        }
     }
 
     toggle() {
@@ -21,16 +46,18 @@ export class TurniereNavigation extends React.Component {
 
     render() {
         const {tournament} = this.props;
+        const {isToggleVisible} = this.state;
 
         return (
             <Navbar color="light" light expand="lg" sticky="top">
                 <NavbarBrand className={'hide-below-260-w'} href="/">turnie.re</NavbarBrand>
                 {tournament && tournament.timerEnd &&
                     <NavbarText className="m-auto">
-                        <span className={'hide-below-340-w'}>Spielzeit: </span><Timer timerEnd={tournament.timerEnd} />
+                        <span className={'hide-below-340-w'}>Spielzeit: </span><Timer timerEnd={tournament.timerEnd}/>
                     </NavbarText>
                 }
-                <NavbarToggler onClick={this.toggle}/>
+                {isToggleVisible && <NavbarText>HALLO WELT</NavbarText>}
+                <NavbarToggler ref={this.togglerRef} onClick={this.toggle}/>
                 <Collapse isOpen={!this.state.collapsed} navbar>
                     <NavLinks/>
                     <div className="ms-auto">
