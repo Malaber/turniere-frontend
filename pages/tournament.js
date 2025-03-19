@@ -31,8 +31,13 @@ class PrivateTournamentPage extends React.Component {
                 <FavoriteBar teams={this.props.tournament.teams}/>
                 <div className='stages'>
                     {groupStage != null &&
-                    <div><GroupStage groups={groupStage.groups} isSignedIn={isSignedIn} isOwner={isOwner}
-                        showMatches={playoffStages !== null}/></div>}
+                    <div><GroupStage
+                        groups={groupStage.groups}
+                        isSignedIn={isSignedIn}
+                        isOwner={isOwner}
+                        showMatches={playoffStages !== null}
+                        teams={this.props.tournament.teams}
+                    /></div>}
                     <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
                         isOwner={isOwner}/>
                 </div>

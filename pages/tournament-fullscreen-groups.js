@@ -24,7 +24,7 @@ function FullscreenPage(props) {
     return (<div>
         <Container className="fs-5" fluid>
             <Row className="row-cols-4">
-                {props.groups.map(group => <Col className="mb-2"><Group group={group} key={group.id}/></Col>)}
+                {props.groups.map(group => <Col className="mb-2"><Group group={group} key={group.id} teams={props.teams}/></Col>)}
                 <Col>
                     <div className="d-flex justify-content-center align-items-center">
                         <QRCodeSVG
@@ -128,7 +128,7 @@ class Main extends React.Component {
                 </Head>
                 <FullscreenPage
                     tournament={tournament} groups={groups} page={page} maxPage={this.pages}
-                    showLogo={showLogo}
+                    showLogo={showLogo} teams={tournament.teams}
                 />
                 <style global jsx>{`
                     body {

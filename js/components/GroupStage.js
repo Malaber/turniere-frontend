@@ -29,6 +29,7 @@ export default class GroupStage extends Component {
                             isSignedIn={this.props.isSignedIn}
                             isOwner={this.props.isOwner}
                             groupRef={this.groupRefs[group.id]}
+                            teams={this.props.teams}
                         />
                     ))}
                 </Row>
@@ -112,7 +113,7 @@ export class Group extends Component {
                                 />
                             ))}
                         </Collapse>
-                        <GroupScoresTable scores={this.state.scores}/>
+                        <GroupScoresTable scores={this.state.scores} teams={this.props.teams}/>
                     </CardBody>
                 </Card>
             </Col>
@@ -133,16 +134,25 @@ function GroupScoresTable(props) {
             </tr>
             </thead>
             <tbody>
-            {props.scores.map(groupScore => <GroupScoresTableRow score={groupScore} key={groupScore.id}/>)}
+            {props.scores.map(groupScore => (
+                <GroupScoresTableRow
+                    score={groupScore}
+                    key={groupScore.id}
+                    teams={props.teams}
+                />
+            ))}
             </tbody>
         </Table>
     );
 }
 
 function GroupScoresTableRow(props) {
+    const advancingTeam = props.teams?.find(team => team.id === props.score.team.id && team.advancing_from_group_stage);
+    const rowClass = advancingTeam ? 'table-success' : '';
     const teamId = `favorite-team-groupstage-${props.score.team.id}`;
+
     return (
-        <tr id={teamId}>
+        <tr className={rowClass} id={teamId}>
             <td>{props.score.position}</td>
             <td>{props.score.team.name}</td>
             <td>{props.score.group_points}</td>
