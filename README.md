@@ -43,3 +43,4 @@ The built container exposes port 80.
 # Todo 
 
 Timer in topnav
+showMatches={playoffStages !== null} showmatches in GroupStage mittlerweile vmtl useless weil immer eingeklappt
