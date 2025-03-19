@@ -30,9 +30,9 @@ export class TurniereNavigation extends React.Component {
 
         return (
             <Navbar color="light" light expand="lg" sticky="top">
-                <NavbarBrand className={'hide-below-320-w'} href="/">turnie.re</NavbarBrand>
+                <NavbarBrand href="/">turnie.re</NavbarBrand>
                 {tournament && tournament.timerEnd &&
-                    <NavbarTimer timerEnd={tournament.timerEnd} className="m-auto hide-above-992-w"/>
+                    <NavbarTimer timerEnd={tournament.timerEnd} className="m-auto hide-below-320-w hide-above-992-w"/>
                 }
                 <NavbarToggler onClick={this.toggle}/>
                 <Collapse isOpen={!this.state.collapsed} navbar>
