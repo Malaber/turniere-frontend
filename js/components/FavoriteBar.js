@@ -53,12 +53,8 @@ export function FavoriteBar({teams}) {
         setIsVisible(false); // Close the favorite menu
     };
 
-    const scrollToFavorite = () => {
-        if (!favorite) {
-            return; // Exit if there is no favorite team selected
-        }
-
-        const matchesWithFavoriteParticipation = document.querySelectorAll(`[data-team-level-ids*='-${favorite.id}']`);
+    function findLowestPlayoffParticipation(favoriteId) {
+        const matchesWithFavoriteParticipation = document.querySelectorAll(`[data-team-level-ids*='-${favoriteId}']`);
         let lowestMatch = null; // lowest means lowest stage number > latest game of the favorite
         let lowestStageNum = Infinity;
 
@@ -73,6 +69,15 @@ export function FavoriteBar({teams}) {
                 }
             });
         });
+        return lowestMatch;
+    }
+
+    const scrollToFavorite = () => {
+        if (!favorite) {
+            return; // Exit if there is no favorite team selected
+        }
+
+        const lowestMatch = findLowestPlayoffParticipation(favorite.id);
 
         let scrollTo;
         if (lowestMatch) {
