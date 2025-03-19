@@ -8,6 +8,12 @@ import {logout} from '../api';
 import {notify} from 'react-notify-toast';
 import {Timer} from './Timer';
 
+const TournamentTimer = ({timerEnd, className}) => (
+    <NavbarText className={className}>
+        <span className={'hide-below-340-w'}>Spielzeit: </span><Timer timerEnd={timerEnd}/>
+    </NavbarText>
+);
+
 export class TurniereNavigation extends React.Component {
     constructor(props) {
         super(props);
@@ -26,17 +32,13 @@ export class TurniereNavigation extends React.Component {
             <Navbar color="light" light expand="lg" sticky="top">
                 <NavbarBrand className={'hide-below-260-w'} href="/">turnie.re</NavbarBrand>
                 {tournament && tournament.timerEnd &&
-                    <NavbarText className="m-auto hide-above-992-w">
-                        <span className={'hide-below-340-w'}>Spielzeit: </span><Timer timerEnd={tournament.timerEnd} />
-                    </NavbarText>
+                    <TournamentTimer timerEnd={tournament.timerEnd} className="m-auto hide-above-992-w"/>
                 }
                 <NavbarToggler onClick={this.toggle}/>
                 <Collapse isOpen={!this.state.collapsed} navbar>
                     <NavLinks/>
                     {tournament && tournament.timerEnd &&
-                        <NavbarText className="m-auto hide-below-992-w">
-                            <span className={'hide-below-340-w'}>Spielzeit: </span><Timer timerEnd={tournament.timerEnd} />
-                        </NavbarText>
+                        <TournamentTimer timerEnd={tournament.timerEnd} className="m-auto hide-below-992-w"/>
                     }
                     <div className="ms-auto">
                         <LoginLogoutButtons/>
