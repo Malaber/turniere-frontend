@@ -70,6 +70,7 @@ class Main extends React.Component {
     }
 
     componentDidMount() {
+        document.body.classList.add('hide-cursor');
         this.updateTournament();
         const intervalIdPage = setInterval(this.increasePage, 15000);
         this.setState({intervalIdPage: intervalIdPage});
