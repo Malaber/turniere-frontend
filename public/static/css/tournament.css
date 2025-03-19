@@ -96,14 +96,14 @@
     text-align: left;
 }
 
-@media (max-width: 340px) {
-    .hide-below-340-w {
+@media (max-width: 400px) {
+    .hide-below-400-w {
         display: none;
     }
 }
 
-@media (max-width: 260px) {
-    .hide-below-260-w {
+@media (max-width: 320px) {
+    .hide-below-320-w {
         display: none;
     }
 }
