@@ -12,7 +12,7 @@ export function LoadingPage(props) {
         <TurniereNavigation/>
         <Container>
             <div className='text-center'>
-                <img src='/static/images/logo-questionmark.png' alt='' className='loading-logo'/>
+                <img src='/static/images/logo-questionmark.png' alt='' className='img-fluid loading-logo'/>
             </div>
             <div className='py-5 text-center w-100 h1 custom-font'>
                 {props.text}
