@@ -1,11 +1,12 @@
 import {
-    Button, ButtonGroup, Collapse, Nav, Navbar, NavbarBrand, NavbarToggler, NavItem, NavLink
+    Button, ButtonGroup, Collapse, Nav, Navbar, NavbarBrand, NavbarText, NavbarToggler, NavItem, NavLink
 } from 'reactstrap';
 import {connect} from 'react-redux';
 import React from 'react';
 
 import {logout} from '../api';
 import {notify} from 'react-notify-toast';
+import {Timer} from './Timer';
 
 export class TurniereNavigation extends React.Component {
     constructor(props) {
@@ -19,12 +20,19 @@ export class TurniereNavigation extends React.Component {
     }
 
     render() {
+        const {tournament} = this.props;
+
         return (<Navbar color="light" light expand="lg" sticky="top">
-            <NavbarBrand href="/">turnie.re</NavbarBrand>
+            <NavbarBrand className={'hide-below-260-w'} href="/">turnie.re</NavbarBrand>
+            {tournament && tournament.timerEnd &&
+                <NavbarText className={'m-auto'}>
+                    <span className={'hide-below-340-w'}>Spielzeit: </span><Timer timerEnd={tournament.timerEnd} />
+                </NavbarText>
+            }
             <NavbarToggler onClick={this.toggle}/>
             <Collapse isOpen={!this.state.collapsed} navbar>
                 <NavLinks/>
-                <div className='ms-auto me-0'>
+                <div className="ms-auto me-0">
                     <LoginLogoutButtons/>
                 </div>
             </Collapse>
@@ -60,14 +68,14 @@ class InvisibleLoginLogoutButtons extends React.Component {
         if (isSignedIn) {
             return (<ButtonGroup className="nav-item">
                 <Button outline color="success" href="/profile"
-                    className="navbar-btn my-2 my-sm-0 px-5">{username}</Button>
+                        className="navbar-btn my-2 my-sm-0 px-5">{username}</Button>
                 <Button outline color="success" onClick={this.logout.bind(this)}
-                    className="navbar-btn my-2 my-sm-0 px-5">Logout</Button>
+                        className="navbar-btn my-2 my-sm-0 px-5">Logout</Button>
             </ButtonGroup>);
         } else {
             return (<ButtonGroup className="nav-item">
                 <Button outline color="success" href="/login"
-                    className="navbar-btn my-2 my-sm-0 px-5">Login</Button>
+                        className="navbar-btn my-2 my-sm-0 px-5">Login</Button>
             </ButtonGroup>);
         }
     }

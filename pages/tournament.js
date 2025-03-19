@@ -120,7 +120,7 @@ class Main extends React.Component {
                 <Head>
                     <title>{tournamentName}: turnie.re</title>
                 </Head>
-                <TurniereNavigation/>
+                <TurniereNavigation tournament={tournament} />
                 <TournamentPage tournament={tournament}/>
                 <Footer/>
             </div>);
