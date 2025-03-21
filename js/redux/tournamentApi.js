@@ -52,6 +52,19 @@ export function getTournamentMatches(tournamentId, successCallback, errorCallbac
         .catch(errorCallback);
 }
 
+export function getTournamentTimerEnd(tournamentId, successCallback, errorCallback) {
+    getRequest(getState(), '/tournaments/' + tournamentId + '/timer_end')
+        .then(response => {
+            let timerEndDate;
+            if (response.data.timer_end === null) {
+                timerEndDate = null;
+            } else {
+                timerEndDate = new Date(response.data.timer_end);
+            }
+            successCallback(response.status, timerEndDate);
+        })
+        .catch(errorCallback);
+}
 
 function convertTournament(apiTournament) {
     let groupStage = null;
@@ -74,7 +87,8 @@ function convertTournament(apiTournament) {
         ownerUsername: apiTournament.owner_username,
         groupStage: groupStage,
         playoffStages: playoffStages,
-        teams: apiTournament.teams
+        teams: apiTournament.teams,
+        timerEnd: apiTournament.timer_end ? new Date(apiTournament.timer_end) : null
     };
 }
 

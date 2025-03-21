@@ -1,18 +1,23 @@
 import Head from 'next/head';
 import React from 'react';
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
-import {getTournamentMatches, getTournamentMeta} from '../js/redux/tournamentApi';
+import {getTournamentMatches, getTournamentMeta, getTournamentTimerEnd} from '../js/redux/tournamentApi';
 import {
     Col, Container, DropdownItem, DropdownMenu, DropdownToggle, Navbar, NavbarBrand, Row, UncontrolledDropdown,
     Spinner
 } from 'reactstrap';
 import {Match} from '../js/components/Match';
 import {sortMatchesByPositionAscending} from '../js/utils/sorting';
+import {Timer} from '../js/components/Timer';
 
 
 function FullscreenPage(props) {
     return (<div>
-        <FullscreenPageHeader title={props.tournamentMeta.name} code={props.tournamentMeta.code} filter={props.filter}/>
+        <FullscreenPageHeader
+            title={props.tournamentMeta.name}
+            code={props.tournamentMeta.code}
+            filter={props.filter}
+            timerEnd={props.timerEnd}/>
         <Matches matches={props.matches}/>
     </div>);
 }
@@ -20,20 +25,20 @@ function FullscreenPage(props) {
 function Matches(props) {
     let matches;
     if (props.matches == null) {
-        matches = (<div className='text-center text-secondary'>
-            <Spinner animation='border' role='status' size='sm'/>
-            <span className='ml-3'>lade Matches</span>
+        matches = (<div className="text-center text-secondary">
+            <Spinner animation="border" role="status" size="sm"/>
+            <span className="ml-3">lade Matches</span>
         </div>);
     } else if (props.matches.length === 0) {
-        matches = (<div className='text-center text-secondary font-italic'>keine Matches</div>);
+        matches = (<div className="text-center text-secondary font-italic">keine Matches</div>);
     } else {
         matches = (<Row>
             {props.matches.sort(sortMatchesByPositionAscending()).map(
-                match => <Col md='auto'><Match key={match.id} match={match}/></Col>
+                match => <Col md="auto"><Match key={match.id} match={match}/></Col>
             )}
         </Row>);
     }
-    return (<div className='mx-4 h5 disable-hover'>
+    return (<div className="mx-4 h5 disable-hover">
         {matches}
     </div>);
 }
@@ -41,7 +46,7 @@ function Matches(props) {
 function FilterDropdown(props) {
     return (<UncontrolledDropdown>
         <i>Match-Filter: </i>
-        <DropdownToggle color='light' caret>
+        <DropdownToggle color="light" caret>
             {props.selected.label}
         </DropdownToggle>
         <DropdownMenu>
@@ -55,10 +60,17 @@ function FilterDropdown(props) {
 
 
 function FullscreenPageHeader(props) {
-    return (<Navbar color='light' className='mb-4 border-bottom py-0 show-cursor'>
-        <FilterDropdown {...props.filter}/>
-        <NavbarBrand>{props.title}</NavbarBrand>
-    </Navbar>);
+    return (
+        <Navbar color="light" className="mb-4 border-bottom py-0 show-cursor">
+            <div className="ml-auto dropdown-container"><FilterDropdown {...props.filter} /></div>
+            <NavbarBrand>{props.title}</NavbarBrand>
+            {props.timerEnd &&
+                <div className="ml-auto timer-container">
+                    Spielzeit: <NavbarBrand><Timer timerEnd={props.timerEnd}/></NavbarBrand>
+                </div>
+            }
+        </Navbar>
+    );
 }
 
 const matchFilters = {
@@ -80,7 +92,8 @@ class Main extends React.Component {
         super(props);
 
         this.state = {
-            tournamentMeta: null, matches: [], matchFilter: matchFilters.all, loadedMeta: false, loadedMatches: false
+            tournamentMeta: null, matches: [], matchFilter: matchFilters.all, loadedMeta: false, loadedMatches: false,
+            timerEnd: null, intervalId: null
         };
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
@@ -88,6 +101,7 @@ class Main extends React.Component {
         this.onTournamentMatchesRequestError = this.onTournamentMatchesRequestError.bind(this);
         this.updateMatches = this.updateMatches.bind(this);
         this.selectFilter = this.selectFilter.bind(this);
+        this.updateTimerEnd = this.updateTimerEnd.bind(this);
     }
 
     selectFilter(filter) {
@@ -100,12 +114,15 @@ class Main extends React.Component {
         const tournamentId = this.props.query.code;
         getTournamentMeta(tournamentId, this.onTournamentRequestSuccess, this.onTournamentRequestError);
         this.updateMatches();
-        const intervalId = setInterval(this.updateMatches, 10000);
-        this.setState({intervalId: intervalId});
+        this.updateTimerEnd();
+        const matchesIntervalId = setInterval(this.updateMatches, 10000);
+        const timerEndIntervalId = setInterval(this.updateTimerEnd, 10000);
+        this.setState({matchesIntervalId: matchesIntervalId, timerEndIntervalId: timerEndIntervalId});
     }
 
     componentWillUnmount() {
-        clearInterval(this.state.intervalId);
+        clearInterval(this.state.matchesIntervalId);
+        clearInterval(this.state.timerEndIntervalId);
     }
 
     updateMatches() {
@@ -114,6 +131,14 @@ class Main extends React.Component {
             this.state.matchFilter.backend);
     }
 
+    updateTimerEnd() {
+        const tournamentId = this.props.query.code;
+        getTournamentTimerEnd(tournamentId, (status, timerEnd) => {
+            this.setState({timerEnd: timerEnd});
+        }, error => {
+            console.error('Failed to fetch timer end:', error);
+        });
+    }
 
     onTournamentRequestSuccess(requestStatus, tournament) {
         this.setState({metaStatus: requestStatus, tournamentMeta: tournament, loadedMeta: true});
@@ -139,9 +164,8 @@ class Main extends React.Component {
         }
     }
 
-
     render() {
-        const {metaStatus, matchesStatus, tournamentMeta, matches} = this.state;
+        const {metaStatus, matchesStatus, tournamentMeta, matches, timerEnd} = this.state;
         const filter = {
             selected: this.state.matchFilter, select: this.selectFilter
         };
@@ -150,9 +174,9 @@ class Main extends React.Component {
                 <Head>
                     <title>Vollbild-Ansicht: turnie.re</title>
                 </Head>
-                <Container className='p-5 text-center text-secondary'>
-                    <Spinner size='sm'/>
-                    <span className='ml-3'>lade Vollbild-Ansicht</span>
+                <Container className="p-5 text-center text-secondary">
+                    <Spinner size="sm"/>
+                    <span className="ml-3">lade Vollbild-Ansicht</span>
                 </Container>
             </div>);
         }
@@ -161,7 +185,7 @@ class Main extends React.Component {
                 <Head>
                     <title>{tournamentMeta.name}: turnie.re</title>
                 </Head>
-                <FullscreenPage tournamentMeta={tournamentMeta} matches={null} filter={filter}/>
+                <FullscreenPage tournamentMeta={tournamentMeta} matches={null} filter={filter} timerEnd={timerEnd}/>
             </div>);
         }
         if (metaStatus === 200 && matchesStatus === 200) {
@@ -169,7 +193,7 @@ class Main extends React.Component {
                 <Head>
                     <title>{tournamentMeta.name}: turnie.re</title>
                 </Head>
-                <FullscreenPage tournamentMeta={tournamentMeta} matches={matches} filter={filter}/>
+                <FullscreenPage tournamentMeta={tournamentMeta} matches={matches} filter={filter} timerEnd={timerEnd}/>
             </div>);
         } else {
             return <ErrorPageComponent code={metaStatus}/>;

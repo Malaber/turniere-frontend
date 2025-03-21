@@ -35,7 +35,6 @@ class PrivateTournamentPage extends React.Component {
                         groups={groupStage.groups}
                         isSignedIn={isSignedIn}
                         isOwner={isOwner}
-                        showMatches={playoffStages !== null}
                         teams={this.props.tournament.teams}
                     /></div>}
                     <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
@@ -120,7 +119,7 @@ class Main extends React.Component {
                 <Head>
                     <title>{tournamentName}: turnie.re</title>
                 </Head>
-                <TurniereNavigation/>
+                <TurniereNavigation tournament={tournament} />
                 <TournamentPage tournament={tournament}/>
                 <Footer/>
             </div>);

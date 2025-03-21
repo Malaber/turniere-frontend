@@ -25,5 +25,5 @@ export const defaultStateTournamentinfo = {
     isPublic: '',
     stages: [],
     teams: []
+    // date: null
 };
-

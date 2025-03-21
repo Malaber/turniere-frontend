@@ -85,3 +85,37 @@
 .disable-hover {
     pointer-events: none;
 }
+
+.timer-container {
+    min-width: 20%;
+    text-align: right;
+}
+
+.dropdown-container {
+    min-width: 20%;
+    text-align: left;
+}
+
+@media (max-width: 400px) {
+    .hide-below-400-w {
+        display: none;
+    }
+}
+
+@media (max-width: 320px) {
+    .hide-below-320-w {
+        display: none;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .hide-below-992-w {
+        display: none;
+    }
+}
+
+@media (min-width: 992px) {
+    .hide-above-992-w {
+        display: none;
+    }
+}
