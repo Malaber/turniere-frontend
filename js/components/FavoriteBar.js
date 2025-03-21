@@ -119,10 +119,10 @@ export function FavoriteBar({teams, tournamentId}) {
             }, 100);
         };
 
-        scrollTo.scrollIntoView({behavior: 'smooth', block: 'center'}); // Smoothly scroll to the target element
-
         // scroll up a tiny amount to reset the scroll event listener if user is already on the element
         window.scrollBy(0, 1);
+
+        scrollTo.scrollIntoView({behavior: 'smooth', block: 'center'}); // Smoothly scroll to the target element
 
         // Add a scroll event listener to start the highlighting after scrolling only
         window.addEventListener('scroll', handleScroll);
