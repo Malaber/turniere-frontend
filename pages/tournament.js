@@ -28,7 +28,7 @@ class PrivateTournamentPage extends React.Component {
             <div className='pb-5'>
                 <TournamentBigImage {...this.props.tournament}/>
                 <StatusBar tournament={this.props.tournament} isOwner={isOwner} isSignedIn={isSignedIn}/>
-                <FavoriteBar teams={this.props.tournament.teams}/>
+                <FavoriteBar teams={this.props.tournament.teams} tournamentId={this.props.tournament.id}/>
                 <div className='stages'>
                     {groupStage != null &&
                     <div><GroupStage

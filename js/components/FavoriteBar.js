@@ -2,7 +2,7 @@ import React, {useState, useEffect, useRef} from 'react';
 import {Button, ButtonGroup, Input} from 'reactstrap';
 import {FaHeartCirclePlus, FaRegHeart, FaHeart, FaArrowTurnDown} from 'react-icons/fa6';
 
-export function FavoriteBar({teams}) {
+export function FavoriteBar({teams, tournamentId}) {
     const [favorite, setFavorite] = useState(null);
     const [isVisible, setIsVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -13,7 +13,7 @@ export function FavoriteBar({teams}) {
     const scrollButtonRef = useRef(null);
 
     useEffect(() => {
-        const savedFavorite = localStorage.getItem('favoriteTeam');
+        const savedFavorite = localStorage.getItem(`favoriteTeam_${tournamentId}`);
         if (savedFavorite) {
             const team = teams.find(team => team.id === parseInt(savedFavorite, 10));
             if (team) {
@@ -21,7 +21,7 @@ export function FavoriteBar({teams}) {
             }
         }
         setIsLoading(false);
-    }, [teams]);
+    }, [teams, tournamentId]);
 
     useEffect(() => {
         if (isVisible && favoriteBarRef.current) {
@@ -40,10 +40,10 @@ export function FavoriteBar({teams}) {
     const toggleFavorite = team => {
         if (favorite && favorite.id === team.id) {
             setFavorite(null);
-            localStorage.removeItem('favoriteTeam');
+            localStorage.removeItem(`favoriteTeam_${tournamentId}`);
         } else {
             setFavorite(team);
-            localStorage.setItem('favoriteTeam', team.id);
+            localStorage.setItem(`favoriteTeam_${tournamentId}`, team.id);
             setIsPulsing(true);
             headingRef.current.scrollIntoView({behavior: 'smooth', block: 'center'});
             if (scrollButtonRef.current) {
