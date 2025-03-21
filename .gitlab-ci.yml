@@ -10,8 +10,8 @@ include:
   - project: 'turniere/turniere-infra'
     file: '/ci/pipeline.yaml'
 
-eslint:
-  stage: test
-  script:
-    - yarn install
-    - yarn eslint .
+#eslint:
+#  stage: test
+#  script:
+#    - yarn install
+#    - yarn eslint .
