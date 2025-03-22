@@ -61,7 +61,7 @@ function FilterDropdown(props) {
 
 function FullscreenPageHeader(props) {
     return (
-        <Navbar color="light" className="mb-4 border-bottom fixed-bottom py-0 show-cursor">
+        <Navbar color="light" className="mt-4 border-bottom fixed-bottom py-0 show-cursor">
             <div className="ml-auto dropdown-container"><FilterDropdown {...props.filter} /></div>
             <NavbarBrand>{props.title}</NavbarBrand>
             {props.timerEnd &&
