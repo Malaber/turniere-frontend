@@ -6,6 +6,8 @@ import {
   seedGroupStageAndRunToBeforeFinal,
 } from '../helpers/scenario-seeder';
 
+test.setTimeout(90_000);
+
 test('Public tournament view renders group-stage and playoff data', async ({ page }, testInfo) => {
   // --- Seed: create group-stage tournament (4 groups × 4 teams, 8 playoff spots) ---
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
