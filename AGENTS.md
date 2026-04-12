@@ -5,11 +5,28 @@ Package manager is **yarn**. The build tool is **next**.
 
 ## Default Workflow
 
+Use `tasks.py` and prefer `inv ...` for local setup and startup.
+
 ```sh
-yarn          # install dependencies
-yarn dev      # dev server via node server.js (http://localhost on whatever port Express binds)
-yarn build    # next build – production bundle
-yarn start    # NODE_ENV=production node server.js
+inv setup
+inv start --api-url=http://127.0.0.1:3000
+```
+
+Assume Node and Yarn are already installed locally.
+
+What the invoke tasks do:
+
+- `inv setup` runs `yarn install`
+- `inv check-backend --api-url=...` waits for backend `/healthz`
+- `inv start --api-url=...` optionally installs dependencies, waits for backend health, and starts the Express/Next dev server
+
+Equivalent lower-level commands still work:
+
+```sh
+yarn install
+TURNIERE_API_URL=http://127.0.0.1:3000 yarn dev
+yarn build
+yarn start
 ```
 
 No dedicate test runner exists today (`"test"` script just exits 1).
@@ -21,10 +38,18 @@ The only runtime env var consumed by the frontend is:
 
 ```
 TURNIERE_API_URL   # base URL of the backend API, e.g. https://api.turnie.re
+HOST               # optional bind host for the custom Express server
+PORT               # optional bind port for the custom Express server
 ```
 
 This is set at container start time, not baked into the image at build time.
 The custom Express server in `server.js` reads and injects it.
+
+For local development, the invoke task defaults are:
+
+- backend: `http://127.0.0.1:3000`
+- frontend bind host: `0.0.0.0`
+- frontend bind port: `3001`
 
 ## Page / Route Map
 
