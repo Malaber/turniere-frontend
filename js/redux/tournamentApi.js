@@ -133,14 +133,14 @@ function convertMatch(apiMatch, allowUndecided) {
 
     if (apiMatch.match_scores.length === 2) {
         result.team1 = {
-            name: apiMatch.match_scores[0].team.name,
-            id: apiMatch.match_scores[0].team.id,
+            name: apiMatch.match_scores[0].team ? apiMatch.match_scores[0].team.name : 'TBD',
+            id: apiMatch.match_scores[0].team ? apiMatch.match_scores[0].team.id : null,
             score: apiMatch.match_scores[0].points,
             scoreId: apiMatch.match_scores[0].id
         };
         result.team2 = {
-            name: apiMatch.match_scores[1].team.name,
-            id: apiMatch.match_scores[1].team.id,
+            name: apiMatch.match_scores[1].team ? apiMatch.match_scores[1].team.name : 'TBD',
+            id: apiMatch.match_scores[1].team ? apiMatch.match_scores[1].team.id : null,
             score: apiMatch.match_scores[1].points,
             scoreId: apiMatch.match_scores[1].id
         };

@@ -137,7 +137,7 @@ class Main extends React.Component {
                 `}</style>
             </div>);
         } else {
-            return <ErrorPageComponent code={loadingStatus}/>;
+            return <ErrorPageComponent statusCode={loadingStatus}/>;
         }
     }
 }

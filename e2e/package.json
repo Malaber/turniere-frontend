@@ -1,0 +1,13 @@
+{
+  "name": "turniere-frontend-e2e",
+  "version": "1.0.0",
+  "description": "Playwright E2E tests for turniere-frontend",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug"
+  },
+  "dependencies": {
+    "@playwright/test": "1.52.0"
+  }
+}
