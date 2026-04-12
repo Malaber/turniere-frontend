@@ -70,8 +70,13 @@ export class Match extends React.Component {
 
     changeScores(scoreTeam1, scoreTeam2) {
         const updatedMatch = this.state.match;
-        updatedMatch.team1.score = scoreTeam1;
-        updatedMatch.team2.score = scoreTeam2;
+        if (updatedMatch.decider) {
+            updatedMatch.team1.hiddenScore = scoreTeam1;
+            updatedMatch.team2.hiddenScore = scoreTeam2;
+        } else {
+            updatedMatch.team1.score = scoreTeam1;
+            updatedMatch.team2.score = scoreTeam2;
+        }
         this.setState({match: updatedMatch});
         this.props.onChange !== undefined && this.props.onChange();
     }
@@ -79,15 +84,15 @@ export class Match extends React.Component {
     getMatchFinishedMessage() {
         const match = this.state.match;
         if (match.winnerTeamId === null) {
-            return 'Spiel beendet, unentschieden';
+            return match.decider ? 'Entscheidungsmatch beendet, weiterhin Gleichstand' : 'Spiel beendet, unentschieden';
         }
         if (match.winnerTeamId === match.team1.id) {
-            return 'Gewinner: ' + match.team1.name;
+            return (match.decider ? 'Entscheidung für: ' : 'Gewinner: ') + match.team1.name;
         }
         if (match.winnerTeamId === match.team2.id) {
-            return 'Gewinner: ' + match.team2.name;
+            return (match.decider ? 'Entscheidung für: ' : 'Gewinner: ') + match.team2.name;
         }
-        return 'Spiel beendet';
+        return match.decider ? 'Entscheidungsmatch beendet' : 'Spiel beendet';
     }
 
     render() {
@@ -99,7 +104,7 @@ export class Match extends React.Component {
         case 'in_progress':
             cardClass = 'bg-warning';
             borderClass = 'border-warning';
-            smallMessage = 'Spiel läuft';
+            smallMessage = this.state.match.decider ? 'Entscheidungsmatch läuft' : 'Spiel läuft';
             break;
         case 'finished':
             cardClass = 'bg-success';
@@ -112,15 +117,22 @@ export class Match extends React.Component {
             smallMessage = 'kein Gegner, Team kommt weiter';
             break;
         case 'not_ready':
-            smallMessage = 'Spiel kann noch nicht gestartet werden';
+            smallMessage = this.state.match.decider ?
+                'Entscheidungsmatch kann noch nicht gestartet werden' :
+                'Spiel kann noch nicht gestartet werden';
             break;
         case 'not_started':
-            smallMessage = 'Spiel kann gestartet werden';
+            smallMessage = this.state.match.decider ?
+                'Entscheidungsmatch kann gestartet werden' :
+                'Spiel kann gestartet werden';
             break;
         }
 
         const groupInformation = this.state.match.group ?
             <div className="mb-2 mt-2">Gr. {this.state.match.group.number}</div> :
+            '';
+        const deciderInformation = this.state.match.decider ?
+            <div className="mb-2 mt-2" data-decider-label={this.state.match.id}>Entscheidung</div> :
             '';
         let team1Id; let team2Id;
         if (this.props.stageLevel !== undefined) {
@@ -135,6 +147,8 @@ export class Match extends React.Component {
                 className={'shadow-sm match'}
                 onClick={this.toggleModal}
                 data-team-level-ids={`${team1Id},${team2Id}`}
+                data-match-id={this.state.match.id}
+                data-decider-match={this.state.match.decider ? 'true' : 'false'}
             >
                 <div className="d-flex flex-row">
                     <CardBody className={borderClass + ' border py-2 ' + cardClass + ' ' + styles.match_bg}>
@@ -146,6 +160,7 @@ export class Match extends React.Component {
                     </CardBody>
                     <span className="badge bg-secondary align-items-center">
                         {groupInformation}
+                        {deciderInformation}
                         <div className="mb-2 mt-2">Sp. {this.state.match.position}</div>
                     </span>
                 </div>

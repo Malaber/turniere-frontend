@@ -257,12 +257,12 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
         return Object.assign({}, state, {});
     case actionTypesTournamentinfo.SUBMIT_MATCH_SCORES:
         patchRequest(action.state, '/match_scores/' + action.parameters.scoreIdTeam1, {
-            points: action.parameters.scoreTeam1
+            [action.parameters.scoreField || 'points']: action.parameters.scoreTeam1
         }).then(resp => {
             storeOptionalToken(resp);
 
             patchRequest(action.state, '/match_scores/' + action.parameters.scoreIdTeam2, {
-                points: action.parameters.scoreTeam2
+                [action.parameters.scoreField || 'points']: action.parameters.scoreTeam2
             }).then(resp => {
                 storeOptionalToken(resp);
 
@@ -278,6 +278,36 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
                 storeOptionalToken(error.response);
             }
             action.parameters.errorCallback();
+        });
+        return Object.assign({}, state, {});
+    case actionTypesTournamentinfo.CREATE_DECIDER_MATCH:
+        postRequest(action.state, '/groups/' + action.parameters.groupId + '/matches', {
+            team_ids: action.parameters.teamIds
+        }).then(resp => {
+            storeOptionalToken(resp);
+            action.parameters.successCallback(resp.data);
+        }).catch(error => {
+            if (error.response) {
+                storeOptionalToken(error.response);
+                action.parameters.errorCallback(error.response.data);
+            } else {
+                action.parameters.errorCallback(null);
+            }
+        });
+        return Object.assign({}, state, {});
+    case actionTypesTournamentinfo.FINISH_GROUP_STAGE:
+        patchRequest(action.state, '/stages/' + action.parameters.stageId, {
+            state: 'finished'
+        }).then(resp => {
+            storeOptionalToken(resp);
+            action.parameters.successCallback(resp.data);
+        }).catch(error => {
+            if (error.response) {
+                storeOptionalToken(error.response);
+                action.parameters.errorCallback(error.response.data, error.response.status);
+            } else {
+                action.parameters.errorCallback(null, -1);
+            }
         });
         return Object.assign({}, state, {});
     case actionTypesTournamentinfo.END_MATCH:
@@ -531,6 +561,55 @@ export function submitMatchScores(scoreTeam1, scoreIdTeam1, scoreTeam2, scoreIdT
             scoreIdTeam1: scoreIdTeam1,
             scoreTeam2: scoreTeam2,
             scoreIdTeam2: scoreIdTeam2,
+            scoreField: 'points',
+            successCallback: successCallback,
+            errorCallback: errorCallback
+        },
+        state: __store.getState()
+    });
+}
+
+export function submitDeciderMatchScores(
+    scoreTeam1,
+    scoreIdTeam1,
+    scoreTeam2,
+    scoreIdTeam2,
+    successCallback,
+    errorCallback
+) {
+    __store.dispatch({
+        type: actionTypesTournamentinfo.SUBMIT_MATCH_SCORES,
+        parameters: {
+            scoreTeam1: scoreTeam1,
+            scoreIdTeam1: scoreIdTeam1,
+            scoreTeam2: scoreTeam2,
+            scoreIdTeam2: scoreIdTeam2,
+            scoreField: 'hidden_points',
+            successCallback: successCallback,
+            errorCallback: errorCallback
+        },
+        state: __store.getState()
+    });
+}
+
+export function createDeciderMatch(groupId, teamIds, successCallback, errorCallback) {
+    __store.dispatch({
+        type: actionTypesTournamentinfo.CREATE_DECIDER_MATCH,
+        parameters: {
+            groupId: groupId,
+            teamIds: teamIds,
+            successCallback: successCallback,
+            errorCallback: errorCallback
+        },
+        state: __store.getState()
+    });
+}
+
+export function finishGroupStage(stageId, successCallback, errorCallback) {
+    __store.dispatch({
+        type: actionTypesTournamentinfo.FINISH_GROUP_STAGE,
+        parameters: {
+            stageId: stageId,
             successCallback: successCallback,
             errorCallback: errorCallback
         },

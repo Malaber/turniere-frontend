@@ -25,6 +25,7 @@ DEFAULT_E2E_EMAIL = "e2e@example.com"
 DEFAULT_E2E_PASSWORD = "password123"
 DEFAULT_E2E_USERNAME = "e2e-user"
 DOCKER_COMPOSE_FILE = ROOT / "docker-compose.e2e.yml"
+DECIDER_MATCH_SPEC = "tests/08-decider-matches.spec.ts"
 
 
 def _zsh_script(command: str, cwd: Path, env: dict[str, str] | None = None, node_version: str | None = None) -> str:
@@ -170,13 +171,17 @@ def e2e_test(
     email=DEFAULT_E2E_EMAIL,
     password=DEFAULT_E2E_PASSWORD,
     username=DEFAULT_E2E_USERNAME,
+    spec="",
 ):
     """Run Playwright against an already running frontend and backend."""
     _wait_for_url(f"{backend_url.rstrip('/')}/healthz")
     _wait_for_url(frontend_url.rstrip("/"))
+    command = "npx playwright test"
+    if spec:
+        command = f"{command} {shlex.quote(spec)}"
     _run_node(
         c,
-        "npx playwright test",
+        command,
         cwd=E2E_DIR,
         node_version=node_version,
         env={
@@ -203,6 +208,7 @@ def e2e_local(
     email=DEFAULT_E2E_EMAIL,
     password=DEFAULT_E2E_PASSWORD,
     username=DEFAULT_E2E_USERNAME,
+    spec="",
 ):
     """
     Run the local frontend E2E flow end to end against an already running backend.
@@ -235,10 +241,67 @@ def e2e_local(
             email=email,
             password=password,
             username=username,
+            spec=spec,
         )
     finally:
         _stop_background_process(process)
         print(f"Frontend log: {log_path}")
+
+
+@task(name="e2e-test-decider")
+def e2e_test_decider(
+    c,
+    frontend_url=DEFAULT_FRONTEND_URL,
+    backend_url=DEFAULT_API_URL,
+    node_version=DEFAULT_NODE_VERSION,
+    email=DEFAULT_E2E_EMAIL,
+    password=DEFAULT_E2E_PASSWORD,
+    username=DEFAULT_E2E_USERNAME,
+):
+    """Run only the decider-match Playwright coverage against running services."""
+    e2e_test(
+        c,
+        frontend_url=frontend_url,
+        backend_url=backend_url,
+        node_version=node_version,
+        email=email,
+        password=password,
+        username=username,
+        spec=DECIDER_MATCH_SPEC,
+    )
+
+
+@task(name="e2e-local-decider")
+def e2e_local_decider(
+    c,
+    api_url=DEFAULT_API_URL,
+    frontend_url=DEFAULT_FRONTEND_URL,
+    host=DEFAULT_HOST,
+    port=DEFAULT_PORT,
+    install_frontend=True,
+    install_e2e=True,
+    node_version=DEFAULT_NODE_VERSION,
+    browser="chromium",
+    email=DEFAULT_E2E_EMAIL,
+    password=DEFAULT_E2E_PASSWORD,
+    username=DEFAULT_E2E_USERNAME,
+):
+    """Run the local end-to-end decider-match flow, including screenshot capture."""
+    e2e_local(
+        c,
+        api_url=api_url,
+        frontend_url=frontend_url,
+        host=host,
+        port=port,
+        install_frontend=install_frontend,
+        install_e2e=install_e2e,
+        node_version=node_version,
+        browser=browser,
+        email=email,
+        password=password,
+        username=username,
+        spec=DECIDER_MATCH_SPEC,
+    )
 
 
 @task(name="e2e-docker")
