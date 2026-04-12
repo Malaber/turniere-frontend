@@ -15,3 +15,87 @@ include:
 #  script:
 #    - yarn install
 #    - yarn eslint .
+
+frontend e2e:
+  stage: test
+  image: mcr.microsoft.com/playwright:v1.52.0-noble
+  services:
+    - name: postgres:16
+      alias: postgres
+    # Production backend server
+    - name: $CI_REGISTRY/turniere/turniere-backend/production:latest
+      alias: backend
+      command:
+        - bundle
+        - exec
+        - rails
+        - s
+        - -p
+        - "3000"
+        - -b
+        - 0.0.0.0
+    # Option A: backend test image runs migrations + bootstraps the confirmed E2E user.
+    # It connects directly to the shared Postgres service (no exec into the backend container needed).
+    - name: $CI_REGISTRY/turniere/turniere-backend/test/commits:latest
+      alias: migrate-and-bootstrap
+      entrypoint: ["/bin/bash"]
+      command:
+        - -c
+        - |
+          set -e
+          cd /app
+          export RAILS_ENV=production
+          bundle exec rails db:migrate
+          until curl -sf http://backend:3000/healthz 2>/dev/null; do sleep 1; done
+          bundle exec rails runner "user = User.find_or_initialize_by(email: 'e2e@example.com'); user.username = 'e2e-user'; user.password = 'password123'; user.password_confirmation = 'password123'; user.confirmed_at = Time.current; user.uid = user.email; user.provider = 'email'; user.save!"
+          echo "Bootstrap complete."
+          sleep infinity
+    # Production frontend container (the image under test)
+    - name: $CI_REGISTRY_IMAGE/production/commits:$CI_COMMIT_SHA
+      alias: frontend
+  variables:
+    FF_NETWORK_PER_BUILD: "true"
+    # Postgres
+    POSTGRES_DB: turniere_e2e
+    POSTGRES_USER: turniere
+    POSTGRES_PASSWORD: turniere
+    # Backend env (forwarded to all service containers by GitLab CI)
+    POSTGRES_URL: postgres://turniere:turniere@postgres:5432/turniere_e2e
+    POSTGRES_USERNAME: turniere
+    SECRET_KEY_BASE: e2e-secret-key-base
+    MAILGUN_API_KEY: e2e-test-api-key
+    MAILGUN_DOMAIN: e2e.example.com
+    RAILS_LOG_TO_STDOUT: "1"
+    RAILS_SERVE_STATIC_FILES: "1"
+    RAILS_ENV: production
+    # Frontend env
+    TURNIERE_API_URL: http://backend:3000
+    # Playwright env
+    TURNIERE_FRONTEND_URL: http://frontend:80
+    TURNIERE_BACKEND_URL: http://backend:3000
+    TURNIERE_E2E_EMAIL: e2e@example.com
+    TURNIERE_E2E_PASSWORD: password123
+    TURNIERE_E2E_USERNAME: e2e-user
+    # Bypass proxy for internal service-to-service traffic
+    NO_PROXY: backend,frontend,postgres,migrate-and-bootstrap,localhost,127.0.0.1
+    no_proxy: backend,frontend,postgres,migrate-and-bootstrap,localhost,127.0.0.1
+  rules:
+    - if: $SKIP_TEST
+      when: never
+    - if: $SKIP_E2E
+      when: never
+    - if: $CI_PIPELINE_SOURCE != "push"
+      when: never
+    - when: always
+  before_script:
+    - cd e2e
+    - npm install
+    - npx playwright install --with-deps chromium
+  script:
+    - npx playwright test
+  artifacts:
+    when: always
+    paths:
+      - e2e/screenshots/
+      - e2e/test-results/
+    expire_in: 30 days

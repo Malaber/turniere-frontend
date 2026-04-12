@@ -127,7 +127,7 @@ class Main extends React.Component {
             if (!this.state.loaded) {
                 return <LoadingPage title='turnie.re' text='Turnier wird geladen...'/>;
             }
-            return <ErrorPageComponent code={status}/>;
+            return <ErrorPageComponent statusCode={status}/>;
         }
     }
 }

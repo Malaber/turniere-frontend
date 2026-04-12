@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: turniere_e2e
+      POSTGRES_USER: turniere
+      POSTGRES_PASSWORD: turniere
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U turniere -d turniere_e2e"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Run migrations + bootstrap the E2E user, then start the server — all in one
+  # container so there is no init-container-exits-prematurely race.
+  backend:
+    image: registry.gitlab.com/turniere/turniere-backend/production:${BACKEND_VERSION:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      RAILS_ENV: production
+      POSTGRES_URL: postgres://turniere:turniere@postgres:5432/turniere_e2e
+      POSTGRES_USERNAME: turniere
+      POSTGRES_PASSWORD: turniere
+      SECRET_KEY_BASE: e2e-secret-key-base-local
+      MAILGUN_API_KEY: e2e-test-api-key
+      MAILGUN_DOMAIN: e2e.example.com
+      RAILS_LOG_TO_STDOUT: "1"
+      RAILS_SERVE_STATIC_FILES: "1"
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        bundle exec rails db:migrate
+        bundle exec rails runner "user = User.find_or_initialize_by(email: 'e2e@example.com'); user.username = 'e2e-user'; user.password = 'password123'; user.password_confirmation = 'password123'; user.confirmed_at = Time.current; user.uid = user.email; user.provider = 'email'; user.save!"
+        exec bundle exec rails s -p 3000 -b 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "ruby -e \"require 'net/http'; exit Net::HTTP.get_response(URI('http://localhost:3000/healthz')).code == '200' ? 0 : 1\""]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 15s
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/production/Dockerfile
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      TURNIERE_API_URL: http://backend:3000
+    ports:
+      - "8080:80"
+
+  e2e:
+    build:
+      context: ./e2e
+      dockerfile: Dockerfile
+    depends_on:
+      - frontend
+    environment:
+      TURNIERE_FRONTEND_URL: http://frontend:80
+      TURNIERE_BACKEND_URL: http://backend:3000
+      TURNIERE_E2E_EMAIL: e2e@example.com
+      TURNIERE_E2E_PASSWORD: password123
+      TURNIERE_E2E_USERNAME: e2e-user
+    volumes:
+      - ./e2e/screenshots:/app/screenshots
+      - ./e2e/test-results:/app/test-results

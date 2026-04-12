@@ -196,7 +196,7 @@ class Main extends React.Component {
                 <FullscreenPage tournamentMeta={tournamentMeta} matches={matches} filter={filter} timerEnd={timerEnd}/>
             </div>);
         } else {
-            return <ErrorPageComponent code={metaStatus}/>;
+            return <ErrorPageComponent statusCode={metaStatus}/>;
         }
     }
 }
