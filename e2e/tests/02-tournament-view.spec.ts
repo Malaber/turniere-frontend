@@ -43,7 +43,9 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
 
   await keyframe(page, testInfo, 'tournament_before_final');
 
-  // "Statistiken" and "Vollbild-Ansicht" buttons visible in the status bar
-  await expect(page.getByRole('button', { name: 'Statistiken' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Vollbild-Ansicht' })).toBeVisible();
+  // The tournament action labels are visible in the status bar regardless of
+  // whether reactstrap renders them as <button> or <a> elements.
+  const statusBarActions = page.locator('.btn-group');
+  await expect(statusBarActions.getByText('Statistiken')).toBeVisible();
+  await expect(statusBarActions.getByText('Vollbild-Ansicht')).toBeVisible();
 });
