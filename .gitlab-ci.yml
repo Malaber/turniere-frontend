@@ -34,20 +34,6 @@ frontend e2e:
         - "3000"
         - -b
         - 0.0.0.0
-    - name: $CI_REGISTRY/turniere/turniere-backend/test:latest
-      alias: migrate-and-bootstrap
-      entrypoint: ["/bin/bash"]
-      command:
-        - -c
-        - |
-          set -e
-          cd /app
-          export RAILS_ENV=production
-          bundle exec rails db:migrate
-          until curl -sf http://backend:3000/healthz 2>/dev/null; do sleep 1; done
-          bundle exec rails runner "user = User.find_or_initialize_by(email: 'e2e@example.com'); user.username = 'e2e-user'; user.password = 'password123'; user.password_confirmation = 'password123'; user.confirmed_at = Time.current; user.uid = user.email; user.provider = 'email'; user.save!"
-          echo "Bootstrap complete."
-          sleep infinity
     # Production frontend container (the image under test)
     - name: $CI_REGISTRY_IMAGE/production/commits:$CI_COMMIT_SHA
       alias: frontend
@@ -75,8 +61,8 @@ frontend e2e:
     TURNIERE_E2E_PASSWORD: password123
     TURNIERE_E2E_USERNAME: e2e-user
     # Bypass proxy for internal service-to-service traffic
-    NO_PROXY: backend,frontend,postgres,migrate-and-bootstrap,localhost,127.0.0.1
-    no_proxy: backend,frontend,postgres,migrate-and-bootstrap,localhost,127.0.0.1
+    NO_PROXY: backend,frontend,postgres,localhost,127.0.0.1
+    no_proxy: backend,frontend,postgres,localhost,127.0.0.1
   rules:
     - if: $SKIP_TEST
       when: never
@@ -86,6 +72,22 @@ frontend e2e:
       when: never
     - when: always
   before_script:
+    # Wait for the backend to be healthy (it runs migrations on boot)
+    - echo "Waiting for backend…"
+    - until curl -sf http://backend:3000/healthz 2>/dev/null; do sleep 2; done
+    - echo "Backend is ready."
+    # Bootstrap the confirmed E2E user:
+    # 1) Register via the API (Devise creates a proper bcrypt password hash)
+    - |
+      curl -sf -X POST http://backend:3000/users \
+        -H 'Content-Type: application/json' \
+        -d '{"email":"e2e@example.com","password":"password123","password_confirmation":"password123","username":"e2e-user"}' \
+        || echo "User may already exist, continuing…"
+    # 2) Confirm the user directly in Postgres (bypass email confirmation)
+    - apt-get update -qq && apt-get install -y -qq postgresql-client > /dev/null 2>&1
+    - PGPASSWORD=$POSTGRES_PASSWORD psql -h postgres -U $POSTGRES_USER -d $POSTGRES_DB -c "UPDATE users SET confirmed_at = NOW() WHERE email = 'e2e@example.com' AND confirmed_at IS NULL;"
+    - echo "E2E user bootstrapped."
+    # Install Playwright test dependencies
     - cd e2e
     - npm install
     - npx playwright install --with-deps chromium
