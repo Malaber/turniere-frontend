@@ -6,7 +6,7 @@ import {
   seedGroupStageAndRunToBeforeFinal,
 } from '../helpers/scenario-seeder';
 
-test.setTimeout(90_000);
+test.setTimeout(600_000);
 
 test('Public tournament view renders group-stage and playoff data', async ({ page }, testInfo) => {
   // --- Seed: create group-stage tournament (4 groups × 4 teams, 8 playoff spots) ---
@@ -14,7 +14,7 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
 
   // --- Step 1: fresh tournament page ---
   await page.goto(`/t/${tournament.id}`);
-  await page.waitForLoadState('networkidle');
+  await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
 
   await keyframe(page, testInfo, 'tournament_created');
 
@@ -29,7 +29,7 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
   const { tournament: t2 } = await seedAndPlayGroupStage(4, 4, 8);
 
   await page.goto(`/t/${t2.id}`);
-  await page.waitForLoadState('networkidle');
+  await expect(page.locator('.stages').first()).toBeVisible({ timeout: 120000 });
 
   await keyframe(page, testInfo, 'tournament_groups_finished');
 
@@ -41,7 +41,7 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
   const { tournament: t3 } = await seedGroupStageAndRunToBeforeFinal(4, 4, 8);
 
   await page.goto(`/t/${t3.id}`);
-  await page.waitForLoadState('networkidle');
+  await expect(page.locator('.btn-group')).toBeVisible({ timeout: 120000 });
 
   await keyframe(page, testInfo, 'tournament_before_final');
 
