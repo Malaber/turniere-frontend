@@ -15,6 +15,7 @@ services:
   # container so there is no init-container-exits-prematurely race.
   backend:
     image: registry.gitlab.com/turniere/turniere-backend/production:${BACKEND_VERSION:-latest}
+    platform: linux/amd64
     depends_on:
       postgres:
         condition: service_healthy
@@ -33,8 +34,8 @@ services:
       - -lc
       - |
         set -e
-        bundle exec rails db:migrate
-        bundle exec rails runner "user = User.find_or_initialize_by(email: 'e2e@example.com'); user.username = 'e2e-user'; user.password = 'password123'; user.password_confirmation = 'password123'; user.confirmed_at = Time.current; user.uid = user.email; user.provider = 'email'; user.save!"
+        bundle exec rails db:prepare
+        bundle exec rails runner "user = User.find_or_initialize_by(email: ENV.fetch('TURNIERE_E2E_EMAIL', 'e2e@example.com')); user.username = ENV.fetch('TURNIERE_E2E_USERNAME', 'e2e-user'); user.password = ENV.fetch('TURNIERE_E2E_PASSWORD', 'password123'); user.password_confirmation = ENV.fetch('TURNIERE_E2E_PASSWORD', 'password123'); user.confirmed_at = Time.current; user.uid = user.email; user.provider = 'email'; user.save!"
         exec bundle exec rails s -p 3000 -b 0.0.0.0
     healthcheck:
       test: ["CMD-SHELL", "ruby -e \"require 'net/http'; exit Net::HTTP.get_response(URI('http://localhost:3000/healthz')).code == '200' ? 0 : 1\""]
@@ -42,8 +43,6 @@ services:
       timeout: 10s
       retries: 30
       start_period: 15s
-    ports:
-      - "3000:3000"
 
   frontend:
     build:
@@ -54,8 +53,6 @@ services:
         condition: service_healthy
     environment:
       TURNIERE_API_URL: http://backend:3000
-    ports:
-      - "8080:80"
 
   e2e:
     build:
