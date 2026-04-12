@@ -1,5 +1,4 @@
 import shlex
-import shutil
 import time
 import urllib.error
 import urllib.request
@@ -11,25 +10,11 @@ from invoke import task
 DEFAULT_API_URL = "http://127.0.0.1:3000"
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = "3001"
-NODE_VERSION = "24"
 NODE_MODULES_PATH = Path("node_modules")
-NVM_PATH = Path.home() / ".nvm" / "nvm.sh"
-
-
-def _package_manager():
-    if shutil.which("yarn"):
-        return "yarn"
-    return "corepack yarn"
-
-
-def _with_node(command):
-    if NVM_PATH.exists():
-        return f"source {shlex.quote(str(NVM_PATH))} && nvm use {NODE_VERSION} >/dev/null && {command}"
-    return command
 
 
 def _run(c, command):
-    c.run(_with_node(command), pty=True, shell="/bin/zsh")
+    c.run(command, pty=True)
 
 
 def _wait_for_backend(api_url, timeout=30):
@@ -56,7 +41,7 @@ def _wait_for_backend(api_url, timeout=30):
 @task
 def setup(c):
     """Install frontend dependencies locally."""
-    _run(c, f"{_package_manager()} install")
+    _run(c, "yarn install")
 
 
 @task(name="check-backend")
@@ -77,5 +62,5 @@ def start(c, api_url=DEFAULT_API_URL, host=DEFAULT_HOST, port=DEFAULT_PORT, inst
 
     _run(
         c,
-        f"TURNIERE_API_URL={shlex.quote(api_url)} HOST={shlex.quote(host)} PORT={shlex.quote(str(port))} {_package_manager()} run dev",
+        f"TURNIERE_API_URL={shlex.quote(api_url)} HOST={shlex.quote(host)} PORT={shlex.quote(str(port))} yarn run dev",
     )
