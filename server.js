@@ -2,6 +2,8 @@ const express = require('express');
 const next = require('next');
 
 const dev = process.env.NODE_ENV !== 'production';
+const host = process.env.HOST || '0.0.0.0';
+const port = parseInt(process.env.PORT || (dev ? '3001' : '80'), 10);
 const app = next({dev});
 const handle = app.getRequestHandler();
 
@@ -43,8 +45,9 @@ app.prepare()
             return handle(req, res);
         });
 
-        server.listen(dev ? 3001 : 80, err => {
+        server.listen(port, host, err => {
             if (err) throw err;
+            console.log(`turniere-frontend listening on http://${host}:${port}`);
         });
     })
     .catch(err => {
