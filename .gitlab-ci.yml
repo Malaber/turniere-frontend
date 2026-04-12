@@ -34,9 +34,7 @@ frontend e2e:
         - "3000"
         - -b
         - 0.0.0.0
-    # Option A: backend test image runs migrations + bootstraps the confirmed E2E user.
-    # It connects directly to the shared Postgres service (no exec into the backend container needed).
-    - name: $CI_REGISTRY/turniere/turniere-backend/test/commits:latest
+    - name: $CI_REGISTRY/turniere/turniere-backend/test:latest
       alias: migrate-and-bootstrap
       entrypoint: ["/bin/bash"]
       command:
