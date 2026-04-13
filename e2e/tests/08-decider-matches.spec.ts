@@ -22,6 +22,9 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   const { tournament, relevantTeamNames } = await seedRelevantDeciderScenario();
   const deciderCard = page.locator('[data-decider-match="true"]').first();
   const decisionIcons = page.locator('[data-ranking-decision-trigger]');
+  const deciderOwnerTrigger = page
+    .locator('tr', { hasText: relevantTeamNames[0] })
+    .locator('[data-ranking-decision-trigger]');
   let modal = page.getByRole('dialog');
 
   await page.goto(`/t/${tournament.id}`);
@@ -36,7 +39,7 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await expect(page.getByTestId('blocking-ties-alert')).toContainText(relevantTeamNames[1]);
   await keyframe(page, testInfo, 'decider_blocking_alert');
 
-  await decisionIcons.first().click();
+  await deciderOwnerTrigger.click();
   modal = page.getByRole('dialog');
   await expect(visibleModal(page)).toBeVisible();
   await expect(modal.getByText('Deshalb braucht es ein Entscheidungsmatch.')).toBeVisible();
