@@ -14,7 +14,7 @@ async function expectNoHorizontalOverflow(page) {
 }
 
 function visibleModal(page) {
-  return page.locator('.modal.show .modal-content').first();
+  return page.getByRole('dialog').first();
 }
 
 test('Owner can create and resolve a decider match, then start playoffs', async ({ context, page }, testInfo) => {
