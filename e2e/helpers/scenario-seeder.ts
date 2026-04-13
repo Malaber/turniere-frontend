@@ -425,6 +425,44 @@ export async function seedRelevantDeciderScenario(): Promise<DeciderScenario> {
   };
 }
 
+export async function seedResolvedDeciderScenario(): Promise<DeciderScenario> {
+  const client = await makeClient();
+  const seeded = await seedRelevantDeciderScenario();
+
+  const createDecider = await client.post(`/groups/${seeded.groupId}/matches`, {
+    team_ids: seeded.tournament.teams
+      .filter((team) => seeded.relevantTeamNames.includes(team.name))
+      .map((team) => team.id),
+  });
+  expectStatus(createDecider, 201, `create decider match for group ${seeded.groupId}`);
+
+  let tournament = await fetchTournament(client, seeded.tournament.id);
+  const deciderMatch = groupStageOf(tournament).groups[0]?.matches.find((match) => match.decider);
+  if (!deciderMatch) {
+    throw new Error('Expected a decider match after creating one');
+  }
+
+  await playMatchWithExactScores(
+    client,
+    deciderMatch,
+    {
+      [seeded.relevantTeamNames[0]]: 3,
+      [seeded.relevantTeamNames[1]]: 5,
+    },
+    'hidden_points',
+  );
+
+  tournament = await fetchTournament(client, seeded.tournament.id);
+
+  return {
+    tournament,
+    code: tournament.code,
+    groupId: seeded.groupId,
+    stageId: seeded.stageId,
+    relevantTeamNames: seeded.relevantTeamNames,
+  };
+}
+
 export async function seedIrrelevantTieScenario(): Promise<SeededTournament> {
   const client = await makeClient();
   const payload = groupStagePayload(1, 4, 2);

@@ -27,6 +27,7 @@ DEFAULT_E2E_USERNAME = "e2e-user"
 DOCKER_COMPOSE_FILE = ROOT / "docker-compose.e2e.yml"
 DECIDER_MATCH_SPEC = "tests/08-decider-matches.spec.ts"
 MANUAL_SCENARIOS_SCRIPT = E2E_DIR / "scripts" / "seed-manual-scenarios.mjs"
+SCREENSHOTS_DIR = E2E_DIR / "screenshots"
 
 
 def _zsh_script(command: str, cwd: Path, env: dict[str, str] | None = None, node_version: str | None = None) -> str:
@@ -46,6 +47,12 @@ def _zsh_script(command: str, cwd: Path, env: dict[str, str] | None = None, node
 def _run_node(c, command: str, cwd: Path = ROOT, env: dict[str, str] | None = None, node_version: str = DEFAULT_NODE_VERSION):
     script = _zsh_script(command, cwd=cwd, env=env, node_version=node_version)
     c.run(f"/bin/zsh -lc {shlex.quote(script)}", pty=True)
+
+
+def _reset_screenshots_dir():
+    if SCREENSHOTS_DIR.exists():
+        shutil.rmtree(SCREENSHOTS_DIR)
+    SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _wait_for_url(url: str, timeout: int = 120, acceptable_statuses: set[int] | None = None):
@@ -173,10 +180,13 @@ def e2e_test(
     password=DEFAULT_E2E_PASSWORD,
     username=DEFAULT_E2E_USERNAME,
     spec="",
+    clean_screenshots=True,
 ):
     """Run Playwright against an already running frontend and backend."""
     _wait_for_url(f"{backend_url.rstrip('/')}/healthz")
     _wait_for_url(frontend_url.rstrip("/"))
+    if clean_screenshots:
+        _reset_screenshots_dir()
     command = "npx playwright test"
     if spec:
         command = f"{command} {shlex.quote(spec)}"
