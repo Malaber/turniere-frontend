@@ -26,6 +26,7 @@ DEFAULT_E2E_PASSWORD = "password123"
 DEFAULT_E2E_USERNAME = "e2e-user"
 DOCKER_COMPOSE_FILE = ROOT / "docker-compose.e2e.yml"
 DECIDER_MATCH_SPEC = "tests/08-decider-matches.spec.ts"
+MANUAL_SCENARIOS_SCRIPT = E2E_DIR / "scripts" / "seed-manual-scenarios.mjs"
 
 
 def _zsh_script(command: str, cwd: Path, env: dict[str, str] | None = None, node_version: str | None = None) -> str:
@@ -301,6 +302,31 @@ def e2e_local_decider(
         password=password,
         username=username,
         spec=DECIDER_MATCH_SPEC,
+    )
+
+
+@task(name="seed-manual-scenarios")
+def seed_manual_scenarios(
+    c,
+    frontend_url=DEFAULT_FRONTEND_URL,
+    backend_url=DEFAULT_API_URL,
+    node_version=DEFAULT_NODE_VERSION,
+    email=DEFAULT_E2E_EMAIL,
+    password=DEFAULT_E2E_PASSWORD,
+):
+    """Seed local tournaments in modal-related states and print ready-to-open frontend URLs."""
+    _wait_for_url(f"{backend_url.rstrip('/')}/healthz")
+    _run_node(
+        c,
+        f"node {shlex.quote(str(MANUAL_SCENARIOS_SCRIPT))}",
+        cwd=ROOT,
+        node_version=node_version,
+        env={
+            "TURNIERE_FRONTEND_URL": frontend_url,
+            "TURNIERE_BACKEND_URL": backend_url,
+            "TURNIERE_E2E_EMAIL": email,
+            "TURNIERE_E2E_PASSWORD": password,
+        },
     )
 
 

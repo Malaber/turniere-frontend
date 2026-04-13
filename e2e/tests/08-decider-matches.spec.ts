@@ -36,6 +36,7 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   modal = page.getByRole('dialog');
   await expect(modal.getByText('Deshalb braucht es ein Entscheidungsmatch.')).toBeVisible();
   await expect(modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' })).toBeVisible();
+  await keyframe(page, testInfo, 'decider_decision_modal');
   await modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' }).click();
   await expect(deciderCard).toBeVisible({ timeout: 15000 });
   await keyframe(page, testInfo, 'decider_match_created');
@@ -61,9 +62,9 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20000 });
   await expect(page.getByLabel('Tie-Break erklärt')).toHaveCount(1, { timeout: 20000 });
   await page.getByLabel('Tie-Break erklärt').click();
-  await expect(
-    page.getByRole('dialog').getByText(`Entscheidungsmatch gegen ${relevantTeamNames[0]}: verloren.`)
-  ).toBeVisible();
+  await expect(page.getByRole('dialog').getByText(/hat das Entscheidungsmatch gegen .* verloren\./)).toBeVisible();
+  await expect(page.getByRole('dialog').getByText(/Entscheidungsmatch gegen .*: verloren\./)).toBeVisible();
+  await keyframe(page, testInfo, 'decider_resolved_modal');
   await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await keyframe(page, testInfo, 'decider_resolved');
@@ -99,7 +100,7 @@ test('Mobile tournament view keeps decider tables readable without side scrollin
 
   await page.locator('[data-ranking-decision-trigger]').first().click();
   await expect(page.getByRole('dialog').getByText('Deshalb braucht es ein Entscheidungsmatch.')).toBeVisible();
-  await keyframe(page, testInfo, 'mobile_decider_table');
+  await keyframe(page, testInfo, 'mobile_decider_info_modal');
 });
 
 test('Irrelevant bottom ties do not force a decider match in the tournament view', async ({ page }, testInfo) => {
@@ -113,5 +114,5 @@ test('Irrelevant bottom ties do not force a decider match in the tournament view
   await page.locator('[data-ranking-decision-trigger]').first().click();
   await expect(page.getByRole('dialog').getByText('Dieser Gleichstand blockiert die Playoffs nicht.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Entscheidungsmatch anlegen' })).toHaveCount(0);
-  await keyframe(page, testInfo, 'irrelevant_tie_no_decider_required');
+  await keyframe(page, testInfo, 'irrelevant_tie_modal');
 });

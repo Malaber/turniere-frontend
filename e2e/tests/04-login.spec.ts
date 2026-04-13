@@ -33,3 +33,16 @@ test('Login flow works and shows user state', async ({ page }, testInfo) => {
   // The navbar now shows Logout instead of Login
   await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
 });
+
+test('Login failure shows an error instead of crashing the page', async ({ page }, testInfo) => {
+  await page.goto('/login');
+  await page.waitForLoadState('networkidle');
+
+  await page.fill('input[name="username"]', email);
+  await page.fill('input[name="password"]', 'definitely-wrong-password');
+  await page.click('input[type="submit"]');
+
+  await expect(page.getByText('Unhandled Runtime Error')).toHaveCount(0);
+  await expect(page.locator('.error-box li').first()).toBeVisible({ timeout: 10_000 });
+  await keyframe(page, testInfo, 'login_error');
+});

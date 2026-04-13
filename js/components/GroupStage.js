@@ -380,8 +380,8 @@ function modalExplanationFor(score, rankingDecision) {
             `${rankingDecision.compared_with_team_name} einsortiert.`;
     }
     if (rankingDecision.resolved_by === 'hidden_points') {
-        return `${score.team.name} wurde über die verdeckten Tie-Breaker Punkte aus dem ` +
-            `Entscheidungsmatch gegen ${rankingDecision.compared_with_team_name} einsortiert.`;
+        return `${score.team.name} hat das Entscheidungsmatch gegen ` +
+            `${rankingDecision.compared_with_team_name} ${translateResult(rankingDecision.hidden_points_result)}.`;
     }
     if (rankingDecision.resolved_by === 'tie') {
         return `${score.team.name} bleibt mit ${rankingDecision.compared_with_team_name} gleichauf. ` +

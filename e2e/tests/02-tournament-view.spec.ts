@@ -41,13 +41,14 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
   const { tournament: t3 } = await seedGroupStageAndRunToBeforeFinal(4, 4, 8);
 
   await page.goto(`/t/${t3.id}`);
-  await expect(page.locator('.btn-group')).toBeVisible({ timeout: 120000 });
+  const statusBarActions = page.locator('.me-auto.btn-group');
+  const statisticsAction = statusBarActions.getByRole('button', { name: 'Statistiken' });
+  const fullscreenAction = statusBarActions.getByRole('button', { name: 'Vollbild-Ansicht' });
+  await expect(statisticsAction).toBeVisible({ timeout: 120000 });
+  await expect(fullscreenAction).toBeVisible({ timeout: 120000 });
 
   await keyframe(page, testInfo, 'tournament_before_final');
 
-  // The tournament action labels are visible in the status bar regardless of
-  // whether reactstrap renders them as <button> or <a> elements.
-  const statusBarActions = page.locator('.btn-group');
-  await expect(statusBarActions.getByText('Statistiken')).toBeVisible();
-  await expect(statusBarActions.getByText('Vollbild-Ansicht')).toBeVisible();
+  await expect(statisticsAction).toBeVisible();
+  await expect(fullscreenAction).toBeVisible();
 });

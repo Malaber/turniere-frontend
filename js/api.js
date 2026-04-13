@@ -15,6 +15,24 @@ import {
 } from './redux/tournamentStatistics';
 
 
+function normalizeErrorMessages(error, fallbackMessage) {
+    const data = error && error.response ? error.response.data : null;
+    if (Array.isArray(data && data.errors)) {
+        return data.errors;
+    }
+    if (data && data.errors && Array.isArray(data.errors.full_messages)) {
+        return data.errors.full_messages;
+    }
+    if (Array.isArray(data && data.full_messages)) {
+        return data.full_messages;
+    }
+    if (typeof data === 'string' && data.length > 0) {
+        return [data];
+    }
+    return [fallbackMessage];
+}
+
+
 function storeOptionalToken(response) {
     if (checkForAuthenticationHeaders(response)) {
         __store.dispatch({
@@ -107,7 +125,7 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
                 __store.dispatch({
                     'type': actionTypesUserinfo.LOGIN_RESULT_ERROR,
                     'parameters': {
-                        'errorMessages': error.response.data.errors
+                        'errorMessages': normalizeErrorMessages(error, errorMessages['login_errorunknown']['en'])
                     }
                 });
                 storeOptionalToken(error.response);
