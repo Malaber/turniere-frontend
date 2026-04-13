@@ -320,7 +320,8 @@ function RankingDecisionModal(props) {
     const createKey = teamIds.join('-');
 
     return (
-        <Modal isOpen={props.isOpen} toggle={props.toggle}>
+        <Modal isOpen={props.isOpen} toggle={props.toggle}
+            fade={false} contentClassName='ranking-decision-modal-content'>
             <ModalHeader toggle={props.toggle}>
                 {modalTitleFor(rankingDecision)}
             </ModalHeader>

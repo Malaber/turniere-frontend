@@ -109,7 +109,8 @@ export class MatchModal extends Component {
             actionButton = <Button color='primary' onClick={this.props.startMatch}>Spiel starten</Button>;
             break;
         }
-        return (<Modal isOpen={this.props.isOpen} toggle={this.props.toggle}>
+        return (<Modal isOpen={this.props.isOpen} toggle={this.props.toggle}
+            fade={false} contentClassName='match-modal-content'>
             <ModalHeader toggle={this.props.toggle}>{title}</ModalHeader>
             <ModalBody>
                 {matchTable}

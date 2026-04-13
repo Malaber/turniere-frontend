@@ -43,5 +43,19 @@ export async function locatorKeyframe(locator: Locator, testInfo: TestInfo, name
 export async function modalKeyframe(page: Page, testInfo: TestInfo, name: string): Promise<void> {
   const file = screenshotPath(testInfo, name);
   await waitForSettledLayout(page);
-  await page.locator('.modal.show .modal-content').first().screenshot({ path: file });
+  const contentLocator = page.locator(
+    '.ranking-decision-modal-content, .match-modal-content, .modal-dialog'
+  ).first();
+  if (await contentLocator.isVisible()) {
+    await contentLocator.screenshot({ path: file });
+    return;
+  }
+
+  const dialogLocator = page.locator('.modal-dialog').first();
+  if (await dialogLocator.isVisible()) {
+    await dialogLocator.screenshot({ path: file });
+    return;
+  }
+
+  await page.getByRole('dialog').first().screenshot({ path: file });
 }
