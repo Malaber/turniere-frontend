@@ -72,7 +72,11 @@ function convertTournament(apiTournament) {
     for (const apiStage of apiTournament.stages) {
         if (apiStage.groups.length > 0) {
             // group stage
-            groupStage = {groups: apiStage.groups.map(group => convertGroup(group))};
+            groupStage = {
+                id: apiStage.id,
+                state: apiStage.state,
+                groups: apiStage.groups.map(group => convertGroup(group))
+            };
         } else {
             // playoff stage
             playoffStages.push(convertPlayoffStage(apiStage));
@@ -117,15 +121,18 @@ function convertGroup(apiGroup) {
                 return 0;
             }
         }),
-        matches: apiGroup.matches.sort((a, b) => a.position > b.position).map(match => convertMatch(match, true))
+        matches: apiGroup.matches.sort(sortMatchesByPositionAscending()).map(match => convertMatch(match, true))
     };
 }
 
 function convertMatch(apiMatch, allowUndecided) {
+    const scoreMode = apiMatch.decider ? 'hidden_points' : 'points';
     const result = {
         id: apiMatch.id,
         state: apiMatch.state,
+        decider: apiMatch.decider === true,
         allowUndecided: allowUndecided,
+        scoreMode: scoreMode,
         winnerTeamId: apiMatch.winner === null ? null : apiMatch.winner.id,
         position: apiMatch.position + 1,
         group: apiMatch.group ? {id: apiMatch.group.id, number: apiMatch.group.number} : null
@@ -136,12 +143,14 @@ function convertMatch(apiMatch, allowUndecided) {
             name: apiMatch.match_scores[0].team ? apiMatch.match_scores[0].team.name : 'TBD',
             id: apiMatch.match_scores[0].team ? apiMatch.match_scores[0].team.id : null,
             score: apiMatch.match_scores[0].points,
+            hiddenScore: apiMatch.match_scores[0].hidden_points,
             scoreId: apiMatch.match_scores[0].id
         };
         result.team2 = {
             name: apiMatch.match_scores[1].team ? apiMatch.match_scores[1].team.name : 'TBD',
             id: apiMatch.match_scores[1].team ? apiMatch.match_scores[1].team.id : null,
             score: apiMatch.match_scores[1].points,
+            hiddenScore: apiMatch.match_scores[1].hidden_points,
             scoreId: apiMatch.match_scores[1].id
         };
     } else if (apiMatch.match_scores.length === 1) {
@@ -149,23 +158,27 @@ function convertMatch(apiMatch, allowUndecided) {
             name: apiMatch.match_scores[0].team.name,
             id: apiMatch.match_scores[0].team.id,
             score: apiMatch.match_scores[0].points,
+            hiddenScore: apiMatch.match_scores[0].hidden_points,
             scoreId: apiMatch.match_scores[0].id
         };
         result.team2 = {
             name: 'TBD',
             id: null,
-            score: 0
+            score: 0,
+            hiddenScore: 0
         };
     } else {
         result.team1 = {
             name: 'TBD',
             id: null,
-            score: 0
+            score: 0,
+            hiddenScore: 0
         };
         result.team2 = {
             name: 'TBD',
             id: null,
-            score: 0
+            score: 0,
+            hiddenScore: 0
         };
     }
 

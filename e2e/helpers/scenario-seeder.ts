@@ -18,6 +18,7 @@ const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 interface MatchScore {
   id: number;
   points: number | null;
+  hidden_points?: number | null;
   team: { id: number; name: string } | null;
 }
 
@@ -25,6 +26,7 @@ interface Match {
   id: number;
   position: number;
   state: string;
+  decider?: boolean;
   match_scores: MatchScore[];
   stage_level?: number; // attached by helpers, not from API
 }
@@ -32,6 +34,16 @@ interface Match {
 interface Group {
   id: number;
   number: number;
+  group_scores?: Array<{
+    team: { id: number; name: string };
+    ranking_decision?: {
+      resolved_by: string;
+      compared_with_team_id?: number | null;
+      compared_with_team_name?: string | null;
+      needs_decider_match: boolean;
+      decider_match_id?: number | null;
+    } | null;
+  }>;
   matches: Match[];
 }
 
@@ -79,6 +91,22 @@ async function fetchMatch(client: ApiClient, id: number): Promise<Match> {
   const res = await client.get<Match>(`/matches/${id}`);
   expectStatus(res, 200, `fetch match ${id}`);
   return res.json;
+}
+
+async function patchScores(
+  client: ApiClient,
+  match: Match,
+  scoresByTeamName: Record<string, number>,
+  scoreField: 'points' | 'hidden_points' = 'points',
+): Promise<void> {
+  for (const score of match.match_scores.sort((a, b) => a.id - b.id)) {
+    const teamName = score.team?.name;
+    if (!teamName || scoresByTeamName[teamName] === undefined) {
+      throw new Error(`Missing score for team ${teamName ?? 'unknown'} in match ${match.id}`);
+    }
+    const updated = await client.patch(`/match_scores/${score.id}`, { [scoreField]: scoresByTeamName[teamName] });
+    expectStatus(updated, 200, `update ${scoreField} for match_score ${score.id}`);
+  }
 }
 
 /** Determine the preferred winner name (first alphabetically by seed, then group, then name). */
@@ -133,6 +161,24 @@ async function playMatch(
       finished.json,
     );
   }
+
+  return { matchId: match.id, status: finished.status };
+}
+
+async function playMatchWithExactScores(
+  client: ApiClient,
+  match: Match,
+  scoresByTeamName: Record<string, number>,
+  scoreField: 'points' | 'hidden_points' = 'points',
+): Promise<PlayResult> {
+  const started = await client.patch(`/matches/${match.id}`, { state: 'in_progress' });
+  expectStatus(started, 200, `start match ${match.id}`);
+
+  const fresh = await fetchMatch(client, match.id);
+  await patchScores(client, fresh, scoresByTeamName, scoreField);
+
+  const finished = await client.patch(`/matches/${match.id}`, { state: 'finished' });
+  expectStatus(finished, 200, `finish match ${match.id}`);
 
   return { matchId: match.id, status: finished.status };
 }
@@ -225,6 +271,12 @@ function playoffOnlyPayload(teamCount: number) {
 export interface SeededTournament {
   tournament: Tournament;
   code: string;
+}
+
+interface DeciderScenario extends SeededTournament {
+  groupId: number;
+  stageId: number;
+  relevantTeamNames: [string, string];
 }
 
 /**
@@ -327,5 +379,121 @@ export async function seedAndPlayToCompletion(teamCount = 8): Promise<SeededTour
   await runPlayoffsToCompletion(client, id);
 
   const tournament = await fetchTournament(client, id);
+  return { tournament, code: tournament.code };
+}
+
+export async function seedRelevantDeciderScenario(): Promise<DeciderScenario> {
+  const client = await makeClient();
+  const payload = groupStagePayload(1, 4, 2);
+
+  const created = await client.post<Tournament>('/tournaments', payload);
+  expectStatus(created, 201, 'create relevant decider scenario tournament');
+
+  let tournament = await fetchTournament(client, (created.json as { id: number }).id);
+  const groupStage = groupStageOf(tournament);
+  const group = groupStage.groups[0];
+  if (!group) {
+    throw new Error('Expected a group in the relevant decider scenario');
+  }
+
+  const matchByTeams = (teamA: string, teamB: string): Match => {
+    const match = group.matches.find((candidate) => {
+      const names = candidate.match_scores.map((score) => score.team?.name).filter((name): name is string => !!name);
+      return names.includes(teamA) && names.includes(teamB);
+    });
+    if (!match) {
+      throw new Error(`Could not find match for ${teamA} vs ${teamB}`);
+    }
+    return match;
+  };
+
+  await playMatchWithExactScores(client, matchByTeams('G1-S1', 'G1-S2'), { 'G1-S1': 3, 'G1-S2': 1 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S1', 'G1-S3'), { 'G1-S1': 3, 'G1-S3': 1 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S1', 'G1-S4'), { 'G1-S1': 3, 'G1-S4': 1 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S2', 'G1-S3'), { 'G1-S2': 2, 'G1-S3': 2 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S2', 'G1-S4'), { 'G1-S2': 3, 'G1-S4': 1 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S3', 'G1-S4'), { 'G1-S3': 3, 'G1-S4': 1 });
+
+  tournament = await fetchTournament(client, tournament.id);
+
+  return {
+    tournament,
+    code: tournament.code,
+    groupId: group.id,
+    stageId: groupStage.id,
+    relevantTeamNames: ['G1-S2', 'G1-S3'],
+  };
+}
+
+export async function seedResolvedDeciderScenario(): Promise<DeciderScenario> {
+  const client = await makeClient();
+  const seeded = await seedRelevantDeciderScenario();
+
+  const createDecider = await client.post(`/groups/${seeded.groupId}/matches`, {
+    team_ids: seeded.tournament.teams
+      .filter((team) => seeded.relevantTeamNames.includes(team.name))
+      .map((team) => team.id),
+  });
+  expectStatus(createDecider, 201, `create decider match for group ${seeded.groupId}`);
+
+  let tournament = await fetchTournament(client, seeded.tournament.id);
+  const deciderMatch = groupStageOf(tournament).groups[0]?.matches.find((match) => match.decider);
+  if (!deciderMatch) {
+    throw new Error('Expected a decider match after creating one');
+  }
+
+  await playMatchWithExactScores(
+    client,
+    deciderMatch,
+    {
+      [seeded.relevantTeamNames[0]]: 3,
+      [seeded.relevantTeamNames[1]]: 5,
+    },
+    'hidden_points',
+  );
+
+  tournament = await fetchTournament(client, seeded.tournament.id);
+
+  return {
+    tournament,
+    code: tournament.code,
+    groupId: seeded.groupId,
+    stageId: seeded.stageId,
+    relevantTeamNames: seeded.relevantTeamNames,
+  };
+}
+
+export async function seedIrrelevantTieScenario(): Promise<SeededTournament> {
+  const client = await makeClient();
+  const payload = groupStagePayload(1, 4, 2);
+
+  const created = await client.post<Tournament>('/tournaments', payload);
+  expectStatus(created, 201, 'create irrelevant tie scenario tournament');
+
+  let tournament = await fetchTournament(client, (created.json as { id: number }).id);
+  const group = groupStageOf(tournament).groups[0];
+  if (!group) {
+    throw new Error('Expected a group in the irrelevant tie scenario');
+  }
+
+  const matchByTeams = (teamA: string, teamB: string): Match => {
+    const match = group.matches.find((candidate) => {
+      const names = candidate.match_scores.map((score) => score.team?.name).filter((name): name is string => !!name);
+      return names.includes(teamA) && names.includes(teamB);
+    });
+    if (!match) {
+      throw new Error(`Could not find match for ${teamA} vs ${teamB}`);
+    }
+    return match;
+  };
+
+  await playMatchWithExactScores(client, matchByTeams('G1-S1', 'G1-S2'), { 'G1-S1': 3, 'G1-S2': 1 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S1', 'G1-S3'), { 'G1-S1': 3, 'G1-S3': 1 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S1', 'G1-S4'), { 'G1-S1': 3, 'G1-S4': 1 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S2', 'G1-S3'), { 'G1-S2': 3, 'G1-S3': 1 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S2', 'G1-S4'), { 'G1-S2': 3, 'G1-S4': 1 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S3', 'G1-S4'), { 'G1-S3': 2, 'G1-S4': 2 });
+
+  tournament = await fetchTournament(client, tournament.id);
   return { tournament, code: tournament.code };
 }

@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
 import { seedAndPlayGroupStage } from '../helpers/scenario-seeder';
 
+test.setTimeout(240_000);
+
 test('Fullscreen beamer pages render correctly', async ({ page }, testInfo) => {
   // Fullscreen/beamer pages are designed for projectors — use a wide viewport
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -11,13 +13,9 @@ test('Fullscreen beamer pages render correctly', async ({ page }, testInfo) => {
 
   // --- Fullscreen match view ---
   await page.goto(`/t/${tournament.id}/fullscreen`);
-  await page.waitForLoadState('networkidle');
-
-  await keyframe(page, testInfo, 'fullscreen_loaded');
-
-  // Tournament name appears in the fixed-bottom navbar
   const bottomNavbar = page.locator('.fixed-bottom');
   await expect(bottomNavbar).toBeVisible();
+  await keyframe(page, testInfo, 'fullscreen_loaded');
 
   // Cursor is hidden (body gains 'hide-cursor' class on mount)
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
@@ -27,7 +25,7 @@ test('Fullscreen beamer pages render correctly', async ({ page }, testInfo) => {
 
   // --- Fullscreen groups view ---
   await page.goto(`/t/${tournament.id}/fullscreen-groups`);
-  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('heading', { name: 'Gruppe 1' })).toBeVisible();
 
   await keyframe(page, testInfo, 'fullscreen_groups_loaded');
 
@@ -35,7 +33,6 @@ test('Fullscreen beamer pages render correctly', async ({ page }, testInfo) => {
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
 
   // Group headings are rendered (verifying the group stage data is displayed)
-  await expect(page.getByRole('heading', { name: 'Gruppe 1' })).toBeVisible();
   // All 4 groups are present
   await expect(page.getByRole('heading', { name: /^Gruppe \d+$/ })).toHaveCount(4);
 

@@ -33,9 +33,12 @@ class PrivateTournamentPage extends React.Component {
                     {groupStage != null &&
                     <div><GroupStage
                         groups={groupStage.groups}
+                        stageId={groupStage.id}
+                        stageState={groupStage.state}
                         isSignedIn={isSignedIn}
                         isOwner={isOwner}
                         teams={this.props.tournament.teams}
+                        onTournamentChange={this.props.onTournamentChange}
                     /></div>}
                     <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
                         isOwner={isOwner}/>
@@ -90,9 +93,14 @@ class Main extends React.Component {
         };
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
+        this.reloadTournament = this.reloadTournament.bind(this);
     }
 
     componentDidMount() {
+        this.reloadTournament();
+    }
+
+    reloadTournament() {
         getTournament(this.props.query.code, this.onTournamentRequestSuccess, this.onTournamentRequestError);
     }
 
@@ -120,7 +128,7 @@ class Main extends React.Component {
                     <title>{tournamentName}: turnie.re</title>
                 </Head>
                 <TurniereNavigation tournament={tournament} />
-                <TournamentPage tournament={tournament}/>
+                <TournamentPage tournament={tournament} onTournamentChange={this.reloadTournament}/>
                 <Footer/>
             </div>);
         } else {

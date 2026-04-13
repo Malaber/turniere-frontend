@@ -1,10 +1,15 @@
-import {Button, Card, CardBody, Col, Collapse, Row, Table} from 'reactstrap';
+import {
+    Alert, Button, Card, CardBody, Col, Collapse, Modal, ModalBody, ModalFooter, ModalHeader, Row, Table
+} from 'reactstrap';
 import {Match} from './Match';
 import React, {Component} from 'react';
 import {getGroup} from '../redux/tournamentApi';
 import {notify} from 'react-notify-toast';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
-import {FaChevronDown} from 'react-icons/fa6';
+import {
+    FaChevronDown, FaCircleExclamation, FaCircleInfo
+} from 'react-icons/fa6';
+import {createDeciderMatch, finishGroupStage} from '../api';
 
 export default class GroupStage extends Component {
     constructor(props) {
@@ -13,6 +18,41 @@ export default class GroupStage extends Component {
             acc[group.id] = React.createRef();
             return acc;
         }, {});
+        this.state = {
+            blockingTies: [],
+            finishingStage: false
+        };
+        this.finishStage = this.finishStage.bind(this);
+        this.onFinishStageSuccess = this.onFinishStageSuccess.bind(this);
+        this.onFinishStageError = this.onFinishStageError.bind(this);
+        this.clearBlockingTies = this.clearBlockingTies.bind(this);
+    }
+
+    finishStage() {
+        this.setState({finishingStage: true});
+        finishGroupStage(this.props.stageId, this.onFinishStageSuccess, this.onFinishStageError);
+    }
+
+    onFinishStageSuccess() {
+        this.setState({blockingTies: [], finishingStage: false});
+        notify.show('Playoffs wurden generiert.', 'success', 2500);
+        this.props.onTournamentChange !== undefined && this.props.onTournamentChange();
+    }
+
+    onFinishStageError(errorBody) {
+        const blockingTies = errorBody && Array.isArray(errorBody.blocking_ties) ? errorBody.blocking_ties : [];
+        this.setState({blockingTies: blockingTies, finishingStage: false});
+        if (blockingTies.length > 0) {
+            notify.show('Ein Entscheidungsmatch ist noch nötig, bevor die Playoffs starten können.', 'warning', 4000);
+        } else {
+            notify.show('Die Gruppenphase konnte nicht beendet werden.', 'error', 3000);
+        }
+    }
+
+    clearBlockingTies() {
+        if (this.state.blockingTies.length > 0) {
+            this.setState({blockingTies: []});
+        }
     }
 
     render() {
@@ -21,6 +61,23 @@ export default class GroupStage extends Component {
                 <h1 className='custom-font'>
                     <span className='px-2'>Gruppenphase</span>
                 </h1>
+                {this.props.isSignedIn && this.props.isOwner && this.props.stageState !== 'finished' &&
+                    <div className='px-2 mt-3'>
+                        <Button color='success' onClick={this.finishStage} disabled={this.state.finishingStage}
+                            data-testid='finish-group-stage'>
+                            {this.state.finishingStage ? 'Playoffs werden generiert...' : 'Playoffs starten'}
+                        </Button>
+                    </div>}
+                {this.state.blockingTies.length > 0 &&
+                    <Alert color='warning' className='mx-2 mt-3' data-testid='blocking-ties-alert'>
+                        <div><strong>Playoffs können noch nicht gestartet werden.</strong></div>
+                        {this.state.blockingTies.map((tie, index) => (
+                            <div key={index}>
+                                Gruppe {tie.group_number}: {tie.team_names.join(' vs. ')}
+                                {' '}brauchen ein Entscheidungsmatch.
+                            </div>
+                        ))}
+                    </Alert>}
                 <Row className='mt-3 gx-0'>
                     {this.props.groups.map(group => (
                         <Group
@@ -30,6 +87,8 @@ export default class GroupStage extends Component {
                             isOwner={this.props.isOwner}
                             groupRef={this.groupRefs[group.id]}
                             teams={this.props.teams}
+                            blockingTies={this.state.blockingTies}
+                            onGroupReload={this.clearBlockingTies}
                         />
                     ))}
                 </Row>
@@ -57,12 +116,19 @@ export class Group extends Component {
         super(props);
         this.state = {
             ...props.group,
-            showMatches: false
+            showMatches: false,
+            creatingDeciderKey: null,
+            decisionModalScore: null
         };
         this.reload = this.reload.bind(this);
         this.handleToggle = this.handleToggle.bind(this);
         this.onReloadSuccess = this.onReloadSuccess.bind(this);
         this.onReloadError = this.onReloadError.bind(this);
+        this.createDecider = this.createDecider.bind(this);
+        this.onCreateDeciderSuccess = this.onCreateDeciderSuccess.bind(this);
+        this.onCreateDeciderError = this.onCreateDeciderError.bind(this);
+        this.openDecisionModal = this.openDecisionModal.bind(this);
+        this.closeDecisionModal = this.closeDecisionModal.bind(this);
     }
 
     handleToggle() {
@@ -78,10 +144,35 @@ export class Group extends Component {
 
     onReloadSuccess(status, updatedGroup) {
         this.setState(updatedGroup);
+        this.props.onGroupReload !== undefined && this.props.onGroupReload(updatedGroup);
     }
 
     onReloadError() {
         notify.show('Die Gruppe konnte nicht aktualisiert werden.', 'warning', 2000);
+    }
+
+    createDecider(teamIds) {
+        this.setState({creatingDeciderKey: teamIds.join('-')});
+        createDeciderMatch(this.state.id, teamIds, this.onCreateDeciderSuccess, this.onCreateDeciderError);
+    }
+
+    onCreateDeciderSuccess() {
+        notify.show('Das Entscheidungsmatch wurde angelegt.', 'success', 2500);
+        this.setState({creatingDeciderKey: null, showMatches: true, decisionModalScore: null});
+        this.reload();
+    }
+
+    onCreateDeciderError() {
+        notify.show('Das Entscheidungsmatch konnte nicht angelegt werden.', 'error', 3000);
+        this.setState({creatingDeciderKey: null});
+    }
+
+    openDecisionModal(score) {
+        this.setState({decisionModalScore: score});
+    }
+
+    closeDecisionModal() {
+        this.setState({decisionModalScore: null});
     }
 
     render() {
@@ -109,11 +200,24 @@ export class Group extends Component {
                                     isSignedIn={this.props.isSignedIn}
                                     isOwner={this.props.isOwner}
                                     onChange={this.reload}
+                                    onFinish={this.reload}
                                     key={match.id}
                                 />
                             ))}
                         </Collapse>
-                        <GroupScoresTable scores={this.state.scores} teams={this.props.teams}/>
+                        <GroupScoresTable scores={this.state.scores} teams={this.props.teams} groupId={this.state.id}
+                            isOwner={this.props.isOwner} isSignedIn={this.props.isSignedIn}
+                            onCreateDecider={this.createDecider} creatingDeciderKey={this.state.creatingDeciderKey}
+                            onDecisionClick={this.openDecisionModal}/>
+                        <RankingDecisionModal
+                            score={this.state.decisionModalScore}
+                            isOpen={this.state.decisionModalScore !== null}
+                            toggle={this.closeDecisionModal}
+                            isOwner={this.props.isOwner}
+                            isSignedIn={this.props.isSignedIn}
+                            onCreateDecider={this.createDecider}
+                            creatingDeciderKey={this.state.creatingDeciderKey}
+                        />
                     </CardBody>
                 </Card>
             </Col>
@@ -123,41 +227,181 @@ export class Group extends Component {
 
 function GroupScoresTable(props) {
     return (
-        <Table className="mt-4" striped size="sm" responsive>
+        <Table className="mt-4 mb-0" striped size="sm" style={{tableLayout: 'fixed', width: '100%'}}>
             <thead>
-            <tr>
-                <th>#</th>
-                <th>Team</th>
-                <th><span title="Punkte">Pkt.</span></th>
-                <th><span title="Becherdifferenz">Dif.</span></th>
-                <th><span title="Getroffene Becher (Geworfen)">Gew.</span></th>
-            </tr>
+                <tr>
+                    <th style={{width: '2.5rem'}}>#</th>
+                    <th>Team</th>
+                    <th style={{width: '3.2rem'}}><span title="Punkte">Pkt.</span></th>
+                    <th style={{width: '3.2rem'}}><span title="Becherdifferenz">Dif.</span></th>
+                    <th style={{width: '3.4rem'}}><span title="Getroffene Becher (Geworfen)">Gew.</span></th>
+                </tr>
             </thead>
             <tbody>
-            {props.scores.map(groupScore => (
-                <GroupScoresTableRow
-                    score={groupScore}
-                    key={groupScore.id}
-                    teams={props.teams}
-                />
-            ))}
+                {props.scores.map(groupScore => (
+                    <GroupScoresTableRow
+                        score={groupScore}
+                        key={groupScore.id}
+                        teams={props.teams}
+                        groupId={props.groupId}
+                        isOwner={props.isOwner}
+                        isSignedIn={props.isSignedIn}
+                        onCreateDecider={props.onCreateDecider}
+                        creatingDeciderKey={props.creatingDeciderKey}
+                        onDecisionClick={props.onDecisionClick}
+                    />
+                ))}
             </tbody>
         </Table>
     );
 }
 
 function GroupScoresTableRow(props) {
-    const advancingTeam = props.teams?.find(team => team.id === props.score.team.id && team.advancing_from_group_stage);
+    const teams = props.teams || [];
+    const advancingTeam = teams.find(team => team.id === props.score.team.id && team.advancing_from_group_stage);
     const rowClass = advancingTeam ? 'table-success' : '';
     const teamId = `favorite-team-groupstage-${props.score.team.id}`;
+    const rankingDecision = props.score.ranking_decision;
+    const decisionButton = renderDecisionButton(props, rankingDecision);
 
     return (
         <tr className={rowClass} id={teamId}>
             <td>{props.score.position}</td>
-            <td>{props.score.team.name}</td>
+            <td>
+                <div className='d-flex align-items-center justify-content-between gap-2'>
+                    <span className='text-break'>{props.score.team.name}</span>
+                    {decisionButton}
+                </div>
+            </td>
             <td>{props.score.group_points}</td>
             <td>{props.score.difference_in_points}</td>
             <td>{props.score.scored_points}</td>
         </tr>
     );
+}
+
+function renderDecisionButton(props, rankingDecision) {
+    if (!shouldRenderDecisionIcon(rankingDecision)) {
+        return null;
+    }
+    const Icon = rankingDecision.needs_decider_match ? FaCircleExclamation : FaCircleInfo;
+    const color = rankingDecision.needs_decider_match ? '#dc3545' : '#0d6efd';
+    const label = rankingDecision.needs_decider_match ? 'Tie-Break nötig' : 'Tie-Break erklärt';
+
+    return (
+        <Button color='link' className='p-0 border-0 text-decoration-none flex-shrink-0'
+            title={label} aria-label={label} data-ranking-decision-trigger={props.score.team.id}
+            onClick={() => props.onDecisionClick(props.score)}>
+            <Icon style={{color: color}}/>
+        </Button>
+    );
+}
+
+function shouldRenderDecisionIcon(rankingDecision) {
+    if (!rankingDecision) {
+        return false;
+    }
+    if (rankingDecision.needs_decider_match) {
+        return true;
+    }
+    return ['direct_comparison', 'hidden_points', 'tie'].includes(rankingDecision.resolved_by);
+}
+
+function RankingDecisionModal(props) {
+    if (!props.score || !props.score.ranking_decision) {
+        return null;
+    }
+
+    const rankingDecision = props.score.ranking_decision;
+    const canCreateDecider = props.isOwner && props.isSignedIn &&
+        rankingDecision.needs_decider_match && !rankingDecision.decider_match_id &&
+        props.score.team.id < rankingDecision.compared_with_team_id;
+    const teamIds = [props.score.team.id, rankingDecision.compared_with_team_id];
+    const createKey = teamIds.join('-');
+
+    return (
+        <Modal isOpen={props.isOpen} toggle={props.toggle}
+            fade={false} contentClassName='ranking-decision-modal-content'>
+            <ModalHeader toggle={props.toggle}>
+                {modalTitleFor(rankingDecision)}
+            </ModalHeader>
+            <ModalBody data-ranking-decision={props.score.team.id}>
+                <p className='mb-3'>
+                    {modalExplanationFor(props.score, rankingDecision)}
+                </p>
+                {rankingDecision.resolved_by === 'direct_comparison' &&
+                    <p className='mb-3'>
+                        Direkter Vergleich gegen {rankingDecision.compared_with_team_name}:{' '}
+                        {translateResult(rankingDecision.direct_comparison_result)}.
+                    </p>}
+                {rankingDecision.resolved_by === 'hidden_points' &&
+                    <p className='mb-3'>
+                        Entscheidungsmatch gegen {rankingDecision.compared_with_team_name}:{' '}
+                        {translateResult(rankingDecision.hidden_points_result)}.
+                    </p>}
+                {rankingDecision.needs_decider_match && rankingDecision.decider_match_id &&
+                    <p className='mb-0 text-muted'>
+                        Das Entscheidungsmatch ist bereits angelegt und erscheint in den Gruppen-Matches.
+                    </p>}
+            </ModalBody>
+            <ModalFooter>
+                {canCreateDecider &&
+                    <Button color='warning' data-create-decider={createKey}
+                        disabled={props.creatingDeciderKey === createKey}
+                        onClick={() => props.onCreateDecider(teamIds)}>
+                        {props.creatingDeciderKey === createKey ? 'Wird angelegt...' : 'Entscheidungsmatch anlegen'}
+                    </Button>}
+                <Button color='secondary' onClick={props.toggle}>Schließen</Button>
+            </ModalFooter>
+        </Modal>
+    );
+}
+
+function modalTitleFor(rankingDecision) {
+    if (rankingDecision.needs_decider_match) {
+        return 'Tie-Break nötig';
+    }
+    if (rankingDecision.resolved_by === 'direct_comparison') {
+        return 'Direkter Vergleich entscheidet';
+    }
+    if (rankingDecision.resolved_by === 'hidden_points') {
+        return 'Entscheidungsmatch entscheidet';
+    }
+    return 'Tie-Break Information';
+}
+
+function modalExplanationFor(score, rankingDecision) {
+    if (rankingDecision.needs_decider_match) {
+        return `${score.team.name} und ${rankingDecision.compared_with_team_name} sind nach Punkten, Differenz, ` +
+            'geworfenen Bechern und direktem Vergleich weiterhin gleichauf. Deshalb braucht es ein ' +
+            'Entscheidungsmatch.';
+    }
+    if (rankingDecision.resolved_by === 'direct_comparison') {
+        return `${score.team.name} wurde über den direkten Vergleich gegen ` +
+            `${rankingDecision.compared_with_team_name} einsortiert.`;
+    }
+    if (rankingDecision.resolved_by === 'hidden_points') {
+        return `${score.team.name} hat das Entscheidungsmatch gegen ` +
+            `${rankingDecision.compared_with_team_name} ${translateResult(rankingDecision.hidden_points_result)}.`;
+    }
+    if (rankingDecision.resolved_by === 'tie') {
+        return `${score.team.name} bleibt mit ${rankingDecision.compared_with_team_name} gleichauf. ` +
+            'Dieser Gleichstand blockiert die Playoffs nicht.';
+    }
+    return 'Die Platzierung wurde über zusätzliche Tie-Break Informationen entschieden.';
+}
+
+function translateResult(result) {
+    switch (result) {
+    case 'won':
+        return 'gewonnen';
+    case 'lost':
+        return 'verloren';
+    case 'draw':
+        return 'unentschieden';
+    case 'not_played':
+        return 'noch nicht gespielt';
+    default:
+        return '';
+    }
 }

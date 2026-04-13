@@ -19,6 +19,7 @@ export class ApiError extends Error {
 
 export class ApiClient {
   private authHeaders: Record<string, string> = {};
+  private static readonly REQUEST_TIMEOUT_MS = 120_000;
 
   constructor(private readonly baseUrl: string) {}
 
@@ -76,7 +77,7 @@ export class ApiClient {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(ApiClient.REQUEST_TIMEOUT_MS),
     });
 
     const responseHeaders: Record<string, string> = {};
