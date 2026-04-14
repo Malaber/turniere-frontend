@@ -51,7 +51,7 @@
     background: rgba(255, 255, 255, 0.04);
     border-left: 3px solid #ffc107;
     border-radius: 3px;
-    padding: 0.35rem 0.65rem;
+    padding: 0.3rem 0.65rem;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -83,20 +83,23 @@
 
 .teamName {
     color: #f0ece2;
-    font-size: 0.85rem;
-    font-weight: 500;
+    font-family: Halt, sans-serif;
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .matchMeta {
-    margin-top: 0.15rem;
+    margin-top: 0.1rem;
 }
 
 .matchLabel {
-    font-size: 0.62rem;
-    color: rgba(240, 236, 226, 0.25);
+    font-family: Halt, sans-serif;
+    font-size: 0.72rem;
+    color: rgba(240, 236, 226, 0.3);
     text-transform: uppercase;
     letter-spacing: 0.06em;
 }
