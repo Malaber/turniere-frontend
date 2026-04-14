@@ -16,7 +16,7 @@ export class GroupsView extends React.Component {
             groups: [],
             page: 0,
             showLogo: false,
-            backgroundColor: this.backgroundColors[0],
+            backgroundColor: this.backgroundColors[0]
         };
         this.increasePage = this.increasePage.bind(this);
     }
@@ -57,7 +57,7 @@ export class GroupsView extends React.Component {
             groups: groups.slice(start, end),
             page: this.page,
             showLogo: this.page === this.pages,
-            backgroundColor: this.backgroundColors[this.page] || 'white',
+            backgroundColor: this.backgroundColors[this.page] || 'white'
         });
     }
 

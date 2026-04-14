@@ -67,7 +67,10 @@ export function getTournamentTimerEnd(tournamentId, successCallback, errorCallba
 }
 
 export function getBeamerByName(tournamentCode, beamerName, successCallback, errorCallback) {
-    getRequest(getState(), '/tournaments/' + tournamentCode + '/beamers/by_name?name=' + encodeURIComponent(beamerName || ''))
+    const encodedName = encodeURIComponent(beamerName || '');
+    const path = '/tournaments/' + tournamentCode
+        + '/beamers/by_name?name=' + encodedName;
+    getRequest(getState(), path)
         .then(response => {
             successCallback(response.status, response.data);
         })

@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-    Col, DropdownItem, DropdownMenu, DropdownToggle, Navbar, NavbarBrand, Row, Spinner,
-    UncontrolledDropdown
-} from 'reactstrap';
+import {Col, Navbar, NavbarBrand, Row, Spinner} from 'reactstrap';
 import {Match} from '../Match';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
 import {Timer} from '../Timer';

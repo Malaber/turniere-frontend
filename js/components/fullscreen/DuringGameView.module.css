@@ -1,0 +1,246 @@
+/* === Timer Container === */
+
+.timerContainer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40vh;
+    padding: 2rem 2rem 1rem;
+}
+
+/* === Animated Timer === */
+
+.timer {
+    display: flex;
+    align-items: baseline;
+    font-family: Halt, sans-serif;
+    font-size: clamp(6rem, 12vw, 14rem);
+    color: #f0ece2;
+    letter-spacing: 0.02em;
+    filter: drop-shadow(0 0 30px rgba(255, 193, 7, 0.12));
+    line-height: 1;
+}
+
+.timerUrgent {
+    color: #ff6b35;
+    filter: drop-shadow(0 0 40px rgba(255, 107, 53, 0.35));
+    animation: bump 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes bump {
+    0% { transform: scale(1); }
+    20% { transform: scale(1.06); }
+    50% { transform: scale(0.98); }
+    100% { transform: scale(1); }
+}
+
+/* Single digit odometer slot */
+
+.digitSlot {
+    display: inline-block;
+    height: 0.95em;
+    width: 0.62em;
+    overflow: hidden;
+    position: relative;
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black 15%,
+        black 85%,
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black 15%,
+        black 85%,
+        transparent 100%
+    );
+}
+
+.digitStrip {
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+    will-change: transform;
+}
+
+.digitValue {
+    flex: 0 0 1.2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.timerSeparator {
+    margin: 0 0.04em;
+    opacity: 0.6;
+}
+
+.timerFinished {
+    font-family: Halt, sans-serif;
+    font-size: clamp(3rem, 7vw, 7rem);
+    color: #ff6b35;
+    text-shadow: 0 0 40px rgba(255, 107, 53, 0.3);
+    animation: finishedPulse 2s ease-in-out infinite;
+}
+
+@keyframes finishedPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.75; transform: scale(1.02); }
+}
+
+.noTimer {
+    font-family: Halt, sans-serif;
+    font-size: clamp(2rem, 4vw, 4rem);
+    color: rgba(240, 236, 226, 0.25);
+}
+
+/* === Match Grid === */
+
+.matchesArea {
+    padding: 0 2rem 6rem;
+}
+
+.matchGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    max-width: 1600px;
+    margin: 0 auto;
+}
+
+/* === Match Card === */
+
+.matchCard {
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 3px solid #ffc107;
+    border-radius: 4px;
+    padding: 0.75rem 1rem;
+    animation-name: cardEnter;
+    animation-duration: 0.5s;
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+    animation-fill-mode: both;
+}
+
+@keyframes cardEnter {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.matchTeamRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.2rem 0;
+}
+
+.matchTeamRow + .matchTeamRow {
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    padding-top: 0.3rem;
+}
+
+.teamName {
+    color: #f0ece2;
+    font-size: 1.1rem;
+    font-weight: 500;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 0.75rem;
+}
+
+.teamNameWinner {
+    color: #f0ece2;
+    font-size: 1.1rem;
+    font-weight: 700;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 0.75rem;
+}
+
+.teamScore {
+    color: #ffc107;
+    font-family: Halt, sans-serif;
+    font-size: 1.4rem;
+    min-width: 2rem;
+    text-align: right;
+}
+
+.matchMeta {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.35rem;
+    padding-top: 0.35rem;
+}
+
+.matchLabel {
+    font-size: 0.72rem;
+    color: rgba(240, 236, 226, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.matchLabelLive {
+    font-size: 0.72rem;
+    color: #ffc107;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+
+.matchesLoading {
+    text-align: center;
+    color: rgba(240, 236, 226, 0.4);
+    padding: 2rem;
+    font-size: 1.1rem;
+}
+
+.matchesEmpty {
+    text-align: center;
+    color: rgba(240, 236, 226, 0.2);
+    font-style: italic;
+    padding: 2rem;
+    font-size: 1.1rem;
+}
+
+/* === Bottom Bar === */
+
+.bottomBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 2rem;
+    background: rgba(15, 25, 35, 0.88);
+    border-top: 1px solid rgba(255, 193, 7, 0.12);
+}
+
+.bottomLabel {
+    color: rgba(240, 236, 226, 0.45);
+    font-style: italic;
+    font-size: 0.9rem;
+    min-width: 20%;
+}
+
+.bottomTitle {
+    font-family: Halt, sans-serif;
+    font-size: 1.5rem;
+    color: #f0ece2;
+}
+
+.bottomTimer {
+    min-width: 20%;
+    text-align: right;
+    font-family: Halt, sans-serif;
+    font-size: 1.3rem;
+    color: #f0ece2;
+}
