@@ -66,6 +66,14 @@ export function getTournamentTimerEnd(tournamentId, successCallback, errorCallba
         .catch(errorCallback);
 }
 
+export function getBeamerByName(tournamentCode, beamerName, successCallback, errorCallback) {
+    getRequest(getState(), '/tournaments/' + tournamentCode + '/beamers/by_name?name=' + encodeURIComponent(beamerName || ''))
+        .then(response => {
+            successCallback(response.status, response.data);
+        })
+        .catch(errorCallback);
+}
+
 function convertTournament(apiTournament) {
     let groupStage = null;
     const playoffStages = [];

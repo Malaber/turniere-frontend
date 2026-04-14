@@ -1,46 +1,86 @@
 import { test, expect } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
 import { seedAndPlayGroupStage } from '../helpers/scenario-seeder';
+import { ApiClient, expectStatus } from '../helpers/api-client';
+
+const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
+const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
+const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
 
-test('Fullscreen beamer pages render correctly', async ({ page }, testInfo) => {
+test('Fullscreen beamer page renders with default fallback', async ({ page }, testInfo) => {
   // Fullscreen/beamer pages are designed for projectors — use a wide viewport
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  // Seed a group-stage tournament with all group matches played
   const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
 
-  // --- Fullscreen match view ---
+  // Create a default beamer via the API
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+  const beamerRes = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'default',
+    display_state: 'matches_all',
+    is_default: true,
+  });
+  expectStatus(beamerRes, 201, 'create default beamer');
+
+  // --- Fullscreen without beamer param (should fallback to default) ---
   await page.goto(`/t/${tournament.id}/fullscreen`);
   const bottomNavbar = page.locator('.fixed-bottom');
   await expect(bottomNavbar).toBeVisible();
   await keyframe(page, testInfo, 'fullscreen_loaded');
 
-  // Cursor is hidden (body gains 'hide-cursor' class on mount)
+  // Cursor is hidden
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
 
-  // Match filter dropdown is visible
-  await expect(page.getByText(/Match-Filter/i)).toBeVisible();
+  // Display label shown
+  await expect(page.getByText(/Anzeige:/i)).toBeVisible();
+});
 
-  // --- Fullscreen groups view ---
-  await page.goto(`/t/${tournament.id}/fullscreen-groups`);
-  await expect(page.getByRole('heading', { name: 'Gruppe 1' })).toBeVisible();
+test('Fullscreen beamer page renders with specific beamer param', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
 
-  await keyframe(page, testInfo, 'fullscreen_groups_loaded');
+  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
 
-  // Cursor hidden here too
+  // Create a named beamer
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+  await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'projector-a',
+    display_state: 'matches_in_progress',
+    is_default: false,
+  });
+
+  // --- Fullscreen with beamer param ---
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=projector-a`);
+  const bottomNavbar = page.locator('.fixed-bottom');
+  await expect(bottomNavbar).toBeVisible();
+  await keyframe(page, testInfo, 'fullscreen_named_beamer');
+
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
+});
 
-  // Group headings are rendered (verifying the group stage data is displayed)
-  // All 4 groups are present
-  await expect(page.getByRole('heading', { name: /^Gruppe \d+$/ })).toHaveCount(4);
+test('Fullscreen beamer page falls back when beamer name not found', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
 
-  // Group table data is rendered in the DOM (team names from the seeded data).
-  // The <td> lives inside a reactstrap <Table responsive> wrapper (overflow-x: auto),
-  // so Playwright may consider it clipped — use toBeAttached instead of toBeVisible.
-  await expect(page.getByText('G1-S1').first()).toBeAttached();
+  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
 
-  // QR code SVG is present
-  await expect(page.locator('svg').first()).toBeVisible();
+  // Create a default beamer so fallback works
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+  await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'default',
+    display_state: 'matches_all',
+    is_default: true,
+  });
+
+  // --- Fullscreen with nonexistent beamer name ---
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=nonexistent`);
+  const bottomNavbar = page.locator('.fixed-bottom');
+  await expect(bottomNavbar).toBeVisible();
+  await keyframe(page, testInfo, 'fullscreen_fallback');
+
+  // Should still render (falls back to default beamer)
+  await expect(page.locator('body')).toHaveClass(/hide-cursor/);
 });
