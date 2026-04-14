@@ -10,6 +10,7 @@ import {connectToBeamerSocket} from '../js/utils/beamerSocket';
 import {MatchesView} from '../js/components/fullscreen/MatchesView';
 import {GroupsView} from '../js/components/fullscreen/GroupsView';
 import {DuringGameView} from '../js/components/fullscreen/DuringGameView';
+import {BetweenGamesView} from '../js/components/fullscreen/BetweenGamesView';
 
 
 const DISPLAY_STATE_LABELS = {
@@ -176,6 +177,10 @@ class Main extends React.Component {
                 matches={matches}
                 timerEnd={timerEnd}/>;
         case 'between_games':
+            return <BetweenGamesView
+                tournamentMeta={tournamentMeta}
+                matches={this.state.loadedMatches ? matches : null}
+                timerEnd={timerEnd}/>;
         case 'matches_all':
         case 'matches_in_progress':
         case 'matches_upcoming':
