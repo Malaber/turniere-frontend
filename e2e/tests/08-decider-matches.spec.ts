@@ -10,6 +10,20 @@ const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
 
+async function setDefaultBeamerDisplayState(client: ApiClient, tournamentId: number, displayState: string) {
+  const beamerRes = await client.get<{ id: number }>(
+    `/tournaments/${tournamentId}/beamers/by_name`,
+    { name: 'default' },
+  );
+  expectStatus(beamerRes, 200, 'fetch default beamer');
+
+  const updateRes = await client.patch(
+    `/tournaments/${tournamentId}/beamers/${beamerRes.json.id}`,
+    { display_state: displayState },
+  );
+  expectStatus(updateRes, 200, `set default beamer to ${displayState}`);
+}
+
 async function expectNoHorizontalOverflow(page) {
   const hasOverflow = await page.evaluate(() => {
     const root = document.documentElement;
@@ -151,13 +165,9 @@ test('Fullscreen groups view keeps decider tables compact', async ({ page }, tes
 
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
-  const beamerRes = await client.post(`/tournaments/${tournament.id}/beamers`, {
-    name: 'groups',
-    display_state: 'groups',
-  });
-  expectStatus(beamerRes, 201, 'create groups beamer');
+  await setDefaultBeamerDisplayState(client, tournament.id, 'groups');
 
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=groups`);
+  await page.goto(`/t/${tournament.id}/fullscreen`);
   await page.waitForLoadState('networkidle');
 
   await expect(page.locator('[data-ranking-decision-trigger]')).toHaveCount(2, { timeout: 15000 });

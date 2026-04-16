@@ -9,6 +9,20 @@ const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
 
+async function setDefaultBeamerDisplayState(client: ApiClient, tournamentId: number, displayState: string) {
+  const beamerRes = await client.get<{ id: number }>(
+    `/tournaments/${tournamentId}/beamers/by_name`,
+    { name: 'default' },
+  );
+  expectStatus(beamerRes, 200, 'fetch default beamer');
+
+  const updateRes = await client.patch(
+    `/tournaments/${tournamentId}/beamers/${beamerRes.json.id}`,
+    { display_state: displayState },
+  );
+  expectStatus(updateRes, 200, `set default beamer to ${displayState}`);
+}
+
 /**
  * Start N group-stage matches (without finishing them) so they appear as
  * in_progress. Returns the IDs of started matches.
@@ -55,23 +69,13 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   );
   expectStatus(timerRes, 200, 'set timer');
 
-  // Create a beamer with during_game display state
-  const beamerRes = await client.post(
-    `/tournaments/${tournament.id}/beamers`,
-    { name: 'during', display_state: 'during_game' },
-  );
-  expectStatus(beamerRes, 201, 'create during_game beamer');
+  await setDefaultBeamerDisplayState(client, tournament.id, 'during_game');
 
-  // Start 14 matches — enough for two full chunks of 6 plus overflow
+  // Start enough matches to populate live grid
   await startMatches(client, tournament.id, 14);
 
   // Open the fullscreen during-game view
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=during`);
-
-  // Wait for the bottom bar to confirm the page loaded
-  const bottomBar = page.locator('.fixed-bottom');
-  await expect(bottomBar).toBeVisible();
-  await keyframe(page, testInfo, 'during_game_loaded');
+  await page.goto(`/t/${tournament.id}/fullscreen`);
 
   // White body background for bright-room projector
   await expect(page.locator('body')).toHaveCSS(
@@ -85,6 +89,7 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   // Timer should be visible
   const timerDigits = page.locator('[class*="digitSlot"]');
   await expect(timerDigits.first()).toBeVisible();
+  await keyframe(page, testInfo, 'during_game_loaded');
 
   // Read which digit each odometer strip shows via its translateY offset
   const readTimer = () =>
@@ -108,41 +113,35 @@ test('During-game view shows animated timer that updates', async ({ page }, test
 test('During-game view rotates match chunks', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament } = await seedGroupStageTournament(4, 4, 8);
+  const { tournament } = await seedGroupStageTournament(6, 4, 8);
 
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
 
-  // Create beamer
-  const beamerRes = await client.post(
-    `/tournaments/${tournament.id}/beamers`,
-    { name: 'rotation', display_state: 'during_game' },
-  );
-  expectStatus(beamerRes, 201, 'create during_game beamer');
+  await setDefaultBeamerDisplayState(client, tournament.id, 'during_game');
 
-  // Start 14 matches — gives 3 chunks (6 + 6 + 2), so both first
-  // and second chunks are full and contain different matches
-  await startMatches(client, tournament.id, 14);
+  // Start 20 matches — enough for page 1 (16) plus page 2 overflow (4)
+  await startMatches(client, tournament.id, 20);
 
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=rotation`);
+  await page.goto(`/t/${tournament.id}/fullscreen`);
 
   // Wait for match cards to render
   const matchCards = page.locator('[class*="matchCard"]');
   await expect(matchCards.first()).toBeVisible();
   await keyframe(page, testInfo, 'during_game_chunk1');
 
-  // First chunk must show exactly 6 cards (a full page)
+  // First chunk must show exactly 16 cards (a full page)
   const firstChunkTexts = await matchCards.allInnerTexts();
-  expect(firstChunkTexts).toHaveLength(6);
+  expect(firstChunkTexts).toHaveLength(16);
 
   // Wait for the 10s chunk rotation cycle plus a small buffer
   await page.waitForTimeout(11_000);
 
-  // Second chunk must also show exactly 6 cards (a full page)
+  // Second chunk shows overflow matches
   const secondChunkTexts = await matchCards.allInnerTexts();
-  expect(secondChunkTexts).toHaveLength(6);
+  expect(secondChunkTexts).toHaveLength(4);
 
-  // The two full chunks must show different matches
+  // Chunks must show different matches
   expect(firstChunkTexts).not.toEqual(secondChunkTexts);
 
   await keyframe(page, testInfo, 'during_game_chunk2');

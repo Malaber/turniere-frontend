@@ -8,6 +8,20 @@ const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
 
+async function setDefaultBeamerDisplayState(client: ApiClient, tournamentId: number, displayState: string) {
+  const beamerRes = await client.get<{ id: number }>(
+    `/tournaments/${tournamentId}/beamers/by_name`,
+    { name: 'default' },
+  );
+  expectStatus(beamerRes, 200, 'fetch default beamer');
+
+  const updateRes = await client.patch(
+    `/tournaments/${tournamentId}/beamers/${beamerRes.json.id}`,
+    { display_state: displayState },
+  );
+  expectStatus(updateRes, 200, `set default beamer to ${displayState}`);
+}
+
 /**
  * Build a group-stage payload where every team name is at least 32 chars.
  * 6 groups × 4 teams = 24 teams → 6 × C(4,2) = 36 group matches.
@@ -47,15 +61,10 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   expectStatus(created, 201, 'create long-name tournament');
   const tournamentId = created.json.id;
 
-  // Create a beamer with between_games display state
-  const beamerRes = await client.post(`/tournaments/${tournamentId}/beamers`, {
-    name: 'between',
-    display_state: 'between_games',
-  });
-  expectStatus(beamerRes, 201, 'create between_games beamer');
+  await setDefaultBeamerDisplayState(client, tournamentId, 'between_games');
 
   // Navigate to fullscreen
-  await page.goto(`/t/${tournamentId}/fullscreen?beamer=between`);
+  await page.goto(`/t/${tournamentId}/fullscreen`);
 
   // Wait for match cards to render
   const matchCards = page.locator('[class*="matchCard"]');
