@@ -1,0 +1,261 @@
+/* === Root layout — fill viewport, no scroll === */
+
+.duringGameRoot {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* === Timer Container — fills remaining space above matches === */
+
+.timerContainer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    min-height: 20vh;
+    container-type: size;
+}
+
+/* === Animated Timer === */
+
+.timer {
+    display: flex;
+    align-items: baseline;
+    font-family: Halt, sans-serif;
+    font-size: clamp(9rem, 75cqh, 20rem);
+    color: #1a1a1a;
+    letter-spacing: 0.02em;
+    line-height: 1;
+}
+
+.timerUrgent {
+    color: #cc0000;
+    animation: bump 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes bump {
+    0% { transform: scale(1); }
+    20% { transform: scale(1.06); }
+    50% { transform: scale(0.98); }
+    100% { transform: scale(1); }
+}
+
+/* Single digit odometer slot */
+
+.digitSlot {
+    display: inline-block;
+    height: 0.95em;
+    width: 0.62em;
+    overflow: hidden;
+    position: relative;
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black 15%,
+        black 85%,
+        transparent 100%
+    );
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        black 15%,
+        black 85%,
+        transparent 100%
+    );
+}
+
+.digitStrip {
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+    will-change: transform;
+}
+
+.digitValue {
+    flex: 0 0 1.2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.timerSeparator {
+    margin: 0 0.04em;
+    opacity: 0.5;
+}
+
+.timerFinished {
+    font-family: Halt, sans-serif;
+    font-size: clamp(3rem, 7vw, 7rem);
+    color: #cc0000;
+    animation: finishedPulse 2s ease-in-out infinite;
+}
+
+@keyframes finishedPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.75; transform: scale(1.02); }
+}
+
+.noTimer {
+    font-family: Halt, sans-serif;
+    font-size: clamp(2rem, 4vw, 4rem);
+    color: rgba(0, 0, 0, 0.25);
+}
+
+/* === Timer takeover — fullscreen countdown / finished === */
+
+.timerTakeover {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+}
+
+/* === Match Grid === */
+
+.matchesArea {
+    flex-shrink: 0;
+    padding: 0 1.5rem 1.5rem;
+    overflow: hidden;
+}
+
+.matchGrid {
+    display: grid;
+    gap: 0.75rem;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+/* === Match Card === */
+
+.matchCard {
+    background: #d4edda;
+    border-left: 4px solid #1b7a2b;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    overflow: hidden;
+    container-type: size;
+    aspect-ratio: 5 / 1;
+    animation-name: cardEnter;
+    animation-duration: 0.5s;
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+    animation-fill-mode: both;
+}
+
+@keyframes cardEnter {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.matchContent {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(0.3rem, 8cqh, 1.5rem) clamp(0.6rem, 5cqw, 2rem);
+}
+
+.matchBadge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1b7a2b;
+    color: #ffffff;
+    font-size: clamp(1.2rem, 25cqh, 3.2rem);
+    font-weight: 700;
+    width: 2ch;
+    padding: 0 clamp(0.2rem, 2cqw, 0.6rem);
+    flex-shrink: 0;
+    box-sizing: content-box;
+}
+
+.matchTeamRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.1rem 0;
+}
+
+.matchTeamRow + .matchTeamRow {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding-top: 0.15rem;
+}
+
+.teamName {
+    color: #1a1a1a;
+    font-size: clamp(1.1rem, 18cqh, 2.2rem);
+    font-weight: 600;
+    flex: 1;
+    overflow: hidden;
+    line-height: 1.15;
+    padding-right: 0.5rem;
+}
+
+.teamNameWinner {
+    color: #1a1a1a;
+    font-size: clamp(1.1rem, 18cqh, 2.2rem);
+    font-weight: 800;
+    flex: 1;
+    overflow: hidden;
+    line-height: 1.15;
+    padding-right: 0.5rem;
+}
+
+.teamScore {
+    color: #0055b8;
+    font-family: Halt, sans-serif;
+    font-size: clamp(1rem, 21cqh, 2.6rem);
+    font-weight: 700;
+    min-width: 1.75rem;
+    text-align: right;
+}
+
+.matchesLoading {
+    text-align: center;
+    color: rgba(0, 0, 0, 0.4);
+    padding: 2rem;
+    font-size: 1.1rem;
+}
+
+.matchesEmpty {
+    text-align: center;
+    color: rgba(0, 0, 0, 0.3);
+    font-style: italic;
+    padding: 2rem;
+    font-size: 1.1rem;
+}
+
+/* === Page indicator dots === */
+
+.pageIndicator {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0;
+}
+
+.pageDot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.pageDotActive {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #1b7a2b;
+}
+

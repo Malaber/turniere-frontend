@@ -21,7 +21,7 @@ export class ApiClient {
   private authHeaders: Record<string, string> = {};
   private static readonly REQUEST_TIMEOUT_MS = 120_000;
 
-  constructor(private readonly baseUrl: string) {}
+  constructor(private readonly baseUrl: string) { }
 
   isAuthenticated(): boolean {
     return Object.keys(this.authHeaders).length > 0;

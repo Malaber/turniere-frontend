@@ -210,7 +210,7 @@ async function finishStage(client: ApiClient, stageId: number): Promise<void> {
 }
 
 async function runPlayoffsUntilBeforeFinal(client: ApiClient, tournamentId: number): Promise<void> {
-  for (;;) {
+  for (; ;) {
     const tournament = await fetchTournament(client, tournamentId);
     const playable = playoffMatches(tournament)
       .filter((m) => m.stage_level !== 0 && m.state === 'not_started')
@@ -222,7 +222,7 @@ async function runPlayoffsUntilBeforeFinal(client: ApiClient, tournamentId: numb
 }
 
 async function runPlayoffsToCompletion(client: ApiClient, tournamentId: number): Promise<void> {
-  for (;;) {
+  for (; ;) {
     const tournament = await fetchTournament(client, tournamentId);
     const playable = playoffMatches(tournament)
       .filter((m) => m.state === 'not_started')

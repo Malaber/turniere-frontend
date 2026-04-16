@@ -84,10 +84,9 @@ frontend e2e:
     - echo "Waiting for backend…"
     - until curl -sf http://backend:3000/healthz 2>/dev/null; do sleep 2; done
     - echo "Backend is ready."
-    # Install Playwright test dependencies
+    # Install JS deps. Browser already ships in Playwright CI image.
     - cd e2e
     - npm ci
-    - npx playwright install --with-deps chromium
   script:
     - npx playwright test
   artifacts:

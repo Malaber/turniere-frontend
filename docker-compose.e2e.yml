@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: turniere
       POSTGRES_PASSWORD: turniere
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U turniere -d turniere_e2e"]
+      test: [ "CMD-SHELL", "pg_isready -U turniere -d turniere_e2e" ]
       interval: 3s
       timeout: 3s
       retries: 20
@@ -14,7 +14,7 @@ services:
   # Run migrations + bootstrap the E2E user, then start the server — all in one
   # container so there is no init-container-exits-prematurely race.
   backend:
-    image: registry.gitlab.com/turniere/turniere-backend/production:${BACKEND_VERSION:-latest}
+    image: registry.gitlab.com/turniere/turniere-backend/production/commits:${BACKEND_VERSION:-latest}
     platform: linux/amd64
     depends_on:
       postgres:
@@ -38,7 +38,7 @@ services:
         bundle exec rails runner "user = User.find_or_initialize_by(email: ENV.fetch('TURNIERE_E2E_EMAIL', 'e2e@example.com')); user.username = ENV.fetch('TURNIERE_E2E_USERNAME', 'e2e-user'); user.password = ENV.fetch('TURNIERE_E2E_PASSWORD', 'password123'); user.password_confirmation = ENV.fetch('TURNIERE_E2E_PASSWORD', 'password123'); user.confirmed_at = Time.current; user.uid = user.email; user.provider = 'email'; user.save!"
         exec bundle exec rails s -p 3000 -b 0.0.0.0
     healthcheck:
-      test: ["CMD-SHELL", "ruby -e \"require 'net/http'; exit Net::HTTP.get_response(URI('http://localhost:3000/healthz')).code == '200' ? 0 : 1\""]
+      test: [ "CMD-SHELL", "ruby -e \"require 'net/http'; exit Net::HTTP.get_response(URI('http://localhost:3000/healthz')).code == '200' ? 0 : 1\"" ]
       interval: 5s
       timeout: 10s
       retries: 30

@@ -144,10 +144,10 @@ test('Fullscreen groups view keeps decider tables compact', async ({ page }, tes
   await page.setViewportSize({ width: 1920, height: 1080 });
   const { tournament } = await seedRelevantDeciderScenario();
 
-  await page.goto(`/t/${tournament.id}/fullscreen-groups`);
+  await page.goto(`/t/${tournament.id}/fullscreen?display=groups`);
   await page.waitForLoadState('networkidle');
 
-  await expect(page.locator('[data-ranking-decision-trigger]')).toHaveCount(2);
+  await expect(page.locator('[data-ranking-decision-trigger]')).toHaveCount(2, { timeout: 15000 });
   await expectNoHorizontalOverflow(page);
   await keyframe(page, testInfo, 'fullscreen_decider_groups');
 });

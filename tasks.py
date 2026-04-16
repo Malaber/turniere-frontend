@@ -352,7 +352,14 @@ def e2e_docker(c, backend_version="latest", keep_running=False):
     exit_error = None
 
     try:
-        _compose(["up", "-d", "postgres", "backend", "frontend"], env=env)
+        # Always rebuild and recreate the local frontend before Playwright runs.
+        # Without this, repeated local E2E runs can silently reuse an older
+        # container image and exercise stale fullscreen code.
+        _compose(["build", "frontend"], env=env)
+        _compose(
+            ["up", "-d", "--force-recreate", "postgres", "backend", "frontend"],
+            env=env,
+        )
         _compose(["run", "--rm", "e2e"], env=env)
     except subprocess.CalledProcessError as error:
         exit_error = error
