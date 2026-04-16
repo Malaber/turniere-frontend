@@ -25,6 +25,11 @@ export const defaultStateTournamentinfo = {
     name: '',
     ownerUsername: '',
     isPublic: '',
+    readOnlyMode: false,
+    syncTargetUrl: '',
+    syncAuthToken: '',
+    syncLastPushedAt: null,
+    syncLastPushError: '',
     stages: [],
     teams: []
     // date: null

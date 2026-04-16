@@ -497,3 +497,18 @@ export async function seedIrrelevantTieScenario(): Promise<SeededTournament> {
   tournament = await fetchTournament(client, tournament.id);
   return { tournament, code: tournament.code };
 }
+
+export async function seedReadOnlyFollowerTournament(): Promise<SeededTournament> {
+  const client = await makeClient();
+  const created = await client.post<Tournament>('/tournaments', {
+    name: `E2E Read Only ${Math.random().toString(36).slice(2, 8)}`,
+    description: 'Playwright follower tournament',
+    public: true,
+    read_only_mode: true,
+    sync_auth_token: 'shared-secret',
+  });
+  expectStatus(created, 201, 'create read only follower tournament');
+
+  const tournament = await fetchTournament(client, (created.json as { id: number }).id);
+  return { tournament, code: tournament.code };
+}

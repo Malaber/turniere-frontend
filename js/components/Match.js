@@ -27,9 +27,9 @@ export class Match extends React.Component {
     }
 
     toggleModal() {
-        const {isSignedIn, isOwner} = this.props;
+        const {isSignedIn, isOwner, readOnlyMode} = this.props;
 
-        if (isSignedIn && isOwner) {
+        if (isSignedIn && isOwner && !readOnlyMode) {
             this.setState({modal: !this.state.modal});
         }
     }

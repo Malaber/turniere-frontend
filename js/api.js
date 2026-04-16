@@ -235,6 +235,11 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
             name: action.parameters.name,
             ownerUsername: action.parameters.owner_username,
             isPublic: action.parameters.public,
+            readOnlyMode: action.parameters.read_only_mode === true,
+            syncTargetUrl: action.parameters.sync_target_url || '',
+            syncAuthToken: action.parameters.sync_auth_token || '',
+            syncLastPushedAt: action.parameters.sync_last_pushed_at || null,
+            syncLastPushError: action.parameters.sync_last_push_error || '',
             stages: action.parameters.stages,
             teams: action.parameters.teams
         });
@@ -544,6 +549,24 @@ export function updateTeamName(team, successCB, errorCB) {
             onError: errorCB
         },
         state: __store.getState()
+    });
+}
+
+export function updateTournament(tournamentId, data, successCallback, errorCallback) {
+    patchRequest(__store.getState(), '/tournaments/' + tournamentId, data).then(resp => {
+        storeOptionalToken(resp);
+        __store.dispatch({
+            type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
+            parameters: resp.data
+        });
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
     });
 }
 

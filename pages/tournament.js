@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import React from 'react';
 import {connect} from 'react-redux';
-import {ButtonGroup} from 'reactstrap';
+import {Alert, Badge, ButtonGroup} from 'reactstrap';
 
 
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
@@ -23,11 +23,21 @@ class PrivateTournamentPage extends React.Component {
         const {ownerUsername, playoffStages, groupStage} = this.props.tournament;
         const {isSignedIn, username} = this.props;
         const isOwner = username === ownerUsername;
+        const isReadOnly = this.props.tournament.readOnlyMode === true;
 
         return (
             <div className='pb-5'>
                 <TournamentBigImage {...this.props.tournament}/>
                 <StatusBar tournament={this.props.tournament} isOwner={isOwner} isSignedIn={isSignedIn}/>
+                {isReadOnly &&
+                    <div className='container mt-3'>
+                        <Alert color='warning' data-testid='readonly-tournament-banner'>
+                            <div className='d-flex align-items-center justify-content-between gap-2 flex-wrap'>
+                                <span>Follower-Modus aktiv. Live-Aktionen sind auf dieser Ansicht gesperrt.</span>
+                                <Badge color='warning' pill>Read only</Badge>
+                            </div>
+                        </Alert>
+                    </div>}
                 <FavoriteBar teams={this.props.tournament.teams} tournamentId={this.props.tournament.id}/>
                 <div className='stages'>
                     {groupStage != null &&
@@ -37,11 +47,12 @@ class PrivateTournamentPage extends React.Component {
                         stageState={groupStage.state}
                         isSignedIn={isSignedIn}
                         isOwner={isOwner}
+                        readOnlyMode={isReadOnly}
                         teams={this.props.tournament.teams}
                         onTournamentChange={this.props.onTournamentChange}
                     /></div>}
                     <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
-                        isOwner={isOwner}/>
+                        isOwner={isOwner} readOnlyMode={isReadOnly}/>
                 </div>
                 <ScrollToTopButton />
             </div>

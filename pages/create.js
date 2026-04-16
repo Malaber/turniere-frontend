@@ -67,6 +67,8 @@ class CreateTournamentForm extends React.Component {
             groupPhaseEnabled: false,
 
             name: '', description: '', public: false,
+            readOnlyMode: false,
+            syncAuthToken: '',
 
             groupSize: 4, groupAdvance: 1, teams: [], groups: []
         };
@@ -77,6 +79,8 @@ class CreateTournamentForm extends React.Component {
         this.handleNameInput = this.handleNameInput.bind(this);
         this.handleDescriptionInput = this.handleDescriptionInput.bind(this);
         this.handlePublicInput = this.handlePublicInput.bind(this);
+        this.handleReadOnlyModeInput = this.handleReadOnlyModeInput.bind(this);
+        this.handleSyncAuthTokenInput = this.handleSyncAuthTokenInput.bind(this);
         this.increaseGroupAdvance = this.increaseGroupAdvance.bind(this);
         this.decreaseGroupAdvance = this.decreaseGroupAdvance.bind(this);
         this.increaseGroupSize = this.increaseGroupSize.bind(this);
@@ -108,12 +112,30 @@ class CreateTournamentForm extends React.Component {
                             onChange={this.handlePublicInput}/>
                     </FormGroup>
                     <FormGroup check>
+                        <Label for="read-only-mode" check>Read-only Follower anlegen</Label>
+                        <Input type="checkbox" id="read-only-mode"
+                            checked={this.state.readOnlyMode}
+                            onChange={this.handleReadOnlyModeInput}/>
+                    </FormGroup>
+                    {this.state.readOnlyMode &&
+                        <FormGroup className="mt-3">
+                            <Label for="sync-auth-token">Sync-Token</Label>
+                            <Input type="text" id="sync-auth-token" name="sync-auth-token" required
+                                value={this.state.syncAuthToken}
+                                onChange={this.handleSyncAuthTokenInput}/>
+                            <small className="text-muted">
+                                Follower braucht nur gemeinsamen Token. Teams werden leer angelegt und spater vom
+                                Leader gespiegelt.
+                            </small>
+                        </FormGroup>}
+                    <FormGroup check>
                         <Label for="mix-teams" check>Teams mischen</Label>
                         <Input type="checkbox" id="mix-teams"/>
                     </FormGroup>
                     <FormGroup check>
                         <Label for="group-phase" check>Gruppenphase</Label>
                         <Input type="checkbox" id="group-phase"
+                            disabled={this.state.readOnlyMode}
                             checked={this.state.groupPhaseEnabled}
                             onChange={this.handleGroupPhaseEnabledInput}/>
                     </FormGroup>
@@ -147,18 +169,20 @@ class CreateTournamentForm extends React.Component {
                     </FormGroup>
                 </Collapse>
             </Form>
-            <h3 className="custom-font mt-4">Teams</h3>
-            <EditableStringList
-                addButtonText="hinzufügen"
-                teamPlaceholder="Keine Teams hinzugefügt!"
-                groupPlaceHolder="Keine Gruppen verfügbar!"
-                teams={[]}
-                groups={[]}
-                groupPhaseEnabled={this.state.groupPhaseEnabled}
-                groupSize={this.state.groupSize}
-                onTeamsChange={this.teamListUpdate}
-                onGroupsChange={this.groupListUpdate}
-                inputPlaceholder="Teamname"/>
+            {!this.state.readOnlyMode && <>
+                <h3 className="custom-font mt-4">Teams</h3>
+                <EditableStringList
+                    addButtonText="hinzufügen"
+                    teamPlaceholder="Keine Teams hinzugefügt!"
+                    groupPlaceHolder="Keine Gruppen verfügbar!"
+                    teams={[]}
+                    groups={[]}
+                    groupPhaseEnabled={this.state.groupPhaseEnabled}
+                    groupSize={this.state.groupSize}
+                    onTeamsChange={this.teamListUpdate}
+                    onGroupsChange={this.groupListUpdate}
+                    inputPlaceholder="Teamname"/>
+            </>}
             <Button color="success" size="lg" className="w-100 shadow-sm mt-4" onClick={this.create}>Turnier
                     erstellen</Button>
         </div>);
@@ -222,6 +246,17 @@ class CreateTournamentForm extends React.Component {
         this.setState({public: input.target.checked});
     }
 
+    handleReadOnlyModeInput(input) {
+        this.setState({
+            readOnlyMode: input.target.checked,
+            groupPhaseEnabled: input.target.checked ? false : this.state.groupPhaseEnabled
+        });
+    }
+
+    handleSyncAuthTokenInput(input) {
+        this.setState({syncAuthToken: input.target.value});
+    }
+
     create() {
         if (this.valuesAreCredible()) {
             createTournament(this.generateTournamentCreationObject(), data => {
@@ -235,10 +270,23 @@ class CreateTournamentForm extends React.Component {
     }
 
     valuesAreCredible() {
+        if (this.state.readOnlyMode) {
+            return this.state.name.trim().length > 0 && this.state.syncAuthToken.trim().length > 0;
+        }
         return this.state.teams.length >= this.state.groupAdvance && !this.areGroupsIncomplete();
     }
 
     generateTournamentCreationObject() {
+        if (this.state.readOnlyMode) {
+            return {
+                'name': this.state.name,
+                'description': this.state.description,
+                'public': this.state.public,
+                'read_only_mode': true,
+                'sync_auth_token': this.state.syncAuthToken.trim()
+            };
+        }
+
         const tournament = {
             'name': this.state.name,
             'description': this.state.description,
