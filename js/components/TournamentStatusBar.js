@@ -12,10 +12,10 @@ export function TournamentStatusBar(props) {
 }
 
 export function EditButton(props) {
-    const {tournamentCode, isOwner, isSignedIn} = props;
+    const {tournamentId, isOwner, isSignedIn} = props;
 
     if (isSignedIn && isOwner) {
-        return (<LinkButton href={'/t/' + tournamentCode + '/edit'}>
+        return (<LinkButton href={'/t/' + tournamentId + '/edit'}>
             Turnier bearbeiten
         </LinkButton>);
     } else {

@@ -38,13 +38,13 @@ class StatisticsTournamentPage extends React.Component {
                 <TournamentBigImage {...tournamentStatistics}/>
                 <TournamentStatusBar>
                     <ButtonGroup className='me-auto'>
-                        <EditButton tournamentCode={tournamentStatistics.code}
+                        <EditButton tournamentId={tournamentStatistics.id}
                             isOwner={this.props.username === tournamentStatistics.ownerUsername}
                             isSignedIn={this.props.isSignedIn}/>
-                        <LinkButton href={'/t/' + tournamentStatistics.code}>
+                        <LinkButton href={'/t/' + tournamentStatistics.id}>
                             zurück zum Turnier
                         </LinkButton>
-                        <LinkButton href={'/t/' + tournamentStatistics.code + '/fullscreen'}>
+                        <LinkButton href={'/t/' + tournamentStatistics.id + '/fullscreen'}>
                             Turnier-Vollbild-Ansicht
                         </LinkButton>
                     </ButtonGroup>

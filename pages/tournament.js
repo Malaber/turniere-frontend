@@ -63,21 +63,21 @@ class PrivateTournamentPage extends React.Component {
 function StatusBar(props) {
     return (<TournamentStatusBar>
         <ButtonGroup className='me-auto'>
-            <EditButton tournamentCode={props.tournament.code} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
-            <StatisticsButton tournamentCode={props.tournament.code}/>
-            <FullscreenButton tournamentCode={props.tournament.code}/>
+            <EditButton tournamentId={props.tournament.id} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
+            <StatisticsButton tournamentId={props.tournament.id}/>
+            <FullscreenButton tournamentId={props.tournament.id}/>
         </ButtonGroup>
     </TournamentStatusBar>);
 }
 
 function StatisticsButton(props) {
-    return (<LinkButton href={'/t/' + props.tournamentCode + '/statistics'}>
+    return (<LinkButton href={'/t/' + props.tournamentId + '/statistics'}>
         Statistiken
     </LinkButton>);
 }
 
 function FullscreenButton(props) {
-    return (<LinkButton href={'/t/' + props.tournamentCode + '/fullscreen'}>
+    return (<LinkButton href={'/t/' + props.tournamentId + '/fullscreen'}>
         Vollbild-Ansicht
     </LinkButton>);
 }

@@ -32,7 +32,7 @@ class EditTournamentPage extends React.Component {
     }
 
     componentDidMount() {
-        requestTournament(this.props.query.code, () => {
+        requestTournament(this.props.query.id, () => {
             this.setState({validCode: true, loaded: true});
 
             if (this._edittournamentcontent != null) {
