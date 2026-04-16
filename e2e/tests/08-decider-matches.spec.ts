@@ -154,7 +154,6 @@ test('Fullscreen groups view keeps decider tables compact', async ({ page }, tes
   const beamerRes = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'groups',
     display_state: 'groups',
-    is_default: false,
   });
   expectStatus(beamerRes, 201, 'create groups beamer');
 

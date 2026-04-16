@@ -51,7 +51,6 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   const beamerRes = await client.post(`/tournaments/${tournamentId}/beamers`, {
     name: 'between',
     display_state: 'between_games',
-    is_default: false,
   });
   expectStatus(beamerRes, 201, 'create between_games beamer');
 

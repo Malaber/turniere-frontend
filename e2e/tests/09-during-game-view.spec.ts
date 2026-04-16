@@ -58,7 +58,7 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   // Create a beamer with during_game display state
   const beamerRes = await client.post(
     `/tournaments/${tournament.id}/beamers`,
-    { name: 'during', display_state: 'during_game', is_default: false },
+    { name: 'during', display_state: 'during_game' },
   );
   expectStatus(beamerRes, 201, 'create during_game beamer');
 
@@ -116,7 +116,7 @@ test('During-game view rotates match chunks', async ({ page }, testInfo) => {
   // Create beamer
   const beamerRes = await client.post(
     `/tournaments/${tournament.id}/beamers`,
-    { name: 'rotation', display_state: 'during_game', is_default: false },
+    { name: 'rotation', display_state: 'during_game' },
   );
   expectStatus(beamerRes, 201, 'create during_game beamer');
 

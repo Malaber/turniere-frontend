@@ -18,12 +18,6 @@ test('Fullscreen beamer page renders with default fallback', async ({ page }, te
   // Create a default beamer via the API
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
-  const beamerRes = await client.post(`/tournaments/${tournament.id}/beamers`, {
-    name: 'default',
-    display_state: 'matches_all',
-    is_default: true,
-  });
-  expectStatus(beamerRes, 201, 'create default beamer');
 
   // --- Fullscreen without beamer param (should fallback to default) ---
   await page.goto(`/t/${tournament.id}/fullscreen`);
@@ -49,7 +43,6 @@ test('Fullscreen beamer page renders with specific beamer param', async ({ page 
   await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'projector-a',
     display_state: 'matches_in_progress',
-    is_default: false,
   });
 
   // --- Fullscreen with beamer param ---
@@ -69,11 +62,6 @@ test('Fullscreen beamer page falls back when beamer name not found', async ({ pa
   // Create a default beamer so fallback works
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
-  await client.post(`/tournaments/${tournament.id}/beamers`, {
-    name: 'default',
-    display_state: 'matches_all',
-    is_default: true,
-  });
 
   // --- Fullscreen with nonexistent beamer name ---
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=nonexistent`);
