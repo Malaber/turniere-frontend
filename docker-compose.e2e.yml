@@ -14,7 +14,7 @@ services:
   # Run migrations + bootstrap the E2E user, then start the server — all in one
   # container so there is no init-container-exits-prematurely race.
   backend:
-    image: registry.gitlab.com/turniere/turniere-backend/production:${BACKEND_VERSION:-latest}
+    image: registry.gitlab.com/turniere/turniere-backend/production/commits:${BACKEND_VERSION:-latest}
     platform: linux/amd64
     depends_on:
       postgres:

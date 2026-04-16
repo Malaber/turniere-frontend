@@ -25,7 +25,7 @@ frontend e2e:
     - name: postgres:16
       alias: postgres
     # Production backend server
-    - name: $CI_REGISTRY/turniere/turniere-backend/production:latest
+    - name: $CI_REGISTRY/turniere/turniere-backend/production/commits:latest
       alias: backend
       command:
         - bash
