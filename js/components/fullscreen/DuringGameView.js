@@ -1,7 +1,6 @@
 import React from 'react';
 import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
-import {Timer} from '../Timer';
 import styles from './DuringGameView.module.css';
 
 
@@ -147,34 +146,28 @@ function FullscreenMatchCard({match, index}) {
     const t1Cls = t1Win ? styles.teamNameWinner : styles.teamName;
     const t2Cls = t2Win ? styles.teamNameWinner : styles.teamName;
 
-    const isLive = match.state === 'in_progress';
-    const lblCls = isLive
-        ? styles.matchLabelLive : styles.matchLabel;
-
     const delay = (index * 0.06) + 's';
-    const groupLabel = match.group
-        ? 'Gr. ' + match.group.number + ' \u00b7 ' : '';
+    const badge = match.group
+        ? match.group.number
+        : match.position;
 
     return (
         <div
             className={styles.matchCard}
             style={{animationDelay: delay}}
         >
-            <div className={styles.matchTeamRow}>
-                <span className={t1Cls}>{team1.name}</span>
-                <span className={styles.teamScore}>{score1}</span>
+            <div className={styles.matchContent}>
+                <div className={styles.matchTeamRow}>
+                    <span className={t1Cls}>{team1.name}</span>
+                    <span className={styles.teamScore}>{score1}</span>
+                </div>
+                <div className={styles.matchTeamRow}>
+                    <span className={t2Cls}>{team2.name}</span>
+                    <span className={styles.teamScore}>{score2}</span>
+                </div>
             </div>
-            <div className={styles.matchTeamRow}>
-                <span className={t2Cls}>{team2.name}</span>
-                <span className={styles.teamScore}>{score2}</span>
-            </div>
-            <div className={styles.matchMeta}>
-                <span className={lblCls}>
-                    {isLive ? 'läuft' : ''}
-                </span>
-                <span className={styles.matchLabel}>
-                    {groupLabel}Sp. {match.position}
-                </span>
+            <div className={styles.matchBadge}>
+                {badge}
             </div>
         </div>
     );
@@ -268,27 +261,9 @@ export class DuringGameView extends React.Component {
                     {matchContent}
                 </div>
 
-                <div className={
-                    styles.bottomBar + ' fixed-bottom'
-                }>
-                    <span className={styles.bottomLabel}>
-                        Während dem Spiel
-                    </span>
-                    <span className={styles.bottomTitle}>
-                        {tournamentMeta
-                            ? tournamentMeta.name : ''}
-                    </span>
-                    <span className={styles.bottomTimer}>
-                        {timerEnd && <span>
-                            Spielzeit:{' '}
-                            <Timer timerEnd={timerEnd}/>
-                        </span>}
-                    </span>
-                </div>
-
-                <style global jsx>{`
+<style global jsx>{`
                     body {
-                        background: #0f1923;
+                        background: #ffffff;
                     }
                 `}</style>
             </div>

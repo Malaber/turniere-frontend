@@ -63,31 +63,25 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   await expect(matchCards.first()).toBeVisible();
   await keyframe(page, testInfo, 'between_games_loaded');
 
-  // Dark background
+  // White background for bright-room projector
   await expect(page.locator('body')).toHaveCSS(
     'background-color',
-    'rgb(15, 25, 35)',
+    'rgb(255, 255, 255)',
   );
 
   // First page shows exactly 32 cards (36 total, capped at 32)
   await expect(matchCards).toHaveCount(32);
 
-  // Every visible team name must be truncated to at most 20 chars
-  // (originals are 32+ chars, so all should end with ellipsis)
+  // Team names are rendered (CSS handles truncation via text-overflow)
   const teamNames = page.locator('[class*="teamName"]');
-  const texts = await teamNames.allInnerTexts();
-  expect(texts.length).toBe(64); // 32 matches × 2 teams
+  await expect(teamNames).toHaveCount(64); // 32 matches × 2 teams
 
-  for (const text of texts) {
-    expect(text.length).toBeLessThanOrEqual(20);
-    // Must end with ellipsis since originals exceed 20 chars
-    expect(text).toMatch(/\u2026$/);
-  }
-
-  // Group labels should be present
-  const labels = page.locator('[class*="matchLabel"]');
-  const labelTexts = await labels.allInnerTexts();
-  expect(labelTexts.some((t) => t.startsWith('GRUPPE'))).toBe(true);
+  // Group number badges should be present
+  const badges = page.locator('[class*="matchBadge"]');
+  const badgeTexts = await badges.allInnerTexts();
+  expect(badgeTexts.length).toBe(32);
+  // Badges show group numbers (1-6)
+  expect(badgeTexts.every((t) => /^\d+$/.test(t))).toBe(true);
 
   await keyframe(page, testInfo, 'between_games_truncated_names');
 

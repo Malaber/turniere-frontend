@@ -15,15 +15,13 @@
     align-items: baseline;
     font-family: Halt, sans-serif;
     font-size: clamp(6rem, 12vw, 14rem);
-    color: #f0ece2;
+    color: #1a1a1a;
     letter-spacing: 0.02em;
-    filter: drop-shadow(0 0 30px rgba(255, 193, 7, 0.12));
     line-height: 1;
 }
 
 .timerUrgent {
-    color: #ff6b35;
-    filter: drop-shadow(0 0 40px rgba(255, 107, 53, 0.35));
+    color: #cc0000;
     animation: bump 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97);
 }
 
@@ -74,14 +72,13 @@
 
 .timerSeparator {
     margin: 0 0.04em;
-    opacity: 0.6;
+    opacity: 0.5;
 }
 
 .timerFinished {
     font-family: Halt, sans-serif;
     font-size: clamp(3rem, 7vw, 7rem);
-    color: #ff6b35;
-    text-shadow: 0 0 40px rgba(255, 107, 53, 0.3);
+    color: #cc0000;
     animation: finishedPulse 2s ease-in-out infinite;
 }
 
@@ -93,13 +90,13 @@
 .noTimer {
     font-family: Halt, sans-serif;
     font-size: clamp(2rem, 4vw, 4rem);
-    color: rgba(240, 236, 226, 0.25);
+    color: rgba(0, 0, 0, 0.25);
 }
 
 /* === Match Grid === */
 
 .matchesArea {
-    padding: 0 2rem 6rem;
+    padding: 0 2rem 2rem;
 }
 
 .matchGrid {
@@ -113,10 +110,13 @@
 /* === Match Card === */
 
 .matchCard {
-    background: rgba(255, 255, 255, 0.05);
-    border-left: 3px solid #ffc107;
+    background: #d4edda;
+    border-left: 4px solid #1b7a2b;
     border-radius: 4px;
-    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    overflow: hidden;
     animation-name: cardEnter;
     animation-duration: 0.5s;
     animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
@@ -134,6 +134,28 @@
     }
 }
 
+.matchContent {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.5rem 0.75rem;
+}
+
+.matchBadge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1b7a2b;
+    color: #ffffff;
+    font-size: 2rem;
+    font-weight: 700;
+    min-width: 2.5rem;
+    padding: 0 0.4rem;
+    flex-shrink: 0;
+}
+
 .matchTeamRow {
     display: flex;
     justify-content: space-between;
@@ -142,14 +164,14 @@
 }
 
 .matchTeamRow + .matchTeamRow {
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
     padding-top: 0.3rem;
 }
 
 .teamName {
-    color: #f0ece2;
-    font-size: 1.1rem;
-    font-weight: 500;
+    color: #1a1a1a;
+    font-size: 1.15rem;
+    font-weight: 600;
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -158,9 +180,9 @@
 }
 
 .teamNameWinner {
-    color: #f0ece2;
-    font-size: 1.1rem;
-    font-weight: 700;
+    color: #1a1a1a;
+    font-size: 1.15rem;
+    font-weight: 800;
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -169,78 +191,26 @@
 }
 
 .teamScore {
-    color: #ffc107;
+    color: #0055b8;
     font-family: Halt, sans-serif;
-    font-size: 1.4rem;
+    font-size: 1.5rem;
+    font-weight: 700;
     min-width: 2rem;
     text-align: right;
 }
 
-.matchMeta {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 0.35rem;
-    padding-top: 0.35rem;
-}
-
-.matchLabel {
-    font-size: 0.72rem;
-    color: rgba(240, 236, 226, 0.3);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-.matchLabelLive {
-    font-size: 0.72rem;
-    color: #ffc107;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-weight: 600;
-}
-
 .matchesLoading {
     text-align: center;
-    color: rgba(240, 236, 226, 0.4);
+    color: rgba(0, 0, 0, 0.4);
     padding: 2rem;
     font-size: 1.1rem;
 }
 
 .matchesEmpty {
     text-align: center;
-    color: rgba(240, 236, 226, 0.2);
+    color: rgba(0, 0, 0, 0.3);
     font-style: italic;
     padding: 2rem;
     font-size: 1.1rem;
 }
 
-/* === Bottom Bar === */
-
-.bottomBar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 2rem;
-    background: rgba(15, 25, 35, 0.88);
-    border-top: 1px solid rgba(255, 193, 7, 0.12);
-}
-
-.bottomLabel {
-    color: rgba(240, 236, 226, 0.45);
-    font-style: italic;
-    font-size: 0.9rem;
-    min-width: 20%;
-}
-
-.bottomTitle {
-    font-family: Halt, sans-serif;
-    font-size: 1.5rem;
-    color: #f0ece2;
-}
-
-.bottomTimer {
-    min-width: 20%;
-    text-align: right;
-    font-family: Halt, sans-serif;
-    font-size: 1.3rem;
-    color: #f0ece2;
-}

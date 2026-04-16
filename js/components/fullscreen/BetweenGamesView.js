@@ -6,42 +6,35 @@ import styles from './BetweenGamesView.module.css';
 
 const MATCHES_PER_PAGE = 32;
 const CHUNK_CYCLE_MS = 12000;
-const MAX_TEAM_NAME = 20;
-
-
-function truncate(name) {
-    if (!name || name.length <= MAX_TEAM_NAME) return name;
-    return name.slice(0, MAX_TEAM_NAME - 1) + '\u2026';
-}
 
 
 function MatchCard({match, index}) {
     const team1 = match.team1;
     const team2 = match.team2;
     const delay = (index * 0.03) + 's';
-    const label = match.group
-        ? 'Gruppe ' + match.group.number
-        : 'Sp. ' + match.position;
+    const badge = match.group
+        ? match.group.number
+        : match.position;
 
     return (
         <div
             className={styles.matchCard}
             style={{animationDelay: delay}}
         >
-            <div className={styles.matchTeamRow}>
-                <span className={styles.teamName}>
-                    {truncate(team1.name)}
-                </span>
+            <div className={styles.matchContent}>
+                <div className={styles.matchTeamRow}>
+                    <span className={styles.teamName}>
+                        {team1.name}
+                    </span>
+                </div>
+                <div className={styles.matchTeamRow}>
+                    <span className={styles.teamName}>
+                        {team2.name}
+                    </span>
+                </div>
             </div>
-            <div className={styles.matchTeamRow}>
-                <span className={styles.teamName}>
-                    {truncate(team2.name)}
-                </span>
-            </div>
-            <div className={styles.matchMeta}>
-                <span className={styles.matchLabel}>
-                    {label}
-                </span>
+            <div className={styles.matchBadge}>
+                {badge}
             </div>
         </div>
     );
@@ -114,7 +107,7 @@ export class BetweenGamesView extends React.Component {
                         {' '}lade Daten
                     </div>
                     <style global jsx>{`
-                        body { background: #0f1923; }
+                        body { background: #ffffff; }
                     `}</style>
                 </div>
             );
@@ -166,7 +159,7 @@ export class BetweenGamesView extends React.Component {
 
                 <style global jsx>{`
                     body {
-                        background: #0f1923;
+                        background: #ffffff;
                     }
                 `}</style>
             </div>

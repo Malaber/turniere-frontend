@@ -73,10 +73,10 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   await expect(bottomBar).toBeVisible();
   await keyframe(page, testInfo, 'during_game_loaded');
 
-  // Dark body background should be applied
+  // White body background for bright-room projector
   await expect(page.locator('body')).toHaveCSS(
     'background-color',
-    'rgb(15, 25, 35)',
+    'rgb(255, 255, 255)',
   );
 
   // Cursor is hidden
