@@ -94,7 +94,7 @@ test('Fullscreen beamer page falls back when beamer name not found', async ({ pa
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
 });
 
-test('Fullscreen beamer switches between during-game and between-games modes', async ({ page }, testInfo) => {
+test('Fullscreen shows during-game and between-games modes with timer', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
   const { tournament } = await seedGroupStageTournament(6, 4, 8);
@@ -109,26 +109,14 @@ test('Fullscreen beamer switches between during-game and between-games modes', a
   );
   expectStatus(timerRes, 200, 'set timer');
 
-  const beamerRes = await client.post(`/tournaments/${tournament.id}/beamers`, {
-    name: 'projector-switch',
-    display_state: 'during_game',
-  });
-  expectStatus(beamerRes, 201, 'create switching beamer');
-
   await startMatches(client, tournament.id, 20);
 
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=projector-switch`);
+  await page.goto(`/t/${tournament.id}/fullscreen?display=during_game`);
   await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible();
   await expect(page.locator('[class*="matchCard"]').first()).toBeVisible();
   await keyframe(page, testInfo, 'fullscreen_beamer_during_game');
 
-  const updateRes = await client.patch(
-    `/tournaments/${tournament.id}/beamers/${beamerRes.json.id}`,
-    { display_state: 'between_games' },
-  );
-  expectStatus(updateRes, 200, 'switch beamer to between_games');
-
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=projector-switch`);
+  await page.goto(`/t/${tournament.id}/fullscreen?display=between_games`);
   await expect(page.getByText('Nächste Spiele')).toBeVisible();
   await expect(page.locator('[class*="matchCard"]').first()).toBeVisible();
   await keyframe(page, testInfo, 'fullscreen_beamer_between_games');
