@@ -13,6 +13,7 @@ import {
     defaultStateTournamentStatistics,
     transformTournamentInfoToStatistics, transformTournamentStatsToStatistics
 } from './redux/tournamentStatistics';
+import {mergeTournamentSyncMetadata} from './utils/tournamentSyncMetadata';
 
 
 function normalizeErrorMessages(error, fallbackMessage) {
@@ -217,9 +218,16 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
         return Object.assign({}, state, {});
     case actionTypesTournamentinfo.REQUEST_TOURNAMENT:
         getRequest(action.state, '/tournaments/' + action.parameters.code).then(resp => {
+            const mergedTournament = mergeTournamentSyncMetadata(resp.data, {
+                readOnlyMode: action.state.tournamentinfo.readOnlyMode,
+                syncTargetUrl: action.state.tournamentinfo.syncTargetUrl,
+                syncAuthToken: action.state.tournamentinfo.syncAuthToken,
+                syncLastPushedAt: action.state.tournamentinfo.syncLastPushedAt,
+                syncLastPushError: action.state.tournamentinfo.syncLastPushError
+            });
             __store.dispatch({
                 type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
-                parameters: resp.data
+                parameters: mergedTournament
             });
             storeOptionalToken(resp);
             action.parameters.successCallback();
@@ -555,11 +563,24 @@ export function updateTeamName(team, successCB, errorCB) {
 export function updateTournament(tournamentId, data, successCallback, errorCallback) {
     patchRequest(__store.getState(), '/tournaments/' + tournamentId, data).then(resp => {
         storeOptionalToken(resp);
+        const mergedTournament = mergeTournamentSyncMetadata(resp.data, {
+            readOnlyMode: Object.prototype.hasOwnProperty.call(data, 'read_only_mode') ?
+                data.read_only_mode === true :
+                __store.getState().tournamentinfo.readOnlyMode,
+            syncTargetUrl: Object.prototype.hasOwnProperty.call(data, 'sync_target_url') ?
+                data.sync_target_url :
+                __store.getState().tournamentinfo.syncTargetUrl,
+            syncAuthToken: Object.prototype.hasOwnProperty.call(data, 'sync_auth_token') ?
+                data.sync_auth_token :
+                __store.getState().tournamentinfo.syncAuthToken,
+            syncLastPushedAt: __store.getState().tournamentinfo.syncLastPushedAt,
+            syncLastPushError: __store.getState().tournamentinfo.syncLastPushError
+        });
         __store.dispatch({
             type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
-            parameters: resp.data
+            parameters: mergedTournament
         });
-        successCallback(resp.data);
+        successCallback(mergedTournament);
     }).catch(error => {
         if (error.response) {
             storeOptionalToken(error.response);

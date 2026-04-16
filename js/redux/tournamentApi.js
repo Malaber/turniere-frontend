@@ -1,11 +1,12 @@
 import {getRequest} from './backendApi';
 import {getState} from '../api';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
+import {mergeTournamentSyncMetadata} from '../utils/tournamentSyncMetadata';
 
 export function getTournament(code, successCallback, errorCallback) {
     getRequest(getState(), '/tournaments/' + code)
         .then(response => {
-            successCallback(response.status, convertTournament(response.data));
+            successCallback(response.status, convertTournament(mergeTournamentSyncMetadata(response.data)));
         })
         .catch(errorCallback);
 }

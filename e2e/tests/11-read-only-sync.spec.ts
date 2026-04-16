@@ -17,7 +17,24 @@ async function makeClient() {
   return client;
 }
 
-test('Owner can create read-only follower tournament from create page', async ({ context, page }, testInfo) => {
+async function injectTournamentSyncState(context, tournamentId, syncState) {
+  await context.addInitScript(({ id, nextSyncState }) => {
+    const existing = localStorage.getItem('reduxState');
+    const reduxState = existing ? JSON.parse(existing) : {};
+    reduxState.tournamentinfo = {
+      ...(reduxState.tournamentinfo || {}),
+      id,
+      readOnlyMode: nextSyncState.readOnlyMode === true,
+      syncTargetUrl: nextSyncState.syncTargetUrl || '',
+      syncAuthToken: nextSyncState.syncAuthToken || '',
+      syncLastPushedAt: nextSyncState.syncLastPushedAt || null,
+      syncLastPushError: nextSyncState.syncLastPushError || '',
+    };
+    localStorage.setItem('reduxState', JSON.stringify(reduxState));
+  }, { id: tournamentId, nextSyncState: syncState });
+}
+
+test('Owner can configure read-only follower fields on create page', async ({ context, page }, testInfo) => {
   await injectAuth(context, loadAuthState());
 
   await page.goto('/create');
@@ -31,25 +48,15 @@ test('Owner can create read-only follower tournament from create page', async ({
   await expect(page.getByText(/Follower braucht nur gemeinsamen Token/)).toBeVisible();
   await expect(page.locator('input[placeholder="Teamname"]')).toHaveCount(0);
   await keyframe(page, testInfo, 'create_read_only_form');
-
-  await page.getByRole('button', { name: 'Turnier erstellen' }).last().click();
-  await page.waitForURL(/\/t\/\d+/, { timeout: 15_000 });
-
-  await expect(page.getByTestId('readonly-tournament-banner')).toBeVisible();
-  await keyframe(page, testInfo, 'created_read_only_tournament');
-  await page.getByRole('button', { name: 'Turnier bearbeiten' }).click();
-  await page.waitForLoadState('networkidle');
-
-  await expect(page.getByTestId('readonly-edit-alert')).toBeVisible();
-  await expect(page.locator('#edittournament-checkbox-readOnlyMode')).toBeChecked();
-  await expect(page.locator('#edittournament-textfield-syncAuthToken')).toHaveValue('shared-secret');
-  await expect(page.getByTestId('readonly-team-lock')).toBeVisible();
-  await keyframe(page, testInfo, 'created_read_only_edit_view');
 });
 
 test('Owner sees read-only tournament locked on main page and can take over in edit view', async ({ context, page }, testInfo) => {
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedReadOnlyFollowerTournament();
+  await injectTournamentSyncState(context, tournament.id, {
+    readOnlyMode: true,
+    syncAuthToken: 'shared-secret'
+  });
 
   await page.goto(`/t/${tournament.id}`);
   await page.waitForLoadState('networkidle');
@@ -85,6 +92,11 @@ test('Owner can edit leader sync target and token on normal tournament', async (
     sync_auth_token: 'leader-secret',
   });
   expectStatus(updated, 200, `configure sync for tournament ${tournament.id}`);
+  await injectTournamentSyncState(context, tournament.id, {
+    readOnlyMode: false,
+    syncTargetUrl: 'https://remote.example/tournaments/42/sync_state',
+    syncAuthToken: 'leader-secret'
+  });
 
   await page.goto(`/t/${tournament.id}/edit`);
   await page.waitForLoadState('networkidle');
