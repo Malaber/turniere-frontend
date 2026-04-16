@@ -52,17 +52,18 @@ export async function injectAuth(context: BrowserContext, _auth?: AuthState): Pr
   const auth = await freshLogin();
 
   await context.addInitScript((state: AuthState) => {
-    const reduxState = {
-      userinfo: {
-        isSignedIn: true,
-        username: state.username,
-        accesstoken: state.accesstoken,
-        client: state.client,
-        expiry: state.expiry,
-        uid: state.uid,
-        error: false,
-        errorMessages: [],
-      },
+    const existing = localStorage.getItem('reduxState');
+    const reduxState = existing ? JSON.parse(existing) : {};
+    reduxState.userinfo = {
+      ...(reduxState.userinfo || {}),
+      isSignedIn: true,
+      username: state.username,
+      accesstoken: state.accesstoken,
+      client: state.client,
+      expiry: state.expiry,
+      uid: state.uid,
+      error: false,
+      errorMessages: [],
     };
     localStorage.setItem('reduxState', JSON.stringify(reduxState));
   }, auth);
