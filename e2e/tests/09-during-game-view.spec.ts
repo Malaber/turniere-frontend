@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { setDefaultBeamerDisplayState } from '../helpers/beamer';
 import { keyframe } from '../helpers/screenshot';
 import { seedGroupStageTournament } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
@@ -8,20 +9,6 @@ const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
-
-async function setDefaultBeamerDisplayState(client: ApiClient, tournamentId: number, displayState: string) {
-  const beamerRes = await client.get<{ id: number }>(
-    `/tournaments/${tournamentId}/beamers/by_name`,
-    { name: 'default' },
-  );
-  expectStatus(beamerRes, 200, 'fetch default beamer');
-
-  const updateRes = await client.patch(
-    `/tournaments/${tournamentId}/beamers/${beamerRes.json.id}`,
-    { display_state: displayState },
-  );
-  expectStatus(updateRes, 200, `set default beamer to ${displayState}`);
-}
 
 /**
  * Start N group-stage matches (without finishing them) so they appear as
