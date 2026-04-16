@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { setDefaultBeamerDisplayState } from '../helpers/beamer';
 import { keyframe } from '../helpers/screenshot';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
@@ -48,10 +47,8 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   expectStatus(created, 201, 'create long-name tournament');
   const tournamentId = created.json.id;
 
-  await setDefaultBeamerDisplayState(client, tournamentId, 'between_games');
-
   // Navigate to fullscreen
-  await page.goto(`/t/${tournamentId}/fullscreen`);
+  await page.goto(`/t/${tournamentId}/fullscreen?display=between_games`);
 
   // Wait for match cards to render
   const matchCards = page.locator('[class*="matchCard"]');

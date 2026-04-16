@@ -19,7 +19,11 @@ app.prepare()
 
         server.get('/t/:code/fullscreen', (req, res) => {
             const actualPage = '/tournament-fullscreen-v2';
-            const queryParam = { code: req.params.code, beamer: req.query.beamer || 'default' };
+            const queryParam = {
+                code: req.params.code,
+                beamer: req.query.beamer || 'default',
+                display: req.query.display || null,
+            };
             app.render(req, res, actualPage, queryParam);
         });
 

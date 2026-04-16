@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { setDefaultBeamerDisplayState } from '../helpers/beamer';
 import { keyframe } from '../helpers/screenshot';
 import { seedGroupStageTournament } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
@@ -56,13 +55,11 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   );
   expectStatus(timerRes, 200, 'set timer');
 
-  await setDefaultBeamerDisplayState(client, tournament.id, 'during_game');
-
   // Start enough matches to populate live grid
   await startMatches(client, tournament.id, 14);
 
   // Open the fullscreen during-game view
-  await page.goto(`/t/${tournament.id}/fullscreen`);
+  await page.goto(`/t/${tournament.id}/fullscreen?display=during_game`);
 
   // White body background for bright-room projector
   await expect(page.locator('body')).toHaveCSS(
@@ -105,12 +102,10 @@ test('During-game view rotates match chunks', async ({ page }, testInfo) => {
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
 
-  await setDefaultBeamerDisplayState(client, tournament.id, 'during_game');
-
   // Start 20 matches — enough for page 1 (16) plus page 2 overflow (4)
   await startMatches(client, tournament.id, 20);
 
-  await page.goto(`/t/${tournament.id}/fullscreen`);
+  await page.goto(`/t/${tournament.id}/fullscreen?display=during_game`);
 
   // Wait for match cards to render
   const matchCards = page.locator('[class*="matchCard"]');
