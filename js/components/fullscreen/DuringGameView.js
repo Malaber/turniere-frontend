@@ -4,8 +4,10 @@ import {sortMatchesByPositionAscending} from '../../utils/sorting';
 import styles from './DuringGameView.module.css';
 
 
-const MATCHES_PER_CHUNK = 6;
-const CHUNK_CYCLE_MS = 10000;
+const MATCHES_PER_PAGE = 16;
+const PAGE_CYCLE_MS = 10000;
+const COUNTDOWN_THRESHOLD_S = 10;
+const FINISHED_DISPLAY_MS = 10000;
 
 
 function AnimatedDigit({value}) {
@@ -66,9 +68,21 @@ class AnimatedTimer extends React.Component {
         const timeLeft = remaining > 0 ? remaining : 0;
 
         this.setState({timeLeft}, () => {
-            // Restart bump animation each second in last 10s
             const secs = Math.floor(timeLeft / 1000);
-            if (secs <= 10 && secs > 0 && this.timerRef.current) {
+
+            // Report phase to parent
+            if (this.props.onPhaseChange) {
+                if (timeLeft === 0) {
+                    this.props.onPhaseChange('finished');
+                } else if (secs <= COUNTDOWN_THRESHOLD_S) {
+                    this.props.onPhaseChange('countdown');
+                } else {
+                    this.props.onPhaseChange('normal');
+                }
+            }
+
+            // Restart bump animation each second in last 10s
+            if (secs <= COUNTDOWN_THRESHOLD_S && secs > 0 && this.timerRef.current) {
                 const el = this.timerRef.current;
                 el.style.animation = 'none';
                 void el.offsetWidth;
@@ -177,42 +191,68 @@ function FullscreenMatchCard({match, index}) {
 export class DuringGameView extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {chunkIndex: 0};
-        this.cycleChunk = this.cycleChunk.bind(this);
+        this.state = {
+            pageIndex: 0,
+            timerPhase: 'normal', // 'normal' | 'countdown' | 'finished'
+        };
+        this.cyclePage = this.cyclePage.bind(this);
+        this.onTimerPhaseChange = this.onTimerPhaseChange.bind(this);
+        this._finishedTimeout = null;
     }
 
     componentDidMount() {
         this.intervalId = setInterval(
-            this.cycleChunk, CHUNK_CYCLE_MS
+            this.cyclePage, PAGE_CYCLE_MS
         );
     }
 
     componentWillUnmount() {
         clearInterval(this.intervalId);
+        clearTimeout(this._finishedTimeout);
     }
 
-    cycleChunk() {
+    onTimerPhaseChange(phase) {
+        const prev = this.state.timerPhase;
+        if (phase === prev) return;
+
+        if (phase === 'finished' && prev !== 'normal') {
+            this.setState({timerPhase: 'finished'});
+            clearTimeout(this._finishedTimeout);
+            this._finishedTimeout = setTimeout(() => {
+                this.setState({timerPhase: 'normal'});
+            }, FINISHED_DISPLAY_MS);
+        } else if (phase === 'countdown') {
+            this.setState({timerPhase: 'countdown'});
+        } else if (phase === 'normal' && prev !== 'finished') {
+            this.setState({timerPhase: 'normal'});
+        }
+    }
+
+    cyclePage() {
         const {matches} = this.props;
         if (!matches || matches.length === 0) return;
-        const total = Math.ceil(
-            matches.length / MATCHES_PER_CHUNK
-        );
+        const total = Math.ceil(matches.length / MATCHES_PER_PAGE);
+        if (total <= 1) return;
         this.setState(prev => ({
-            chunkIndex: (prev.chunkIndex + 1) % total
+            pageIndex: (prev.pageIndex + 1) % total
         }));
     }
 
     render() {
-        const {tournamentMeta, matches, timerEnd} = this.props;
-        const {chunkIndex} = this.state;
+        const {matches, timerEnd} = this.props;
+        const {pageIndex, timerPhase} = this.state;
+        const takeover = timerPhase === 'countdown' || timerPhase === 'finished';
 
         const sorted = matches
             ? [...matches].sort(sortMatchesByPositionAscending())
             : [];
-        const start = chunkIndex * MATCHES_PER_CHUNK;
-        const chunk = sorted.slice(
-            start, start + MATCHES_PER_CHUNK
-        );
+        const totalPages = Math.ceil(sorted.length / MATCHES_PER_PAGE);
+        const start = pageIndex * MATCHES_PER_PAGE;
+        const page = sorted.slice(start, start + MATCHES_PER_PAGE);
+
+        // Choose grid columns: 4 cols for a full page, fewer when < 4 matches
+        const cols = Math.min(4, page.length);
+        const rows = cols > 0 ? Math.ceil(page.length / cols) : 0;
 
         let matchContent;
         if (matches == null) {
@@ -222,7 +262,7 @@ export class DuringGameView extends React.Component {
                     {' '}lade Matches
                 </div>
             );
-        } else if (chunk.length === 0) {
+        } else if (page.length === 0) {
             matchContent = (
                 <div className={styles.matchesEmpty}>
                     keine laufenden Matches
@@ -232,9 +272,12 @@ export class DuringGameView extends React.Component {
             matchContent = (
                 <div
                     className={styles.matchGrid}
-                    key={chunkIndex}
+                    key={pageIndex}
+                    style={{
+                        gridTemplateColumns: 'repeat(' + cols + ', 1fr)',
+                    }}
                 >
-                    {chunk.map((m, i) =>
+                    {page.map((m, i) =>
                         <FullscreenMatchCard
                             key={m.id}
                             match={m}
@@ -245,11 +288,42 @@ export class DuringGameView extends React.Component {
             );
         }
 
+        const showPager = !takeover && sorted.length > 0 && totalPages > 1;
+
+        // Fullscreen takeover for countdown / finished
+        if (takeover) {
+            return (
+                <div className={styles.duringGameRoot}>
+                    <div className={styles.timerTakeover}>
+                        {timerEnd ? (
+                            <AnimatedTimer
+                                timerEnd={timerEnd}
+                                onPhaseChange={this.onTimerPhaseChange}
+                            />
+                        ) : (
+                            <div className={styles.noTimer}>
+                                Kein Timer gesetzt
+                            </div>
+                        )}
+                    </div>
+
+<style global jsx>{`
+                        body {
+                            background: #ffffff;
+                        }
+                    `}</style>
+                </div>
+            );
+        }
+
         return (
-            <div>
+            <div className={styles.duringGameRoot}>
                 <div className={styles.timerContainer}>
                     {timerEnd ? (
-                        <AnimatedTimer timerEnd={timerEnd}/>
+                        <AnimatedTimer
+                            timerEnd={timerEnd}
+                            onPhaseChange={this.onTimerPhaseChange}
+                        />
                     ) : (
                         <div className={styles.noTimer}>
                             Kein Timer gesetzt
@@ -260,6 +334,17 @@ export class DuringGameView extends React.Component {
                 <div className={styles.matchesArea}>
                     {matchContent}
                 </div>
+
+                {showPager && (
+                    <div className={styles.pageIndicator}>
+                        {Array.from({length: totalPages}, (_, i) =>
+                            <span
+                                key={i}
+                                className={i === pageIndex ? styles.pageDotActive : styles.pageDot}
+                            />
+                        )}
+                    </div>
+                )}
 
 <style global jsx>{`
                     body {
