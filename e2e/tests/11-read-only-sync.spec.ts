@@ -58,7 +58,7 @@ test('Owner sees read-only tournament locked on main page and can take over in e
     syncAuthToken: 'shared-secret'
   });
 
-  await page.goto(`/t/${tournament.id}`);
+  await page.goto(`/t/${tournament.code}`);
   await page.waitForLoadState('networkidle');
 
   await expect(page.getByTestId('readonly-tournament-banner')).toBeVisible();
@@ -98,7 +98,7 @@ test('Owner can edit leader sync target and token on normal tournament', async (
     syncAuthToken: 'leader-secret'
   });
 
-  await page.goto(`/t/${tournament.id}/edit`);
+  await page.goto(`/t/${tournament.code}/edit`);
   await page.waitForLoadState('networkidle');
 
   await expect(page.locator('#edittournament-checkbox-readOnlyMode')).not.toBeChecked();
