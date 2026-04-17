@@ -271,8 +271,7 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
 
         return Object.assign({}, state, {});
     case actionTypesTournamentinfo.REHYDRATE:
-
-        return Object.assign({}, state, {});
+        return Object.assign({}, state, action.parameters || {});
     case actionTypesTournamentinfo.START_MATCH:
         patchRequest(action.state, '/matches/' + action.parameters.matchId, {
             state: 'in_progress'
@@ -465,12 +464,12 @@ export function initializeStore(initialState = defaultApplicationState) {
 }
 
 export function verifyCredentials() {
-    rehydrateApplicationState();
+    ensureApplicationHydrated();
 
     if (__store.getState().userinfo.isSignedIn) {
         __store.dispatch({
             type: actionTypesUserinfo.VERIFY_CREDENTIALS,
-            state: __store.getState()
+            state: getState()
         });
     }
 }
@@ -485,7 +484,7 @@ export function register(username, email, password, successCallback, errorCallba
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -497,7 +496,7 @@ export function login(email, password, successCallback) {
             password: password,
             successCallback: successCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -507,7 +506,7 @@ export function logout(successCallback) {
         parameters: {
             successCallback: successCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -519,7 +518,7 @@ export function changeMail(newMail, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -531,7 +530,7 @@ export function createTournament(data, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -543,7 +542,7 @@ export function requestTournament(code, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -556,25 +555,26 @@ export function updateTeamName(team, successCB, errorCB) {
             onSuccess: successCB,
             onError: errorCB
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
 export function updateTournament(tournamentId, data, successCallback, errorCallback) {
-    patchRequest(__store.getState(), '/tournaments/' + tournamentId, data).then(resp => {
+    const currentState = getState();
+    patchRequest(currentState, '/tournaments/' + tournamentId, data).then(resp => {
         storeOptionalToken(resp);
         const mergedTournament = mergeTournamentSyncMetadata(resp.data, {
             readOnlyMode: Object.prototype.hasOwnProperty.call(data, 'read_only_mode') ?
                 data.read_only_mode === true :
-                __store.getState().tournamentinfo.readOnlyMode,
+                currentState.tournamentinfo.readOnlyMode,
             syncTargetUrl: Object.prototype.hasOwnProperty.call(data, 'sync_target_url') ?
                 data.sync_target_url :
-                __store.getState().tournamentinfo.syncTargetUrl,
+                currentState.tournamentinfo.syncTargetUrl,
             syncAuthToken: Object.prototype.hasOwnProperty.call(data, 'sync_auth_token') ?
                 data.sync_auth_token :
-                __store.getState().tournamentinfo.syncAuthToken,
-            syncLastPushedAt: __store.getState().tournamentinfo.syncLastPushedAt,
-            syncLastPushError: __store.getState().tournamentinfo.syncLastPushError
+                currentState.tournamentinfo.syncAuthToken,
+            syncLastPushedAt: currentState.tournamentinfo.syncLastPushedAt,
+            syncLastPushError: currentState.tournamentinfo.syncLastPushError
         });
         __store.dispatch({
             type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
@@ -599,7 +599,7 @@ export function startMatch(matchId, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -611,7 +611,7 @@ export function endMatch(matchId, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -627,7 +627,7 @@ export function submitMatchScores(scoreTeam1, scoreIdTeam1, scoreTeam2, scoreIdT
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -650,7 +650,7 @@ export function submitDeciderMatchScores(
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -663,7 +663,7 @@ export function createDeciderMatch(groupId, teamIds, successCallback, errorCallb
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -675,11 +675,12 @@ export function finishGroupStage(stageId, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
 export function getState() {
+    ensureApplicationHydrated();
     return __store.getState();
 }
 
@@ -691,7 +692,7 @@ export function requestTournamentList(type, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -703,7 +704,7 @@ export function requestTournamentStatistics(code, successCallback, errorCallback
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -731,4 +732,10 @@ function rehydrateApplicationState() {
         });
     }
     applicationHydrated = true;
+}
+
+function ensureApplicationHydrated() {
+    if (!applicationHydrated && typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        rehydrateApplicationState();
+    }
 }

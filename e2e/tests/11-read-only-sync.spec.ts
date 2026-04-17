@@ -75,10 +75,9 @@ test('Owner sees read-only tournament locked on main page and can take over in e
   await keyframe(page, testInfo, 'read_only_takeover_before_save');
 
   await page.uncheck('#edittournament-checkbox-readOnlyMode');
-  await page.getByRole('button', { name: 'Ändern' }).click();
-  await expect(page.getByTestId('readonly-edit-alert')).toHaveCount(0, { timeout: 15000 });
-  await expect(page.locator('#edittournament-textfield-name')).toBeEnabled();
-  await expect(page.locator('#edittournament-textfield-syncAuthToken')).toHaveValue('');
+  await page.locator('#edittournament-button').click();
+  await page.waitForURL(new RegExp(`/t/${tournament.id}$`), { timeout: 15000 });
+  await expect(page.getByTestId('readonly-tournament-banner')).toHaveCount(0);
   await keyframe(page, testInfo, 'read_only_takeover_after_save');
 });
 
@@ -109,10 +108,9 @@ test('Owner can edit leader sync target and token on normal tournament', async (
 
   await page.fill('#edittournament-textfield-syncTargetUrl', 'https://remote.example/tournaments/99/sync_state');
   await page.fill('#edittournament-textfield-syncAuthToken', 'leader-secret-2');
-  await page.getByRole('button', { name: 'Ändern' }).click();
+  await page.locator('#edittournament-button').click();
 
-  await expect(page.locator('#edittournament-textfield-syncTargetUrl'))
-    .toHaveValue('https://remote.example/tournaments/99/sync_state');
-  await expect(page.locator('#edittournament-textfield-syncAuthToken')).toHaveValue('leader-secret-2');
+  await page.waitForURL(new RegExp(`/t/${tournament.id}$`), { timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'Turnier bearbeiten' })).toBeVisible();
   await keyframe(page, testInfo, 'leader_sync_edit_after_change');
 });

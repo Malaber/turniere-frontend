@@ -37,8 +37,8 @@ test('Tournament creation flow (requires login)', async ({ page, context }, test
   // Submit the form
   await page.getByRole('button', { name: 'Turnier erstellen' }).last().click();
 
-  // After creation, the app redirects to /t/:id
-  await page.waitForURL(/\/t\/\d+/, { timeout: 15_000 });
+  // After creation, the app redirects to the tournament page.
+  await page.waitForURL(/\/t\/[^/]+$/, { timeout: 15_000 });
 
   await keyframe(page, testInfo, 'create_tournament_result');
 

@@ -352,10 +352,10 @@ def e2e_docker(c, backend_version="latest", keep_running=False):
     exit_error = None
 
     try:
-        # Always rebuild and recreate the local frontend before Playwright runs.
-        # Without this, repeated local E2E runs can silently reuse an older
-        # container image and exercise stale fullscreen code.
-        _compose(["build", "frontend"], env=env)
+        # Always rebuild frontend and E2E containers before Playwright runs.
+        # Without this, repeated local E2E runs can silently reuse older
+        # images and exercise stale app code or stale test specs.
+        _compose(["build", "frontend", "e2e"], env=env)
         _compose(
             ["up", "-d", "--force-recreate", "postgres", "backend", "frontend"],
             env=env,

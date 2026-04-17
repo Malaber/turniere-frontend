@@ -2,6 +2,7 @@ import Head from 'next/head';
 import React from 'react';
 import {connect} from 'react-redux';
 import {notify} from 'react-notify-toast';
+import Router from 'next/router';
 import {
     Alert, Container, Button, Card, CardBody, Input, Label, Table
 } from 'reactstrap';
@@ -32,7 +33,7 @@ class EditTournamentPage extends React.Component {
     }
 
     componentDidMount() {
-        requestTournament(this.props.query.id, () => {
+        requestTournament(getTournamentIdentifier(this.props.query), () => {
             this.setState({validCode: true, loaded: true});
 
             if (this._edittournamentcontent != null) {
@@ -116,11 +117,18 @@ class EditTournamentContent extends React.Component {
     }
 }
 
-function ReturnToTournamentButton() {
+function ReturnToTournamentButtonBase(props) {
+    const tournamentIdentifier = props.id || props.code;
+
     return (<Container className="px-0">
-        <Button color="secondary" className="mb-5 w-100" href="./">Zurück zum Turnier</Button>
+        <Button color="secondary" className="mb-5 w-100" href={'/t/' + tournamentIdentifier}>Zurück zum Turnier</Button>
     </Container>);
 }
+
+const ReturnToTournamentButton = connect(state => ({
+    code: state.tournamentinfo.code,
+    id: state.tournamentinfo.id
+}))(ReturnToTournamentButtonBase);
 
 class EditTournamentPropertiesField extends React.Component {
     render() {
@@ -144,17 +152,23 @@ class EditTournamentForm extends React.Component {
         super(props);
 
         this.state = {
-            name: '',
-            description: '',
-            isPublic: false,
-            readOnlyMode: false,
-            syncTargetUrl: '',
-            syncAuthToken: '',
-            syncLastPushedAt: null,
-            syncLastPushError: '',
-            saving: false
+            ...buildEditTournamentFormState(props),
+            saving: false,
+            lastLoadedKey: buildEditTournamentFormKey(props)
         };
         this.handleClick = this.handleClick.bind(this);
+    }
+
+    static getDerivedStateFromProps(props, state) {
+        const nextLoadedKey = buildEditTournamentFormKey(props);
+        if (state.lastLoadedKey === nextLoadedKey) {
+            return null;
+        }
+        return {
+            ...buildEditTournamentFormState(props),
+            saving: false,
+            lastLoadedKey: nextLoadedKey
+        };
     }
 
     render() {
@@ -231,21 +245,10 @@ class EditTournamentForm extends React.Component {
     }
 
     notifyOfContentUpdate() {
-        const {
-            name, description, isPublic, readOnlyMode, syncTargetUrl,
-            syncAuthToken, syncLastPushedAt, syncLastPushError
-        } = this.props;
-
         this.setState({
-            name: name ? name : '',
-            description: description ? description : '',
-            isPublic: isPublic,
-            readOnlyMode: readOnlyMode === true,
-            syncTargetUrl: syncTargetUrl || '',
-            syncAuthToken: syncAuthToken || '',
-            syncLastPushedAt: syncLastPushedAt || null,
-            syncLastPushError: syncLastPushError || '',
-            saving: false
+            ...buildEditTournamentFormState(this.props),
+            saving: false,
+            lastLoadedKey: buildEditTournamentFormKey(this.props)
         });
     }
 
@@ -278,6 +281,7 @@ class EditTournamentForm extends React.Component {
                 saving: false
             });
             notify.show('Turnier-Einstellungen wurden gespeichert.', 'success', 4000);
+            Router.push('/t/' + updatedTournament.id);
         }, errorBody => {
             const firstError = extractFirstErrorMessage(errorBody);
             this.setState({saving: false});
@@ -353,7 +357,19 @@ class EditTeamNamesForm extends React.Component {
         super(props);
 
         this.state = {
-            teams: []
+            teams: buildEditTeamNamesState(props),
+            lastLoadedKey: buildEditTeamNamesKey(props)
+        };
+    }
+
+    static getDerivedStateFromProps(props, state) {
+        const nextLoadedKey = buildEditTeamNamesKey(props);
+        if (state.lastLoadedKey === nextLoadedKey) {
+            return null;
+        }
+        return {
+            teams: buildEditTeamNamesState(props),
+            lastLoadedKey: nextLoadedKey
         };
     }
 
@@ -385,10 +401,9 @@ class EditTeamNamesForm extends React.Component {
     }
 
     notifyOfContentUpdate() {
-        const {teams} = this.props;
-
         this.setState({
-            teams: teams
+            teams: buildEditTeamNamesState(this.props),
+            lastLoadedKey: buildEditTeamNamesKey(this.props)
         });
     }
 
@@ -440,4 +455,56 @@ function formatSyncTimestamp(value) {
         return 'Unbekannter Zeitpunkt';
     }
     return date.toLocaleString('de-DE');
+}
+
+function getTournamentIdentifier(query) {
+    if (query && query.id !== undefined) {
+        return query.id;
+    }
+    if (query && query.code !== undefined) {
+        return query.code;
+    }
+    return undefined;
+}
+
+function buildEditTournamentFormState(props) {
+    return {
+        name: props.name ? props.name : '',
+        description: props.description ? props.description : '',
+        isPublic: props.isPublic,
+        readOnlyMode: props.readOnlyMode === true,
+        syncTargetUrl: props.syncTargetUrl || '',
+        syncAuthToken: props.syncAuthToken || '',
+        syncLastPushedAt: props.syncLastPushedAt || null,
+        syncLastPushError: props.syncLastPushError || ''
+    };
+}
+
+function buildEditTournamentFormKey(props) {
+    return JSON.stringify({
+        name: props.name || '',
+        description: props.description || '',
+        isPublic: props.isPublic === true,
+        readOnlyMode: props.readOnlyMode === true,
+        syncTargetUrl: props.syncTargetUrl || '',
+        syncAuthToken: props.syncAuthToken || '',
+        syncLastPushedAt: props.syncLastPushedAt instanceof Date ?
+            props.syncLastPushedAt.toISOString() :
+            props.syncLastPushedAt || null,
+        syncLastPushError: props.syncLastPushError || ''
+    });
+}
+
+function buildEditTeamNamesState(props) {
+    return (props.teams || []).map(team => ({...team}));
+}
+
+function buildEditTeamNamesKey(props) {
+    return JSON.stringify({
+        readOnlyMode: props.readOnlyMode === true,
+        teams: (props.teams || []).map(team => ({
+            id: team.id,
+            name: team.name
+        }))
+    });
 }

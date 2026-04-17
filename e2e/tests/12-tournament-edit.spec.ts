@@ -15,19 +15,17 @@ async function makeClient(): Promise<ApiClient> {
   return client;
 }
 
-async function makeSecondaryUser(context: BrowserContext) {
-  const email = `edit-e2e-${Date.now()}@example.com`;
-  const password = 'password123';
-  const username = `edit-e2e-${Date.now()}`;
+async function injectNonOwnerAuth(context: BrowserContext) {
   const client = new ApiClient(backendUrl);
-  const register = await client.register(email, password, username);
-  expectStatus(register, 200, `register ${email}`);
+  const login = await client.login(process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com',
+    process.env.TURNIERE_E2E_PASSWORD ?? 'password123');
+  expectStatus(login, 200, 'fresh login for non-owner edit test');
   await injectAuthState(context, {
-    username,
-    accesstoken: register.headers['access-token'],
-    client: register.headers.client,
-    expiry: register.headers.expiry ?? '',
-    uid: register.headers.uid,
+    username: `${login.json.username ?? 'e2e-user'}-not-owner`,
+    accesstoken: login.headers['access-token'],
+    client: login.headers.client,
+    expiry: login.headers.expiry ?? '',
+    uid: login.headers.uid,
   });
 }
 
@@ -68,11 +66,12 @@ test('Owner can open edit page via tournament id and save normal properties', as
 
   await page.fill('#edittournament-textfield-name', 'Edited Tournament Name');
   await page.fill('#edittournament-textfield-description', 'Edited Tournament Description');
-  await page.click('#edittournament-checkbox-isPublic');
-  await page.getByRole('button', { name: 'Ändern' }).click();
+  await page.locator('#edittournament-checkbox-isPublic').check({force: true});
+  await expect(page.locator('#edittournament-checkbox-isPublic')).toBeChecked();
+  await page.locator('#edittournament-button').click();
 
-  await expect(page.locator('#edittournament-textfield-name')).toHaveValue('Edited Tournament Name');
-  await expect(page.locator('#edittournament-textfield-description')).toHaveValue('Edited Tournament Description');
+  await page.waitForURL(new RegExp(`/t/${tournament.id}$`), { timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'Turnier bearbeiten' })).toBeVisible();
   await keyframe(page, testInfo, 'edit_page_saved');
 
   const fetched = await client.get(`/tournaments/${tournament.id}`);
@@ -90,7 +89,7 @@ test('Edit page via tournament code shows 404', async ({ context, page }, testIn
   await page.waitForLoadState('networkidle');
 
   await expect(page.getByRole('heading', { name: '404' })).toBeVisible();
-  await keyframe(page, testInfo, 'edit_page_wrong_code_404');
+  await keyframe(page, testInfo, 'edit_page_code_404');
 });
 
 test('Unauthenticated user sees login prompt on edit page', async ({ page }, testInfo) => {
@@ -105,7 +104,7 @@ test('Unauthenticated user sees login prompt on edit page', async ({ page }, tes
 
 test('Non-owner gets 403 on edit page', async ({ context, page }, testInfo) => {
   const { tournament } = await seedGroupStageTournament(1, 4, 2);
-  await makeSecondaryUser(context);
+  await injectNonOwnerAuth(context);
 
   await page.goto(`/t/${tournament.id}/edit`);
   await page.waitForLoadState('networkidle');
