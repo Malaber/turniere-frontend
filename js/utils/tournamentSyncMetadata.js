@@ -33,16 +33,21 @@ export function readCachedTournamentSyncMetadata(tournamentId) {
 
 export function mergeTournamentSyncMetadata(apiTournament, cachedMetadata = null) {
     const fallback = cachedMetadata || readCachedTournamentSyncMetadata(apiTournament.id);
+
+    if (!fallback) {
+        return apiTournament;
+    }
+
     return {
         ...apiTournament,
-        read_only_mode: hasOwn(apiTournament, 'read_only_mode') ? apiTournament.read_only_mode : fallback?.readOnlyMode,
-        sync_target_url: hasOwn(apiTournament, 'sync_target_url') ? apiTournament.sync_target_url : fallback?.syncTargetUrl,
-        sync_auth_token: hasOwn(apiTournament, 'sync_auth_token') ? apiTournament.sync_auth_token : fallback?.syncAuthToken,
-        sync_last_pushed_at: hasOwn(apiTournament, 'sync_last_pushed_at') ?
-            apiTournament.sync_last_pushed_at :
-            fallback?.syncLastPushedAt,
-        sync_last_push_error: hasOwn(apiTournament, 'sync_last_push_error') ?
-            apiTournament.sync_last_push_error :
-            fallback?.syncLastPushError
+        read_only_mode: hasOwn(fallback, 'readOnlyMode') ? fallback.readOnlyMode : apiTournament.read_only_mode,
+        sync_target_url: hasOwn(fallback, 'syncTargetUrl') ? fallback.syncTargetUrl : apiTournament.sync_target_url,
+        sync_auth_token: hasOwn(fallback, 'syncAuthToken') ? fallback.syncAuthToken : apiTournament.sync_auth_token,
+        sync_last_pushed_at: hasOwn(fallback, 'syncLastPushedAt') ?
+            fallback.syncLastPushedAt :
+            apiTournament.sync_last_pushed_at,
+        sync_last_push_error: hasOwn(fallback, 'syncLastPushError') ?
+            fallback.syncLastPushError :
+            apiTournament.sync_last_push_error
     };
 }

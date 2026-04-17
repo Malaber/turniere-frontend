@@ -563,10 +563,11 @@ export function updateTournament(tournamentId, data, successCallback, errorCallb
     const currentState = getState();
     patchRequest(currentState, '/tournaments/' + tournamentId, data).then(resp => {
         storeOptionalToken(resp);
+        const newReadOnlyMode = Object.prototype.hasOwnProperty.call(data, 'read_only_mode') ?
+            data.read_only_mode === true :
+            currentState.tournamentinfo.readOnlyMode;
         const mergedTournament = mergeTournamentSyncMetadata(resp.data, {
-            readOnlyMode: Object.prototype.hasOwnProperty.call(data, 'read_only_mode') ?
-                data.read_only_mode === true :
-                currentState.tournamentinfo.readOnlyMode,
+            readOnlyMode: newReadOnlyMode,
             syncTargetUrl: Object.prototype.hasOwnProperty.call(data, 'sync_target_url') ?
                 data.sync_target_url :
                 currentState.tournamentinfo.syncTargetUrl,
@@ -576,6 +577,9 @@ export function updateTournament(tournamentId, data, successCallback, errorCallb
             syncLastPushedAt: currentState.tournamentinfo.syncLastPushedAt,
             syncLastPushError: currentState.tournamentinfo.syncLastPushError
         });
+        if (Object.prototype.hasOwnProperty.call(data, 'read_only_mode')) {
+            mergedTournament.read_only_mode = data.read_only_mode === true;
+        }
         __store.dispatch({
             type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
             parameters: mergedTournament
