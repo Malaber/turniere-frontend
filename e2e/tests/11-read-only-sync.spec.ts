@@ -45,7 +45,7 @@ test('Owner can configure read-only follower fields on create page', async ({ co
   await page.click('#public');
   await page.click('#read-only-mode');
   await page.fill('#sync-auth-token', 'shared-secret');
-  await expect(page.getByText(/Follower braucht nur gemeinsamen Token/)).toBeVisible();
+  await expect(page.getByText(/Ein Follower braucht ein gemeinsamen Token/)).toBeVisible();
   await expect(page.locator('input[placeholder="Teamname"]')).toHaveCount(0);
   await keyframe(page, testInfo, 'create_read_only_form');
 });

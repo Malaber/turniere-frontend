@@ -124,8 +124,8 @@ class CreateTournamentForm extends React.Component {
                                 value={this.state.syncAuthToken}
                                 onChange={this.handleSyncAuthTokenInput}/>
                             <small className="text-muted">
-                                Follower braucht nur gemeinsamen Token. Teams werden leer angelegt und spater vom
-                                Leader gespiegelt.
+                                Ein Follower braucht ein gemeinsamen Token mit dem Leader.
+                                Turniere werden leer angelegt und später vom Leader befüllt.
                             </small>
                         </FormGroup>}
                     <FormGroup check>
