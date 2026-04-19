@@ -7,8 +7,6 @@ const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
 const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
-test.setTimeout(240_000);
-
 /**
  * Start N group-stage matches (without finishing them) so they appear as
  * in_progress. Returns the IDs of started matches.
@@ -38,39 +36,55 @@ async function startMatches(
   return ids;
 }
 
-test('During-game view shows animated timer that updates', async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 1920, height: 1080 });
+async function setupBeamerAndMatches(
+  matchCount: number,
+  opts: { timerSeconds?: number; beamerName?: string } = {},
+) {
+  const { timerSeconds, beamerName = 'e2e-during' } = opts;
 
-  // Seed a tournament (not played — we only need group matches to start)
-  const { tournament } = await seedGroupStageTournament(4, 4, 8);
+  // Use more groups/teams to have enough matches available
+  const { tournament } = await seedGroupStageTournament(8, 4, 8);
 
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
 
-  // Set a timer 5 minutes in the future
-  const timerEnd = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-  const timerRes = await client.patch(
-    `/tournaments/${tournament.id}/set_timer_end`,
-    { timer_end: timerEnd },
-  );
-  expectStatus(timerRes, 200, 'set timer');
+  if (timerSeconds !== undefined) {
+    const timerEnd = new Date(Date.now() + timerSeconds * 1000).toISOString();
+    const timerRes = await client.patch(
+      `/tournaments/${tournament.id}/set_timer_end`,
+      { timer_end: timerEnd },
+    );
+    expectStatus(timerRes, 200, 'set timer');
+  }
 
-  // Create a beamer with during_game display state
   const beamerRes = await client.post(
     `/tournaments/${tournament.id}/beamers`,
-    { name: 'during', display_state: 'during_game', is_default: false },
+    { name: beamerName, display_state: 'during_game', is_default: false },
   );
   expectStatus(beamerRes, 201, 'create during_game beamer');
 
-  // Start 14 matches — enough for two full chunks of 6 plus overflow
-  await startMatches(client, tournament.id, 14);
+  await startMatches(client, tournament.id, matchCount);
 
-  // Open the fullscreen during-game view
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=during`);
+  return { tournament, client, beamerName };
+}
 
-  // Wait for the bottom bar to confirm the page loaded
-  const bottomBar = page.locator('.fixed-bottom');
-  await expect(bottomBar).toBeVisible();
+// ---------------------------------------------------------------------------
+// Timer tests
+// ---------------------------------------------------------------------------
+
+test('During-game view shows animated timer that updates', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament, beamerName } = await setupBeamerAndMatches(14, {
+    timerSeconds: 5 * 60,
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+
+  // Wait for match cards to confirm the page loaded
+  const matchCards = page.locator('[class*="matchCard"]');
+  await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'during_game_loaded');
 
   // White body background for bright-room projector
@@ -86,7 +100,6 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   const timerDigits = page.locator('[class*="digitSlot"]');
   await expect(timerDigits.first()).toBeVisible();
 
-  // Read which digit each odometer strip shows via its translateY offset
   const readTimer = () =>
     page.evaluate(() => {
       const strips = document.querySelectorAll('[class*="digitStrip"]');
@@ -105,45 +118,227 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   await keyframe(page, testInfo, 'during_game_timer_updated');
 });
 
-test('During-game view rotates match chunks', async ({ page }, testInfo) => {
+test('Fullscreen timer takeover during countdown and finished', async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament } = await seedGroupStageTournament(4, 4, 8);
+  // Set timer to expire in 15 seconds — enough for seeding + page load before countdown
+  const { tournament, beamerName } = await setupBeamerAndMatches(12, {
+    timerSeconds: 15,
+  });
 
-  const client = new ApiClient(backendUrl);
-  await client.login(e2eEmail, e2ePassword);
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
 
-  // Create beamer
-  const beamerRes = await client.post(
-    `/tournaments/${tournament.id}/beamers`,
-    { name: 'rotation', display_state: 'during_game', is_default: false },
-  );
-  expectStatus(beamerRes, 201, 'create during_game beamer');
-
-  // Start 14 matches — gives 3 chunks (6 + 6 + 2), so both first
-  // and second chunks are full and contain different matches
-  await startMatches(client, tournament.id, 14);
-
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=rotation`);
-
-  // Wait for match cards to render
+  // Wait for match cards to confirm initial render
   const matchCards = page.locator('[class*="matchCard"]');
   await expect(matchCards.first()).toBeVisible();
-  await keyframe(page, testInfo, 'during_game_chunk1');
+  await keyframe(page, testInfo, 'before_countdown');
 
-  // First chunk must show exactly 6 cards (a full page)
-  const firstChunkTexts = await matchCards.allInnerTexts();
-  expect(firstChunkTexts).toHaveLength(6);
+  // Match cards should be visible in normal mode
+  const cardsVisibleBefore = await matchCards.count();
+  expect(cardsVisibleBefore).toBeGreaterThan(0);
 
-  // Wait for the 10s chunk rotation cycle plus a small buffer
+  // Wait for countdown phase (timer <= 10s triggers takeover)
+  const timerTakeover = page.locator('[class*="timerTakeover"]');
+  await expect(timerTakeover).toBeVisible({ timeout: 15_000 });
+  // Use direct screenshot — bump animation repeats each second
+  await page.screenshot({ path: `screenshots/fullscreen_timer_takeover_during_countdown_and_finished/countdown_takeover.png` });
+
+  // During takeover, match cards should not be visible
+  await expect(matchCards).toHaveCount(0);
+
+  // Timer digits should still be visible inside the takeover
+  const timerUrgent = page.locator('[class*="timerUrgent"]');
+  await expect(timerUrgent).toBeVisible({ timeout: 5_000 });
+  await page.screenshot({ path: `screenshots/fullscreen_timer_takeover_during_countdown_and_finished/countdown_urgent.png` });
+
+  // Wait for "Spiel vorbei!" finished state
+  const finishedText = page.locator('[class*="timerFinished"]');
+  await expect(finishedText).toBeVisible({ timeout: 15_000 });
+  await expect(finishedText).toContainText('Spiel vorbei!');
+  // Use direct screenshot — finishedPulse animation is infinite
+  await page.screenshot({ path: `screenshots/fullscreen_timer_takeover_during_countdown_and_finished/finished_takeover.png` });
+
+  // After ~10s the finished display should disappear and matches return
+  await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `screenshots/fullscreen_timer_takeover_during_countdown_and_finished/back_to_normal.png` });
+});
+
+// ---------------------------------------------------------------------------
+// Match grid layout tests — varying row counts
+// ---------------------------------------------------------------------------
+
+test('Match grid with 4 matches (1 row)', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament, beamerName } = await setupBeamerAndMatches(4, {
+    timerSeconds: 10 * 60,
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+
+  const matchCards = page.locator('[class*="matchCard"]');
+  await expect(matchCards).toHaveCount(4);
+  await keyframe(page, testInfo, 'grid_1_row_4_matches');
+
+  // With only 1 row, cards should maintain aspect ratio and not stretch
+  // Timer should take more space since fewer matches
+  const timerContainer = page.locator('[class*="timerContainer"]');
+  const timerBox = await timerContainer.boundingBox();
+  expect(timerBox).not.toBeNull();
+  // Timer should be significantly taller than minimum (> 30% of viewport)
+  expect(timerBox!.height).toBeGreaterThan(1080 * 0.3);
+
+  // No page indicator dots for single page
+  const pageDots = page.locator('[class*="pageDot"]');
+  await expect(pageDots).toHaveCount(0);
+});
+
+test('Match grid with 8 matches (2 rows)', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament, beamerName } = await setupBeamerAndMatches(8, {
+    timerSeconds: 10 * 60,
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+
+  const matchCards = page.locator('[class*="matchCard"]');
+  await expect(matchCards).toHaveCount(8);
+  await keyframe(page, testInfo, 'grid_2_rows_8_matches');
+
+  // No page indicator dots for single page
+  const pageDots = page.locator('[class*="pageDot"]');
+  await expect(pageDots).toHaveCount(0);
+});
+
+test('Match grid with 12 matches (3 rows)', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament, beamerName } = await setupBeamerAndMatches(12, {
+    timerSeconds: 10 * 60,
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+
+  const matchCards = page.locator('[class*="matchCard"]');
+  await expect(matchCards).toHaveCount(12);
+  await keyframe(page, testInfo, 'grid_3_rows_12_matches');
+});
+
+test('Match grid with 16 matches (4 rows, full page)', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament, beamerName } = await setupBeamerAndMatches(16, {
+    timerSeconds: 10 * 60,
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+
+  const matchCards = page.locator('[class*="matchCard"]');
+  await expect(matchCards).toHaveCount(16);
+  await keyframe(page, testInfo, 'grid_4_rows_16_matches');
+
+  // Timer should still be visible at its minimum height
+  const timerContainer = page.locator('[class*="timerContainer"]');
+  const timerBox = await timerContainer.boundingBox();
+  expect(timerBox).not.toBeNull();
+  expect(timerBox!.height).toBeGreaterThan(1080 * 0.15);
+
+  // No page dots — exactly 16 fits one page
+  const pageDots = page.locator('[class*="pageDot"]');
+  await expect(pageDots).toHaveCount(0);
+});
+
+// ---------------------------------------------------------------------------
+// Page rotation for overflow
+// ---------------------------------------------------------------------------
+
+test('During-game view rotates match pages', async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament, beamerName } = await setupBeamerAndMatches(30, {
+    timerSeconds: 10 * 60,
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+
+  const matchCards = page.locator('[class*="matchCard"]');
+  await expect(matchCards.first()).toBeVisible();
+  await keyframe(page, testInfo, 'rotation_page1');
+
+  // First page should show 16 matches (MATCHES_PER_PAGE)
+  const firstPageCount = await matchCards.count();
+  expect(firstPageCount).toBe(16);
+
+  // Page indicator dots should be visible since we have overflow (30 > 16)
+  const pageDots = page.locator('[class*="pageDot"]');
+  await expect(pageDots.first()).toBeVisible();
+  const dotCount = await pageDots.count();
+  expect(dotCount).toBe(2); // ceil(30/16) = 2
+
+  const firstPageTexts = await matchCards.allInnerTexts();
+
+  // Wait for the 10s page rotation cycle plus buffer
   await page.waitForTimeout(11_000);
 
-  // Second chunk must also show exactly 6 cards (a full page)
-  const secondChunkTexts = await matchCards.allInnerTexts();
-  expect(secondChunkTexts).toHaveLength(6);
+  // Second page must show different matches
+  const secondPageTexts = await matchCards.allInnerTexts();
+  expect(firstPageTexts).not.toEqual(secondPageTexts);
 
-  // The two full chunks must show different matches
-  expect(firstChunkTexts).not.toEqual(secondChunkTexts);
+  // Second page should show the remaining 14 matches
+  const secondPageCount = await matchCards.count();
+  expect(secondPageCount).toBe(14);
 
-  await keyframe(page, testInfo, 'during_game_chunk2');
+  await keyframe(page, testInfo, 'rotation_page2');
+});
+
+// ---------------------------------------------------------------------------
+// Card aspect ratio consistency
+// ---------------------------------------------------------------------------
+
+test('Cards maintain consistent aspect ratio across row counts', async ({ page }, testInfo) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  // Test with 4 matches (1 row) — cards should not stretch to fill all vertical space
+  const setup4 = await setupBeamerAndMatches(4, {
+    timerSeconds: 10 * 60,
+    beamerName: 'ar-4',
+  });
+
+  await page.goto(`/t/${setup4.tournament.id}/fullscreen?beamer=ar-4`);
+  const matchCards = page.locator('[class*="matchCard"]');
+  await expect(matchCards).toHaveCount(4);
+
+  const card4 = await matchCards.first().boundingBox();
+  expect(card4).not.toBeNull();
+  const ratio4 = card4!.width / card4!.height;
+
+  await keyframe(page, testInfo, 'aspect_ratio_1_row');
+
+  // Test with 16 matches (4 rows)
+  const setup16 = await setupBeamerAndMatches(16, {
+    timerSeconds: 10 * 60,
+    beamerName: 'ar-16',
+  });
+
+  await page.goto(`/t/${setup16.tournament.id}/fullscreen?beamer=ar-16`);
+  await expect(matchCards).toHaveCount(16);
+
+  const card16 = await matchCards.first().boundingBox();
+  expect(card16).not.toBeNull();
+  const ratio16 = card16!.width / card16!.height;
+
+  await keyframe(page, testInfo, 'aspect_ratio_4_rows');
+
+  // Aspect ratios should be similar (within 30% tolerance)
+  // Both should be ~5:1 from the CSS aspect-ratio property
+  expect(Math.abs(ratio4 - ratio16) / ratio16).toBeLessThan(0.3);
 });
