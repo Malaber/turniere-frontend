@@ -35,10 +35,6 @@ class EditTournamentPage extends React.Component {
     componentDidMount() {
         requestTournament(getTournamentIdentifier(this.props.query), () => {
             this.setState({validCode: true, loaded: true});
-
-            if (this._edittournamentcontent != null) {
-                this._edittournamentcontent.notifyOfContentUpdate();
-            }
         }, () => {
             this.setState({validCode: false, loaded: true});
         });
