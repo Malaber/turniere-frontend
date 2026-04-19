@@ -48,7 +48,7 @@ class Main extends React.Component {
             tournament: null,
             matches: [],
             timerEnd: null,
-            displayState: 'matches_all',
+            displayState: props.query.display || 'matches_all',
             beamerName: props.query.beamer || 'default',
             qrCodeUrl: null,
             logoUrl: null,
@@ -69,28 +69,35 @@ class Main extends React.Component {
         document.body.classList.add('hide-cursor');
         const code = this.props.query.code;
         const beamerName = this.state.beamerName;
+        const forcedDisplayState = this.props.query.display;
 
-        // Fetch beamer config
-        getBeamerByName(code, beamerName,
-            (status, beamer) => {
-                this.setState({
-                    displayState: beamer.display_state,
-                    beamerName: beamer.name,
-                    qrCodeUrl: beamer.qr_code_url,
-                    logoUrl: beamer.logo_url
-                }, () => {
+        if (forcedDisplayState) {
+            this.updateMatches();
+        } else {
+            // Fetch beamer config
+            getBeamerByName(code, beamerName,
+                (status, beamer) => {
+                    this.setState({
+                        displayState: beamer.display_state,
+                        beamerName: beamer.name,
+                        qrCodeUrl: beamer.qr_code_url,
+                        logoUrl: beamer.logo_url
+                    }, () => {
+                        this.updateMatches();
+                    });
+                },
+                () => {
+                    // Beamer not found — use defaults
                     this.updateMatches();
-                });
-            },
-            () => {
-                // Beamer not found — use defaults
-                this.updateMatches();
-            }
-        );
+                }
+            );
+        }
 
         // Connect Socket.IO for live state changes
-        const socket = connectToBeamerSocket(beamerName, this.onDisplayStateChange);
-        this.setState({socket});
+        if (!forcedDisplayState) {
+            const socket = connectToBeamerSocket(beamerName, this.onDisplayStateChange);
+            this.setState({socket});
+        }
 
         // Fetch tournament metadata
         getTournamentMeta(code,

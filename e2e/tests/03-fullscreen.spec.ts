@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
-import { seedAndPlayGroupStage } from '../helpers/scenario-seeder';
+import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
@@ -8,6 +8,27 @@ const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
+
+async function startMatches(
+  client: ApiClient,
+  tournamentId: number,
+  count: number,
+): Promise<void> {
+  const res = await client.get<Array<{ id: number; state: string }>>(
+    `/tournaments/${tournamentId}/matches`,
+  );
+  expectStatus(res, 200, 'fetch tournament matches');
+
+  const notStarted = res.json.filter((m) => m.state === 'not_started');
+  const toStart = notStarted.slice(0, count);
+
+  for (const match of toStart) {
+    const started = await client.patch(`/matches/${match.id}`, {
+      state: 'in_progress',
+    });
+    expectStatus(started, 200, `start match ${match.id}`);
+  }
+}
 
 test('Fullscreen beamer page renders with default fallback', async ({ page }, testInfo) => {
   // Fullscreen/beamer pages are designed for projectors — use a wide viewport
@@ -18,12 +39,6 @@ test('Fullscreen beamer page renders with default fallback', async ({ page }, te
   // Create a default beamer via the API
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
-  const beamerRes = await client.post(`/tournaments/${tournament.id}/beamers`, {
-    name: 'default',
-    display_state: 'matches_all',
-    is_default: true,
-  });
-  expectStatus(beamerRes, 201, 'create default beamer');
 
   // --- Fullscreen without beamer param (should fallback to default) ---
   await page.goto(`/t/${tournament.id}/fullscreen`);
@@ -49,7 +64,6 @@ test('Fullscreen beamer page renders with specific beamer param', async ({ page 
   await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'projector-a',
     display_state: 'matches_in_progress',
-    is_default: false,
   });
 
   // --- Fullscreen with beamer param ---
@@ -69,11 +83,6 @@ test('Fullscreen beamer page falls back when beamer name not found', async ({ pa
   // Create a default beamer so fallback works
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
-  await client.post(`/tournaments/${tournament.id}/beamers`, {
-    name: 'default',
-    display_state: 'matches_all',
-    is_default: true,
-  });
 
   // --- Fullscreen with nonexistent beamer name ---
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=nonexistent`);
@@ -83,4 +92,32 @@ test('Fullscreen beamer page falls back when beamer name not found', async ({ pa
 
   // Should still render (falls back to default beamer)
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
+});
+
+test('Fullscreen shows during-game and between-games modes with timer', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(6, 4, 8);
+
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const timerEnd = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+  const timerRes = await client.patch(
+    `/tournaments/${tournament.id}/set_timer_end`,
+    { timer_end: timerEnd },
+  );
+  expectStatus(timerRes, 200, 'set timer');
+
+  await startMatches(client, tournament.id, 20);
+
+  await page.goto(`/t/${tournament.id}/fullscreen?display=during_game`);
+  await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible();
+  await expect(page.locator('[class*="matchCard"]').first()).toBeVisible();
+  await keyframe(page, testInfo, 'fullscreen_beamer_during_game');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?display=between_games`);
+  await expect(page.getByText('Nächste Spiele')).toBeVisible();
+  await expect(page.locator('[class*="matchCard"]').first()).toBeVisible();
+  await keyframe(page, testInfo, 'fullscreen_beamer_between_games');
 });

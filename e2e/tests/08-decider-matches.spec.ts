@@ -2,11 +2,6 @@ import { test, expect } from '@playwright/test';
 import { injectAuth, loadAuthState } from '../helpers/auth';
 import { keyframe, modalKeyframe } from '../helpers/screenshot';
 import { seedIrrelevantTieScenario, seedRelevantDeciderScenario, seedResolvedDeciderScenario } from '../helpers/scenario-seeder';
-import { ApiClient, expectStatus } from '../helpers/api-client';
-
-const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
-const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
-const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
 
@@ -149,16 +144,7 @@ test('Fullscreen groups view keeps decider tables compact', async ({ page }, tes
   await page.setViewportSize({ width: 1920, height: 1080 });
   const { tournament } = await seedRelevantDeciderScenario();
 
-  const client = new ApiClient(backendUrl);
-  await client.login(e2eEmail, e2ePassword);
-  const beamerRes = await client.post(`/tournaments/${tournament.id}/beamers`, {
-    name: 'groups',
-    display_state: 'groups',
-    is_default: false,
-  });
-  expectStatus(beamerRes, 201, 'create groups beamer');
-
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=groups`);
+  await page.goto(`/t/${tournament.id}/fullscreen?display=groups`);
   await page.waitForLoadState('networkidle');
 
   await expect(page.locator('[data-ranking-decision-trigger]')).toHaveCount(2, { timeout: 15000 });

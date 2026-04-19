@@ -171,10 +171,9 @@ async function main() {
 
   // Create beamers for all display states
   const beamers = [
-    { name: 'default', display_state: 'matches_all', is_default: true },
-    { name: 'between', display_state: 'between_games', is_default: false },
-    { name: 'during', display_state: 'during_game', is_default: false },
-    { name: 'groups', display_state: 'groups', is_default: false },
+    { name: 'between', display_state: 'between_games' },
+    { name: 'during', display_state: 'during_game' },
+    { name: 'groups', display_state: 'groups' },
   ];
 
   for (const beamer of beamers) {
