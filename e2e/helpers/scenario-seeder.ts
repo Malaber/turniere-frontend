@@ -526,14 +526,15 @@ export async function seedLeaderFollowerSyncPair(): Promise<{
   expectStatus(leaderCreated, 201, 'create leader tournament for sync pair');
   const leaderId = (leaderCreated.json as { id: number }).id;
 
-  const followerCreated = await client.post<Tournament>('/tournaments', {
-    name: `Follower ${Date.now()}`,
-    public: false,
+  const followerBaseCreated = await client.post<Tournament>('/tournaments', playoffOnlyPayload(4));
+  expectStatus(followerBaseCreated, 201, 'create base follower tournament for sync pair');
+  const followerId = (followerBaseCreated.json as { id: number }).id;
+
+  const followerConfigured = await client.patch<Tournament>(`/tournaments/${followerId}`, {
     read_only_mode: true,
-    sync_auth_token: syncToken
+    sync_auth_token: syncToken,
   });
-  expectStatus(followerCreated, 201, 'create follower tournament for sync pair');
-  const followerId = (followerCreated.json as { id: number }).id;
+  expectStatus(followerConfigured, 200, 'configure follower tournament for sync pair');
 
   const syncTargetUrl = `${backendUrl}/tournaments/${followerId}/sync_state`;
   const leaderConfigured = await client.patch<Tournament>(`/tournaments/${leaderId}`, {

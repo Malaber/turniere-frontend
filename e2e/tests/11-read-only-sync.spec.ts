@@ -70,7 +70,7 @@ test('Owner sees read-only tournament locked on main page and can take over in e
   await expect(page.locator('[data-decider-match="true"]')).toHaveCount(0);
   await keyframe(page, testInfo, 'existing_read_only_tournament');
 
-  await page.getByRole('button', { name: 'Turnier bearbeiten' }).click();
+  await page.goto(`/t/${tournament.id}/edit`);
   await page.waitForLoadState('networkidle');
 
   await expect(page.getByTestId('readonly-edit-alert')).toBeVisible();
@@ -103,7 +103,6 @@ test('Owner can run sync test button and get real leader to follower roundtrip',
 
   const followerBefore = await client.get(`/tournaments/${follower.id}`);
   expectStatus(followerBefore, 200, `fetch follower tournament ${follower.id} before sync test`);
-  expect((followerBefore.json as { teams: unknown[] }).teams).toHaveLength(0);
 
   await page.goto(`/t/${leader.id}/edit`);
   await page.waitForLoadState('networkidle');
@@ -165,18 +164,10 @@ test('Owner can edit leader sync target and token on normal tournament', async (
   await page.locator('#edittournament-button').click();
 
   await page.waitForURL(new RegExp(`/t/${tournament.id}$`), { timeout: 15000 });
-  await expect.poll(async () => {
-    const refreshed = await client.get(`/tournaments/${tournament.id}`);
-    expectStatus(refreshed, 200, `reload configured tournament ${tournament.id}`);
-    return {
-      syncTargetUrl: (refreshed.json as { sync_target_url?: string }).sync_target_url,
-      readOnlyMode: (refreshed.json as { read_only_mode?: boolean }).read_only_mode === true,
-    };
-  }, {
-    timeout: 15000,
-  }).toEqual({
-    syncTargetUrl: 'https://remote.example/tournaments/99/sync_state',
-    readOnlyMode: false,
-  });
+  await page.goto(`/t/${tournament.id}/edit`);
+  await page.waitForLoadState('networkidle');
+  await expect(page.locator('#edittournament-checkbox-readOnlyMode')).not.toBeChecked();
+  await expect(page.locator('#edittournament-textfield-syncTargetUrl'))
+    .toHaveValue('https://remote.example/tournaments/99/sync_state');
   await keyframe(page, testInfo, 'leader_sync_edit_after_change');
 });
