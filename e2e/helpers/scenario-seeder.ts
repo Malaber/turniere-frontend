@@ -513,3 +513,37 @@ export async function seedReadOnlyFollowerTournament(): Promise<SeededTournament
   const tournament = await fetchTournament(client, tournamentId);
   return { tournament, code: tournament.code };
 }
+
+export async function seedLeaderFollowerSyncPair(): Promise<{
+  leader: Tournament;
+  follower: Tournament;
+  syncToken: string;
+}> {
+  const client = await makeClient();
+  const syncToken = `playwright-sync-${Date.now()}`;
+
+  const leaderCreated = await client.post<Tournament>('/tournaments', groupStagePayload(2, 4, 4));
+  expectStatus(leaderCreated, 201, 'create leader tournament for sync pair');
+  const leaderId = (leaderCreated.json as { id: number }).id;
+
+  const followerCreated = await client.post<Tournament>('/tournaments', {
+    name: `Follower ${Date.now()}`,
+    description: 'Read only follower for frontend sync test',
+    public: true,
+    read_only_mode: true,
+    sync_auth_token: syncToken,
+  });
+  expectStatus(followerCreated, 201, 'create follower tournament for sync pair');
+  const followerId = (followerCreated.json as { id: number }).id;
+
+  const syncTargetUrl = `${backendUrl}/tournaments/${followerId}/sync_state`;
+  const leaderConfigured = await client.patch<Tournament>(`/tournaments/${leaderId}`, {
+    sync_target_url: syncTargetUrl,
+    sync_auth_token: syncToken,
+  });
+  expectStatus(leaderConfigured, 200, 'configure leader sync pair');
+
+  const leader = await fetchTournament(client, leaderId);
+  const follower = await fetchTournament(client, followerId);
+  return { leader, follower, syncToken };
+}

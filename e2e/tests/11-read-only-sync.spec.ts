@@ -1,7 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { injectAuth, loadAuthState } from '../helpers/auth';
 import { ApiClient, expectStatus } from '../helpers/api-client';
-import { seedGroupStageTournament, seedReadOnlyFollowerTournament } from '../helpers/scenario-seeder';
+import {
+  seedGroupStageTournament,
+  seedLeaderFollowerSyncPair,
+  seedReadOnlyFollowerTournament,
+} from '../helpers/scenario-seeder';
 import { keyframe } from '../helpers/screenshot';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
@@ -53,10 +57,6 @@ test('Owner can configure read-only follower fields on create page', async ({ co
 test('Owner sees read-only tournament locked on main page and can take over in edit view', async ({ context, page }, testInfo) => {
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedReadOnlyFollowerTournament();
-  await injectTournamentSyncState(context, tournament.id, {
-    readOnlyMode: true,
-    syncAuthToken: 'shared-secret'
-  });
 
   await page.goto(`/t/${tournament.id}`);
   await page.waitForLoadState('networkidle');
@@ -79,6 +79,56 @@ test('Owner sees read-only tournament locked on main page and can take over in e
   await page.waitForURL(new RegExp(`/t/${tournament.id}$`), { timeout: 15000 });
   await expect(page.getByTestId('readonly-tournament-banner')).toHaveCount(0);
   await keyframe(page, testInfo, 'read_only_takeover_after_save');
+});
+
+test('Owner can run sync test button and get real leader to follower roundtrip', async ({ context, page }, testInfo) => {
+  await injectAuth(context, loadAuthState());
+  const { leader, follower, syncToken } = await seedLeaderFollowerSyncPair();
+  await injectTournamentSyncState(context, leader.id, {
+    readOnlyMode: false,
+    syncTargetUrl: `${backendUrl}/tournaments/${follower.id}/sync_state`,
+    syncAuthToken: syncToken
+  });
+
+  const client = await makeClient();
+  const renamedLeader = await client.patch(`/tournaments/${leader.id}`, {
+    name: `Leader Roundtrip ${Date.now()}`,
+    description: 'Sync button should push this to follower',
+  });
+  expectStatus(renamedLeader, 200, `rename leader tournament ${leader.id}`);
+
+  const followerBefore = await client.get(`/tournaments/${follower.id}`);
+  expectStatus(followerBefore, 200, `fetch follower tournament ${follower.id} before sync test`);
+  expect((followerBefore.json as { teams: unknown[] }).teams).toHaveLength(0);
+
+  await page.goto(`/t/${leader.id}/edit`);
+  await page.waitForLoadState('networkidle');
+
+  await expect(page.locator('#edittournament-textfield-syncTargetUrl'))
+    .toHaveValue(`${backendUrl}/tournaments/${follower.id}/sync_state`);
+  await expect(page.locator('#edittournament-textfield-syncAuthToken')).toHaveValue(syncToken);
+  await keyframe(page, testInfo, 'sync_test_before_click');
+
+  await page.getByTestId('sync-test-button').click();
+  await expect(page.getByTestId('sync-test-result')).toContainText('Sync-Test erfolgreich.');
+  await expect(page.getByTestId('sync-last-pushed-at')).not.toContainText('Noch kein erfolgreicher Push');
+  await keyframe(page, testInfo, 'sync_test_after_click');
+
+  await expect.poll(async () => {
+    const followerAfter = await client.get(`/tournaments/${follower.id}`);
+    expectStatus(followerAfter, 200, `fetch follower tournament ${follower.id} after sync test`);
+    return {
+      name: (followerAfter.json as { name: string }).name,
+      description: (followerAfter.json as { description: string }).description,
+      teamCount: (followerAfter.json as { teams: unknown[] }).teams.length,
+    };
+  }, {
+    timeout: 15000,
+  }).toEqual({
+    name: (renamedLeader.json as { name: string }).name,
+    description: (renamedLeader.json as { description: string }).description,
+    teamCount: ((renamedLeader.json as { teams: unknown[] }).teams).length,
+  });
 });
 
 test('Owner can edit leader sync target and token on normal tournament', async ({ context, page }, testInfo) => {

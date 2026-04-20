@@ -14,7 +14,7 @@ import {UserRestrictor, Option} from '../js/components/UserRestrictor';
 import {Footer} from '../js/components/Footer';
 import {Login} from '../js/components/Login';
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
-import {updateTeamName, updateTournament} from '../js/api';
+import {testTournamentSync, updateTeamName, updateTournament} from '../js/api';
 
 import {LoadingPage} from '../js/components/LoadingPage';
 
@@ -150,9 +150,13 @@ class EditTournamentForm extends React.Component {
         this.state = {
             ...buildEditTournamentFormState(props),
             saving: false,
+            testingSync: false,
+            syncTestMessage: '',
+            syncTestStatus: '',
             lastLoadedKey: buildEditTournamentFormKey(props)
         };
         this.handleClick = this.handleClick.bind(this);
+        this.handleTestSyncClick = this.handleTestSyncClick.bind(this);
     }
 
     static getDerivedStateFromProps(props, state) {
@@ -163,6 +167,9 @@ class EditTournamentForm extends React.Component {
         return {
             ...buildEditTournamentFormState(props),
             saving: false,
+            testingSync: false,
+            syncTestMessage: '',
+            syncTestStatus: '',
             lastLoadedKey: nextLoadedKey
         };
     }
@@ -170,9 +177,11 @@ class EditTournamentForm extends React.Component {
     render() {
         const {
             name, description, isPublic, readOnlyMode, syncTargetUrl,
-            syncAuthToken, syncLastPushedAt, syncLastPushError, saving
+            syncAuthToken, syncLastPushedAt, syncLastPushError, saving,
+            testingSync, syncTestMessage, syncTestStatus
         } = this.state;
         const currentlyReadOnly = this.props.readOnlyMode === true;
+        const syncTestConfigured = !readOnlyMode && syncTargetUrl.trim().length > 0 && syncAuthToken.trim().length > 0;
 
         return (<div>
             {readOnlyMode &&
@@ -230,6 +239,23 @@ class EditTournamentForm extends React.Component {
                     Letzter Fehler: {syncLastPushError ? syncLastPushError : 'Kein Fehler gespeichert'}
                 </div>
             </div>
+            {!readOnlyMode &&
+                <div className="form-group">
+                    <Button color="info" outline id="edittournament-button-test-sync"
+                        data-testid="sync-test-button"
+                        disabled={testingSync || !syncTestConfigured}
+                        onClick={this.handleTestSyncClick}>
+                        {testingSync ? 'Teste Sync...' : 'Sync testen'}
+                    </Button>
+                    <div className="mt-2 text-muted" data-testid="sync-test-hint">
+                        Test macht sofort echten Roundtrip zum konfigurierten Follower.
+                    </div>
+                    {syncTestStatus &&
+                        <Alert className="mt-3 mb-0" color={syncTestStatus === 'success' ? 'success' : 'danger'}
+                            data-testid="sync-test-result">
+                            {syncTestMessage}
+                        </Alert>}
+                </div>}
             <div className="form-group">
                 <div className="input-group">
                     <Button color="success" className="px-5" id="edittournament-button"
@@ -244,6 +270,9 @@ class EditTournamentForm extends React.Component {
         this.setState({
             ...buildEditTournamentFormState(this.props),
             saving: false,
+            testingSync: false,
+            syncTestMessage: '',
+            syncTestStatus: '',
             lastLoadedKey: buildEditTournamentFormKey(this.props)
         });
     }
@@ -274,13 +303,51 @@ class EditTournamentForm extends React.Component {
                 syncLastPushedAt: updatedTournament.sync_last_pushed_at ?
                     new Date(updatedTournament.sync_last_pushed_at) : null,
                 syncLastPushError: updatedTournament.sync_last_push_error || '',
-                saving: false
+                saving: false,
+                syncTestMessage: '',
+                syncTestStatus: ''
             });
             notify.show('Turnier-Einstellungen wurden gespeichert.', 'success', 4000);
             Router.push('/t/' + updatedTournament.id);
         }, errorBody => {
             const firstError = extractFirstErrorMessage(errorBody);
             this.setState({saving: false});
+            notify.show(firstError, 'warning', 5000);
+        });
+    }
+
+    handleTestSyncClick() {
+        const {tournamentId} = this.props;
+
+        this.setState({
+            testingSync: true,
+            syncTestMessage: '',
+            syncTestStatus: ''
+        });
+
+        testTournamentSync(tournamentId, updatedTournament => {
+            this.setState({
+                readOnlyMode: updatedTournament.read_only_mode === true,
+                syncTargetUrl: updatedTournament.sync_target_url || '',
+                syncAuthToken: updatedTournament.sync_auth_token || this.state.syncAuthToken,
+                syncLastPushedAt: updatedTournament.sync_last_pushed_at ?
+                    new Date(updatedTournament.sync_last_pushed_at) : null,
+                syncLastPushError: updatedTournament.sync_last_push_error || '',
+                testingSync: false,
+                syncTestMessage: 'Sync-Test erfolgreich.',
+                syncTestStatus: 'success'
+            });
+            notify.show('Sync-Test erfolgreich.', 'success', 4000);
+        }, errorBody => {
+            const firstError = extractFirstErrorMessage(errorBody);
+            this.setState(prevState => ({
+                testingSync: false,
+                syncLastPushError: errorBody && errorBody.tournament ?
+                    (errorBody.tournament.sync_last_push_error || prevState.syncLastPushError) :
+                    prevState.syncLastPushError,
+                syncTestMessage: firstError,
+                syncTestStatus: 'error'
+            }));
             notify.show(firstError, 'warning', 5000);
         });
     }

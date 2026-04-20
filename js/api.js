@@ -595,6 +595,39 @@ export function updateTournament(tournamentId, data, successCallback, errorCallb
     });
 }
 
+export function testTournamentSync(tournamentId, successCallback, errorCallback) {
+    const currentState = getState();
+    postRequest(currentState, '/tournaments/' + tournamentId + '/test_sync', {}).then(resp => {
+        storeOptionalToken(resp);
+        const mergedTournament = mergeTournamentSyncMetadata(resp.data, {
+            syncAuthToken: currentState.tournamentinfo.syncAuthToken
+        });
+        __store.dispatch({
+            type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
+            parameters: mergedTournament
+        });
+        successCallback(mergedTournament);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            const responseTournament = error.response.data && error.response.data.tournament ?
+                mergeTournamentSyncMetadata(error.response.data.tournament, {
+                    syncAuthToken: currentState.tournamentinfo.syncAuthToken
+                }) :
+                null;
+            if (responseTournament) {
+                __store.dispatch({
+                    type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
+                    parameters: responseTournament
+                });
+            }
+            errorCallback(error.response.data, error.response.status, responseTournament);
+        } else {
+            errorCallback(null, -1, null);
+        }
+    });
+}
+
 export function startMatch(matchId, successCallback, errorCallback) {
     __store.dispatch({
         type: actionTypesTournamentinfo.START_MATCH,
