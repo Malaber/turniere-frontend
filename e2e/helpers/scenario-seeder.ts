@@ -528,10 +528,9 @@ export async function seedLeaderFollowerSyncPair(): Promise<{
 
   const followerCreated = await client.post<Tournament>('/tournaments', {
     name: `Follower ${Date.now()}`,
-    description: 'Read only follower for frontend sync test',
-    public: true,
+    public: false,
     read_only_mode: true,
-    sync_auth_token: syncToken,
+    sync_auth_token: syncToken
   });
   expectStatus(followerCreated, 201, 'create follower tournament for sync pair');
   const followerId = (followerCreated.json as { id: number }).id;
