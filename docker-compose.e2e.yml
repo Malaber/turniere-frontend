@@ -15,6 +15,7 @@ services:
   # container so there is no init-container-exits-prematurely race.
   backend:
     image: registry.gitlab.com/turniere/turniere-backend/production/commits:${BACKEND_VERSION:-latest}
+    platform: linux/amd64
     depends_on:
       postgres:
         condition: service_healthy
