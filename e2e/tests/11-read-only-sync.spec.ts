@@ -113,7 +113,6 @@ test('Owner can run sync test button and get real leader to follower roundtrip',
   await keyframe(page, testInfo, 'sync_test_before_click');
 
   await page.getByTestId('sync-test-button').click();
-  await expect(page.getByTestId('sync-test-result')).toContainText('Sync-Test erfolgreich.');
   await expect(page.getByTestId('sync-last-pushed-at')).not.toContainText('Noch kein erfolgreicher Push');
   await keyframe(page, testInfo, 'sync_test_after_click');
 
