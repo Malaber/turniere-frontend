@@ -50,6 +50,7 @@ export class PlayoffStages extends Component {
         return (<div>
             {this.props.playoffStages.map(stage => <Stage isSignedIn={this.props.isSignedIn}
                 isOwner={this.props.isOwner} updateNextStage={() => this.updateNextStage(stage.id)}
+                readOnlyMode={this.props.readOnlyMode}
                 level={getLevelName(stage.level)} matches={stage.matches} stageLevel={stage.level}
                 key={stage.level}/>)}
         </div>);

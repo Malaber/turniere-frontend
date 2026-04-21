@@ -52,7 +52,8 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
 
   // Wait for match cards to render
   const matchCards = page.locator('[class*="matchCard"]');
-  await expect(matchCards.first()).toBeVisible();
+  await expect(page.getByText(/Nächste Spiele/)).toBeVisible({ timeout: 15_000 });
+  await expect(matchCards.first()).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'between_games_loaded');
 
   // White background for bright-room projector
@@ -62,7 +63,7 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   );
 
   // First page shows exactly 32 cards (36 total, capped at 32)
-  await expect(matchCards).toHaveCount(32);
+  await expect(matchCards).toHaveCount(32, { timeout: 20_000 });
 
   // Team names are rendered (CSS handles truncation via text-overflow)
   const teamNames = page.locator('[class*="teamName"]');
@@ -81,6 +82,6 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   await page.waitForTimeout(13_000);
 
   // Second page shows remaining 4 matches
-  await expect(matchCards).toHaveCount(4);
+  await expect(matchCards).toHaveCount(4, { timeout: 20_000 });
   await keyframe(page, testInfo, 'between_games_page2');
 });

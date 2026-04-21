@@ -14,6 +14,25 @@ export interface AuthState {
   uid: string;
 }
 
+export async function injectAuthState(context: BrowserContext, state: AuthState): Promise<void> {
+  await context.addInitScript((nextState: AuthState) => {
+    const existing = localStorage.getItem('reduxState');
+    const reduxState = existing ? JSON.parse(existing) : {};
+    reduxState.userinfo = {
+      ...(reduxState.userinfo || {}),
+      isSignedIn: true,
+      username: nextState.username,
+      accesstoken: nextState.accesstoken,
+      client: nextState.client,
+      expiry: nextState.expiry,
+      uid: nextState.uid,
+      error: false,
+      errorMessages: [],
+    };
+    localStorage.setItem('reduxState', JSON.stringify(reduxState));
+  }, state);
+}
+
 /** Load the auth state written by global-setup. */
 export function loadAuthState(): AuthState {
   const file = path.join(__dirname, '..', '.auth-state.json');
@@ -50,20 +69,5 @@ async function freshLogin(): Promise<AuthState> {
  */
 export async function injectAuth(context: BrowserContext, _auth?: AuthState): Promise<void> {
   const auth = await freshLogin();
-
-  await context.addInitScript((state: AuthState) => {
-    const reduxState = {
-      userinfo: {
-        isSignedIn: true,
-        username: state.username,
-        accesstoken: state.accesstoken,
-        client: state.client,
-        expiry: state.expiry,
-        uid: state.uid,
-        error: false,
-        errorMessages: [],
-      },
-    };
-    localStorage.setItem('reduxState', JSON.stringify(reduxState));
-  }, auth);
+  await injectAuthState(context, auth);
 }

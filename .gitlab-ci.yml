@@ -27,6 +27,7 @@ frontend e2e:
     # Production backend server
     - name: $CI_REGISTRY/turniere/turniere-backend/production:latest
       alias: backend
+      pull_policy: always
       command:
         - bash
         - -lc

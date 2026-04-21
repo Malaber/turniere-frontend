@@ -2,8 +2,9 @@ import Head from 'next/head';
 import React from 'react';
 import {connect} from 'react-redux';
 import {notify} from 'react-notify-toast';
+import Router from 'next/router';
 import {
-    Container, Button, Card, CardBody, Table
+    Alert, Container, Button, Card, CardBody, Input, Label, Table
 } from 'reactstrap';
 
 import {requestTournament} from '../js/api';
@@ -13,7 +14,7 @@ import {UserRestrictor, Option} from '../js/components/UserRestrictor';
 import {Footer} from '../js/components/Footer';
 import {Login} from '../js/components/Login';
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
-import {updateTeamName} from '../js/api';
+import {testTournamentSync, updateTeamName, updateTournament} from '../js/api';
 
 import {LoadingPage} from '../js/components/LoadingPage';
 
@@ -32,12 +33,8 @@ class EditTournamentPage extends React.Component {
     }
 
     componentDidMount() {
-        requestTournament(this.props.query.code, () => {
+        requestTournament(getTournamentIdentifier(this.props.query), () => {
             this.setState({validCode: true, loaded: true});
-
-            if (this._edittournamentcontent != null) {
-                this._edittournamentcontent.notifyOfContentUpdate();
-            }
         }, () => {
             this.setState({validCode: false, loaded: true});
         });
@@ -90,9 +87,9 @@ class EditTournamentPage extends React.Component {
 }
 
 function mapStateToTournamentInfo(state) {
-    const {tournamentname, ownerUsername} = state.tournamentinfo;
+    const {name, ownerUsername} = state.tournamentinfo;
     const {isSignedIn, username} = state.userinfo;
-    return {tournamentname, ownerUsername, isSignedIn, username};
+    return {tournamentname: name, ownerUsername, isSignedIn, username};
 }
 
 export default connect(mapStateToTournamentInfo)(EditTournamentPage);
@@ -116,11 +113,18 @@ class EditTournamentContent extends React.Component {
     }
 }
 
-function ReturnToTournamentButton() {
+function ReturnToTournamentButtonBase(props) {
+    const tournamentIdentifier = props.id || props.code;
+
     return (<Container className="px-0">
-        <Button color="secondary" className="mb-5 w-100" href="./">Zurück zum Turnier</Button>
+        <Button color="secondary" className="mb-5 w-100" href={'/t/' + tournamentIdentifier}>Zurück zum Turnier</Button>
     </Container>);
 }
+
+const ReturnToTournamentButton = connect(state => ({
+    code: state.tournamentinfo.code,
+    id: state.tournamentinfo.id
+}))(ReturnToTournamentButtonBase);
 
 class EditTournamentPropertiesField extends React.Component {
     render() {
@@ -144,50 +148,208 @@ class EditTournamentForm extends React.Component {
         super(props);
 
         this.state = {
-            name: '', description: '', isPublic: false
+            ...buildEditTournamentFormState(props),
+            saving: false,
+            testingSync: false,
+            syncTestMessage: '',
+            syncTestStatus: '',
+            lastLoadedKey: buildEditTournamentFormKey(props)
+        };
+        this.handleClick = this.handleClick.bind(this);
+        this.handleTestSyncClick = this.handleTestSyncClick.bind(this);
+    }
+
+    static getDerivedStateFromProps(props, state) {
+        const nextLoadedKey = buildEditTournamentFormKey(props);
+        if (state.lastLoadedKey === nextLoadedKey) {
+            return null;
+        }
+        return {
+            ...buildEditTournamentFormState(props),
+            saving: false,
+            testingSync: false,
+            syncTestMessage: '',
+            syncTestStatus: '',
+            lastLoadedKey: nextLoadedKey
         };
     }
 
     render() {
-        const {name, description, isPublic} = this.state;
+        const {
+            name, description, isPublic, readOnlyMode, syncTargetUrl,
+            syncAuthToken, syncLastPushedAt, syncLastPushError, saving,
+            testingSync, syncTestMessage, syncTestStatus
+        } = this.state;
+        const currentlyReadOnly = this.props.readOnlyMode === true;
+        const syncTestConfigured = !readOnlyMode && syncTargetUrl.trim().length > 0 && syncAuthToken.trim().length > 0;
 
         return (<div>
+            {readOnlyMode &&
+                <Alert color="warning" data-testid="readonly-edit-alert">
+                    Dieses Turnier ist als Follower schreibgeschützt. Auf dieser Seite sind nur Sync-Konfiguration und
+                    Takeover erlaubt.
+                </Alert>}
             <div className="form-group">
                 <label htmlFor="name">Turnier-Name</label>
                 <input className="form-control" type="text" name="name" id="edittournament-textfield-name"
+                    disabled={currentlyReadOnly}
                     value={name} placeholder={name} onChange={this.handleNameInput.bind(this)}/>
             </div>
             <div className="form-group">
                 <label htmlFor="name">Turnier-Beschreibung</label>
                 <input className="form-control" type="text" name="name" id="edittournament-textfield-description"
+                    disabled={currentlyReadOnly}
                     value={description} placeholder={description}
                     onChange={this.handleDescriptionInput.bind(this)}/>
             </div>
             <div className="form-group custom-control custom-checkbox">
                 <input className="custom-control-input" type="checkbox" name="isPublic"
+                    disabled={currentlyReadOnly}
+                    checked={isPublic}
                     id="edittournament-checkbox-isPublic" value={isPublic}
                     onChange={this.handlePublicInput.bind(this)}/>
                 <label htmlFor="isPublic" className="custom-control-label">Das Turnier öffentlich anzeigen</label>
             </div>
+            <div className="form-group custom-control custom-checkbox mt-4">
+                <input className="custom-control-input" type="checkbox" name="readOnlyMode"
+                    id="edittournament-checkbox-readOnlyMode" checked={readOnlyMode}
+                    onChange={this.handleReadOnlyModeInput.bind(this)}/>
+                <label htmlFor="readOnlyMode" className="custom-control-label">
+                    Follower-Modus aktivieren
+                </label>
+            </div>
+            <div className="form-group mt-3">
+                <Label htmlFor="edittournament-textfield-syncTargetUrl">Sync-Ziel-URL</Label>
+                <Input type="text" id="edittournament-textfield-syncTargetUrl"
+                    value={syncTargetUrl} onChange={this.handleSyncTargetUrlInput.bind(this)}
+                    placeholder="https://remote.example/tournaments/123/sync_state"/>
+            </div>
+            <div className="form-group">
+                <Label htmlFor="edittournament-textfield-syncAuthToken">Sync-Token</Label>
+                <Input type="text" id="edittournament-textfield-syncAuthToken"
+                    value={syncAuthToken} onChange={this.handleSyncAuthTokenInput.bind(this)}
+                    placeholder="gemeinsames secret"/>
+            </div>
+            <div className="form-group">
+                <h5 className="mb-2">Sync-Status</h5>
+                <div data-testid="sync-last-pushed-at">
+                    Letzter erfolgreicher Push: {formatSyncTimestamp(syncLastPushedAt)}
+                </div>
+                <div data-testid="sync-last-push-error">
+                    Letzter Fehler: {syncLastPushError ? syncLastPushError : 'Kein Fehler gespeichert'}
+                </div>
+            </div>
+            {!readOnlyMode &&
+                <div className="form-group">
+                    <Button color="info" outline id="edittournament-button-test-sync"
+                        data-testid="sync-test-button"
+                        disabled={testingSync || !syncTestConfigured}
+                        onClick={this.handleTestSyncClick}>
+                        {testingSync ? 'Teste Sync...' : 'Sync testen'}
+                    </Button>
+                    <div className="mt-2 text-muted" data-testid="sync-test-hint">
+                        Test macht sofort echten Roundtrip zum konfigurierten Follower.
+                    </div>
+                    {syncTestStatus &&
+                        <Alert className="mt-3 mb-0" color={syncTestStatus === 'success' ? 'success' : 'danger'}
+                            data-testid="sync-test-result">
+                            {syncTestMessage}
+                        </Alert>}
+                </div>}
             <div className="form-group">
                 <div className="input-group">
                     <Button color="success" className="px-5" id="edittournament-button"
-                        onClick={this.handleClick.bind(this)}>Ändern</Button>
+                        disabled={saving}
+                        onClick={this.handleClick}>{saving ? 'Speichert...' : 'Ändern'}</Button>
                 </div>
             </div>
         </div>);
     }
 
     notifyOfContentUpdate() {
-        const {name, description, isPublic} = this.props;
-
         this.setState({
-            name: name ? name : '', description: description ? description : '', isPublic: isPublic
+            ...buildEditTournamentFormState(this.props),
+            saving: false,
+            testingSync: false,
+            syncTestMessage: '',
+            syncTestStatus: '',
+            lastLoadedKey: buildEditTournamentFormKey(this.props)
         });
     }
 
     handleClick() {
-        // TODO: Apply changes to the tournament properties
+        const {tournamentId, readOnlyMode: currentlyReadOnly} = this.props;
+        const payload = {
+            read_only_mode: this.state.readOnlyMode,
+            sync_target_url: this.state.syncTargetUrl.trim(),
+            sync_auth_token: this.state.syncAuthToken.trim()
+        };
+
+        if (!currentlyReadOnly) {
+            payload.name = this.state.name;
+            payload.description = this.state.description;
+            payload.public = this.state.isPublic;
+        }
+
+        this.setState({saving: true});
+        updateTournament(tournamentId, payload, updatedTournament => {
+            this.setState({
+                name: updatedTournament.name || '',
+                description: updatedTournament.description || '',
+                isPublic: updatedTournament.public === true,
+                readOnlyMode: updatedTournament.read_only_mode === true,
+                syncTargetUrl: updatedTournament.sync_target_url || '',
+                syncAuthToken: updatedTournament.sync_auth_token || '',
+                syncLastPushedAt: updatedTournament.sync_last_pushed_at ?
+                    new Date(updatedTournament.sync_last_pushed_at) : null,
+                syncLastPushError: updatedTournament.sync_last_push_error || '',
+                saving: false,
+                syncTestMessage: '',
+                syncTestStatus: ''
+            });
+            notify.show('Turnier-Einstellungen wurden gespeichert.', 'success', 4000);
+            Router.push('/t/' + updatedTournament.id);
+        }, errorBody => {
+            const firstError = extractFirstErrorMessage(errorBody);
+            this.setState({saving: false});
+            notify.show(firstError, 'warning', 5000);
+        });
+    }
+
+    handleTestSyncClick() {
+        const {tournamentId} = this.props;
+
+        this.setState({
+            testingSync: true,
+            syncTestMessage: '',
+            syncTestStatus: ''
+        });
+
+        testTournamentSync(tournamentId, updatedTournament => {
+            this.setState({
+                readOnlyMode: updatedTournament.read_only_mode === true,
+                syncTargetUrl: updatedTournament.sync_target_url || '',
+                syncAuthToken: updatedTournament.sync_auth_token || this.state.syncAuthToken,
+                syncLastPushedAt: updatedTournament.sync_last_pushed_at ?
+                    new Date(updatedTournament.sync_last_pushed_at) : null,
+                syncLastPushError: updatedTournament.sync_last_push_error || '',
+                testingSync: false,
+                syncTestMessage: 'Sync-Test erfolgreich.',
+                syncTestStatus: 'success'
+            });
+            notify.show('Sync-Test erfolgreich.', 'success', 4000);
+        }, errorBody => {
+            const firstError = extractFirstErrorMessage(errorBody);
+            this.setState(prevState => ({
+                testingSync: false,
+                syncLastPushError: errorBody && errorBody.tournament ?
+                    (errorBody.tournament.sync_last_push_error || prevState.syncLastPushError) :
+                    prevState.syncLastPushError,
+                syncTestMessage: firstError,
+                syncTestStatus: 'error'
+            }));
+            notify.show(firstError, 'warning', 5000);
+        });
     }
 
     handleNameInput(input) {
@@ -199,13 +361,38 @@ class EditTournamentForm extends React.Component {
     }
 
     handlePublicInput(input) {
-        this.setState({public: input.target.value});
+        this.setState({isPublic: input.target.checked});
+    }
+
+    handleReadOnlyModeInput(input) {
+        this.setState({readOnlyMode: input.target.checked});
+    }
+
+    handleSyncTargetUrlInput(input) {
+        this.setState({syncTargetUrl: input.target.value});
+    }
+
+    handleSyncAuthTokenInput(input) {
+        this.setState({syncAuthToken: input.target.value});
     }
 }
 
 function mapStateToTournamentFormProps(state) {
-    const {name, description, isPublic} = state.tournamentinfo;
-    return {name, description, isPublic};
+    const {
+        id, name, description, isPublic, readOnlyMode,
+        syncTargetUrl, syncAuthToken, syncLastPushedAt, syncLastPushError
+    } = state.tournamentinfo;
+    return {
+        tournamentId: id,
+        name,
+        description,
+        isPublic,
+        readOnlyMode,
+        syncTargetUrl,
+        syncAuthToken,
+        syncLastPushedAt,
+        syncLastPushError
+    };
 }
 
 const VisibleEditTournamentForm = connect(mapStateToTournamentFormProps, null, null,
@@ -233,21 +420,40 @@ class EditTeamNamesForm extends React.Component {
         super(props);
 
         this.state = {
-            teams: []
+            teams: buildEditTeamNamesState(props),
+            lastLoadedKey: buildEditTeamNamesKey(props)
+        };
+    }
+
+    static getDerivedStateFromProps(props, state) {
+        const nextLoadedKey = buildEditTeamNamesKey(props);
+        if (state.lastLoadedKey === nextLoadedKey) {
+            return null;
+        }
+        return {
+            teams: buildEditTeamNamesState(props),
+            lastLoadedKey: nextLoadedKey
         };
     }
 
     render() {
         const {teams} = this.state;
+        const readOnlyMode = this.props.readOnlyMode === true;
 
         return (<div>
+            {readOnlyMode &&
+                <Alert color="info" data-testid="readonly-team-lock">
+                    Team-Namen bleiben gesperrt, solange Follower-Modus aktiv ist.
+                </Alert>}
             <Table className="table-striped mt-3">
                 <tbody>
                     {teams.map((team, index) => <tr key={index}>
                         <td><Button outline size="sm" className="changeTeamnameButton"
+                            disabled={readOnlyMode}
                             id={'editteam-button-team_' + team.id}
                             onClick={this.handleClick.bind(this, index)}>Ändern</Button></td>
                         <td className="w-100"><input className="form-control" type="text"
+                            disabled={readOnlyMode}
                             id={'editteam-textfield-team_' + team.id} value={team.name}
                             placeholder={team.name}
                             onChange={this.handleNameInput.bind(this, index)}/></td>
@@ -258,10 +464,9 @@ class EditTeamNamesForm extends React.Component {
     }
 
     notifyOfContentUpdate() {
-        const {teams} = this.props;
-
         this.setState({
-            teams: teams
+            teams: buildEditTeamNamesState(this.props),
+            lastLoadedKey: buildEditTeamNamesKey(this.props)
         });
     }
 
@@ -285,9 +490,84 @@ class EditTeamNamesForm extends React.Component {
 }
 
 function mapStateToTeamFormProps(state) {
-    const {teams} = state.tournamentinfo;
-    return {teams};
+    const {teams, readOnlyMode} = state.tournamentinfo;
+    return {teams, readOnlyMode};
 }
 
 const VisibleEditTeamNamesForm = connect(mapStateToTeamFormProps, null, null, {withRef: true})(EditTeamNamesForm);
 
+function extractFirstErrorMessage(errorBody) {
+    if (errorBody && Array.isArray(errorBody.full_messages) && errorBody.full_messages.length > 0) {
+        return errorBody.full_messages[0];
+    }
+    if (errorBody && Array.isArray(errorBody.errors) && errorBody.errors.length > 0) {
+        return errorBody.errors[0];
+    }
+    if (errorBody && typeof errorBody.error === 'string' && errorBody.error.length > 0) {
+        return errorBody.error;
+    }
+    return 'Turnier-Einstellungen konnten nicht gespeichert werden.';
+}
+
+function formatSyncTimestamp(value) {
+    if (!value) {
+        return 'Noch kein erfolgreicher Push';
+    }
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return 'Unbekannter Zeitpunkt';
+    }
+    return date.toLocaleString('de-DE');
+}
+
+function getTournamentIdentifier(query) {
+    if (query && query.id !== undefined) {
+        return query.id;
+    }
+    if (query && query.code !== undefined) {
+        return query.code;
+    }
+    return undefined;
+}
+
+function buildEditTournamentFormState(props) {
+    return {
+        name: props.name ? props.name : '',
+        description: props.description ? props.description : '',
+        isPublic: props.isPublic,
+        readOnlyMode: props.readOnlyMode === true,
+        syncTargetUrl: props.syncTargetUrl || '',
+        syncAuthToken: props.syncAuthToken || '',
+        syncLastPushedAt: props.syncLastPushedAt || null,
+        syncLastPushError: props.syncLastPushError || ''
+    };
+}
+
+function buildEditTournamentFormKey(props) {
+    return JSON.stringify({
+        name: props.name || '',
+        description: props.description || '',
+        isPublic: props.isPublic === true,
+        readOnlyMode: props.readOnlyMode === true,
+        syncTargetUrl: props.syncTargetUrl || '',
+        syncAuthToken: props.syncAuthToken || '',
+        syncLastPushedAt: props.syncLastPushedAt instanceof Date ?
+            props.syncLastPushedAt.toISOString() :
+            props.syncLastPushedAt || null,
+        syncLastPushError: props.syncLastPushError || ''
+    });
+}
+
+function buildEditTeamNamesState(props) {
+    return (props.teams || []).map(team => ({...team}));
+}
+
+function buildEditTeamNamesKey(props) {
+    return JSON.stringify({
+        readOnlyMode: props.readOnlyMode === true,
+        teams: (props.teams || []).map(team => ({
+            id: team.id,
+            name: team.name
+        }))
+    });
+}

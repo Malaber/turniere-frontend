@@ -56,12 +56,13 @@ export default class GroupStage extends Component {
     }
 
     render() {
+        const canEdit = this.props.isSignedIn && this.props.isOwner && !this.props.readOnlyMode;
         return (
             <div className='py-2 px-1'>
                 <h1 className='custom-font'>
                     <span className='px-2'>Gruppenphase</span>
                 </h1>
-                {this.props.isSignedIn && this.props.isOwner && this.props.stageState !== 'finished' &&
+                {canEdit && this.props.stageState !== 'finished' &&
                     <div className='px-2 mt-3'>
                         <Button color='success' onClick={this.finishStage} disabled={this.state.finishingStage}
                             data-testid='finish-group-stage'>
@@ -85,6 +86,7 @@ export default class GroupStage extends Component {
                             key={group.id}
                             isSignedIn={this.props.isSignedIn}
                             isOwner={this.props.isOwner}
+                            readOnlyMode={this.props.readOnlyMode}
                             groupRef={this.groupRefs[group.id]}
                             teams={this.props.teams}
                             blockingTies={this.state.blockingTies}
@@ -199,6 +201,7 @@ export class Group extends Component {
                                     match={match}
                                     isSignedIn={this.props.isSignedIn}
                                     isOwner={this.props.isOwner}
+                                    readOnlyMode={this.props.readOnlyMode}
                                     onChange={this.reload}
                                     onFinish={this.reload}
                                     key={match.id}
@@ -207,6 +210,7 @@ export class Group extends Component {
                         </Collapse>
                         <GroupScoresTable scores={this.state.scores} teams={this.props.teams} groupId={this.state.id}
                             isOwner={this.props.isOwner} isSignedIn={this.props.isSignedIn}
+                            readOnlyMode={this.props.readOnlyMode}
                             onCreateDecider={this.createDecider} creatingDeciderKey={this.state.creatingDeciderKey}
                             onDecisionClick={this.openDecisionModal}/>
                         <RankingDecisionModal
@@ -215,6 +219,7 @@ export class Group extends Component {
                             toggle={this.closeDecisionModal}
                             isOwner={this.props.isOwner}
                             isSignedIn={this.props.isSignedIn}
+                            readOnlyMode={this.props.readOnlyMode}
                             onCreateDecider={this.createDecider}
                             creatingDeciderKey={this.state.creatingDeciderKey}
                         />
@@ -313,7 +318,7 @@ function RankingDecisionModal(props) {
     }
 
     const rankingDecision = props.score.ranking_decision;
-    const canCreateDecider = props.isOwner && props.isSignedIn &&
+    const canCreateDecider = props.isOwner && props.isSignedIn && !props.readOnlyMode &&
         rankingDecision.needs_decider_match && !rankingDecision.decider_match_id &&
         props.score.team.id < rankingDecision.compared_with_team_id;
     const teamIds = [props.score.team.id, rankingDecision.compared_with_team_id];

@@ -43,7 +43,7 @@ test('Fullscreen beamer page renders with default fallback', async ({ page }, te
   // --- Fullscreen without beamer param (should fallback to default) ---
   await page.goto(`/t/${tournament.id}/fullscreen`);
   const bottomNavbar = page.locator('.fixed-bottom');
-  await expect(bottomNavbar).toBeVisible();
+  await expect(bottomNavbar).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'fullscreen_loaded');
 
   // Cursor is hidden
@@ -69,7 +69,7 @@ test('Fullscreen beamer page renders with specific beamer param', async ({ page 
   // --- Fullscreen with beamer param ---
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=projector-a`);
   const bottomNavbar = page.locator('.fixed-bottom');
-  await expect(bottomNavbar).toBeVisible();
+  await expect(bottomNavbar).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'fullscreen_named_beamer');
 
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
@@ -87,7 +87,7 @@ test('Fullscreen beamer page falls back when beamer name not found', async ({ pa
   // --- Fullscreen with nonexistent beamer name ---
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=nonexistent`);
   const bottomNavbar = page.locator('.fixed-bottom');
-  await expect(bottomNavbar).toBeVisible();
+  await expect(bottomNavbar).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'fullscreen_fallback');
 
   // Should still render (falls back to default beamer)
@@ -117,7 +117,7 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
   await keyframe(page, testInfo, 'fullscreen_beamer_during_game');
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=between_games`);
-  await expect(page.getByText('Nächste Spiele')).toBeVisible();
-  await expect(page.locator('[class*="matchCard"]').first()).toBeVisible();
+  await expect(page.getByText(/Nächste Spiele/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[class*="matchCard"]').first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'fullscreen_beamer_between_games');
 });

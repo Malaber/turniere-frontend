@@ -27,9 +27,9 @@ app.prepare()
             app.render(req, res, actualPage, queryParam);
         });
 
-        server.get('/t/:code/edit', (req, res) => {
+        server.get('/t/:id(\\d+)/edit', (req, res) => {
             const actualPage = '/tournament-edit';
-            const queryParam = { code: req.params.code };
+            const queryParam = { id: req.params.id };
             app.render(req, res, actualPage, queryParam);
         });
 

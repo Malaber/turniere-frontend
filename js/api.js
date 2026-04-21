@@ -13,6 +13,7 @@ import {
     defaultStateTournamentStatistics,
     transformTournamentInfoToStatistics, transformTournamentStatsToStatistics
 } from './redux/tournamentStatistics';
+import {mergeTournamentSyncMetadata} from './utils/tournamentSyncMetadata';
 
 
 function normalizeErrorMessages(error, fallbackMessage) {
@@ -217,9 +218,16 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
         return Object.assign({}, state, {});
     case actionTypesTournamentinfo.REQUEST_TOURNAMENT:
         getRequest(action.state, '/tournaments/' + action.parameters.code).then(resp => {
+            const mergedTournament = mergeTournamentSyncMetadata(resp.data, {
+                readOnlyMode: action.state.tournamentinfo.readOnlyMode,
+                syncTargetUrl: action.state.tournamentinfo.syncTargetUrl,
+                syncAuthToken: action.state.tournamentinfo.syncAuthToken,
+                syncLastPushedAt: action.state.tournamentinfo.syncLastPushedAt,
+                syncLastPushError: action.state.tournamentinfo.syncLastPushError
+            });
             __store.dispatch({
                 type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
-                parameters: resp.data
+                parameters: mergedTournament
             });
             storeOptionalToken(resp);
             action.parameters.successCallback();
@@ -235,6 +243,11 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
             name: action.parameters.name,
             ownerUsername: action.parameters.owner_username,
             isPublic: action.parameters.public,
+            readOnlyMode: action.parameters.read_only_mode === true,
+            syncTargetUrl: action.parameters.sync_target_url || '',
+            syncAuthToken: action.parameters.sync_auth_token || '',
+            syncLastPushedAt: action.parameters.sync_last_pushed_at || null,
+            syncLastPushError: action.parameters.sync_last_push_error || '',
             stages: action.parameters.stages,
             teams: action.parameters.teams
         });
@@ -258,8 +271,7 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
 
         return Object.assign({}, state, {});
     case actionTypesTournamentinfo.REHYDRATE:
-
-        return Object.assign({}, state, {});
+        return Object.assign({}, state, action.parameters || {});
     case actionTypesTournamentinfo.START_MATCH:
         patchRequest(action.state, '/matches/' + action.parameters.matchId, {
             state: 'in_progress'
@@ -452,12 +464,12 @@ export function initializeStore(initialState = defaultApplicationState) {
 }
 
 export function verifyCredentials() {
-    rehydrateApplicationState();
+    ensureApplicationHydrated();
 
     if (__store.getState().userinfo.isSignedIn) {
         __store.dispatch({
             type: actionTypesUserinfo.VERIFY_CREDENTIALS,
-            state: __store.getState()
+            state: getState()
         });
     }
 }
@@ -472,7 +484,7 @@ export function register(username, email, password, successCallback, errorCallba
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -484,7 +496,7 @@ export function login(email, password, successCallback) {
             password: password,
             successCallback: successCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -494,7 +506,7 @@ export function logout(successCallback) {
         parameters: {
             successCallback: successCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -506,7 +518,7 @@ export function changeMail(newMail, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -518,7 +530,7 @@ export function createTournament(data, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -530,7 +542,7 @@ export function requestTournament(code, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -543,7 +555,76 @@ export function updateTeamName(team, successCB, errorCB) {
             onSuccess: successCB,
             onError: errorCB
         },
-        state: __store.getState()
+        state: getState()
+    });
+}
+
+export function updateTournament(tournamentId, data, successCallback, errorCallback) {
+    const currentState = getState();
+    patchRequest(currentState, '/tournaments/' + tournamentId, data).then(resp => {
+        storeOptionalToken(resp);
+        const newReadOnlyMode = Object.prototype.hasOwnProperty.call(data, 'read_only_mode') ?
+            data.read_only_mode === true :
+            currentState.tournamentinfo.readOnlyMode;
+        const mergedTournament = mergeTournamentSyncMetadata(resp.data, {
+            readOnlyMode: newReadOnlyMode,
+            syncTargetUrl: Object.prototype.hasOwnProperty.call(data, 'sync_target_url') ?
+                data.sync_target_url :
+                currentState.tournamentinfo.syncTargetUrl,
+            syncAuthToken: Object.prototype.hasOwnProperty.call(data, 'sync_auth_token') ?
+                data.sync_auth_token :
+                currentState.tournamentinfo.syncAuthToken,
+            syncLastPushedAt: currentState.tournamentinfo.syncLastPushedAt,
+            syncLastPushError: currentState.tournamentinfo.syncLastPushError
+        });
+        if (Object.prototype.hasOwnProperty.call(data, 'read_only_mode')) {
+            mergedTournament.read_only_mode = data.read_only_mode === true;
+        }
+        __store.dispatch({
+            type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
+            parameters: mergedTournament
+        });
+        successCallback(mergedTournament);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
+}
+
+export function testTournamentSync(tournamentId, successCallback, errorCallback) {
+    const currentState = getState();
+    postRequest(currentState, '/tournaments/' + tournamentId + '/test_sync', {}).then(resp => {
+        storeOptionalToken(resp);
+        const mergedTournament = mergeTournamentSyncMetadata(resp.data, {
+            syncAuthToken: currentState.tournamentinfo.syncAuthToken
+        });
+        __store.dispatch({
+            type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
+            parameters: mergedTournament
+        });
+        successCallback(mergedTournament);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            const responseTournament = error.response.data && error.response.data.tournament ?
+                mergeTournamentSyncMetadata(error.response.data.tournament, {
+                    syncAuthToken: currentState.tournamentinfo.syncAuthToken
+                }) :
+                null;
+            if (responseTournament) {
+                __store.dispatch({
+                    type: actionTypesTournamentinfo.REQUEST_TOURNAMENT_SUCCESS,
+                    parameters: responseTournament
+                });
+            }
+            errorCallback(error.response.data, error.response.status, responseTournament);
+        } else {
+            errorCallback(null, -1, null);
+        }
     });
 }
 
@@ -555,7 +636,7 @@ export function startMatch(matchId, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -567,7 +648,7 @@ export function endMatch(matchId, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -583,7 +664,7 @@ export function submitMatchScores(scoreTeam1, scoreIdTeam1, scoreTeam2, scoreIdT
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -606,7 +687,7 @@ export function submitDeciderMatchScores(
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -619,7 +700,7 @@ export function createDeciderMatch(groupId, teamIds, successCallback, errorCallb
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -631,11 +712,12 @@ export function finishGroupStage(stageId, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
 export function getState() {
+    ensureApplicationHydrated();
     return __store.getState();
 }
 
@@ -647,7 +729,7 @@ export function requestTournamentList(type, successCallback, errorCallback) {
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -659,7 +741,7 @@ export function requestTournamentStatistics(code, successCallback, errorCallback
             successCallback: successCallback,
             errorCallback: errorCallback
         },
-        state: __store.getState()
+        state: getState()
     });
 }
 
@@ -687,4 +769,10 @@ function rehydrateApplicationState() {
         });
     }
     applicationHydrated = true;
+}
+
+function ensureApplicationHydrated() {
+    if (!applicationHydrated && typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+        rehydrateApplicationState();
+    }
 }

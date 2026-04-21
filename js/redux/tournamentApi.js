@@ -1,11 +1,12 @@
 import {getRequest} from './backendApi';
 import {getState} from '../api';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
+import {mergeTournamentSyncMetadata} from '../utils/tournamentSyncMetadata';
 
 export function getTournament(code, successCallback, errorCallback) {
     getRequest(getState(), '/tournaments/' + code)
         .then(response => {
-            successCallback(response.status, convertTournament(response.data));
+            successCallback(response.status, convertTournament(mergeTournamentSyncMetadata(response.data)));
         })
         .catch(errorCallback);
 }
@@ -99,6 +100,11 @@ function convertTournament(apiTournament) {
         description: apiTournament.description,
         name: apiTournament.name,
         isPublic: apiTournament.public,
+        readOnlyMode: apiTournament.read_only_mode === true,
+        syncTargetUrl: apiTournament.sync_target_url || '',
+        syncAuthToken: apiTournament.sync_auth_token || '',
+        syncLastPushedAt: apiTournament.sync_last_pushed_at ? new Date(apiTournament.sync_last_pushed_at) : null,
+        syncLastPushError: apiTournament.sync_last_push_error || '',
         ownerUsername: apiTournament.owner_username,
         groupStage: groupStage,
         playoffStages: playoffStages,

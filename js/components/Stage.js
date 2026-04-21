@@ -3,7 +3,7 @@ import {Match} from './Match';
 import React from 'react';
 
 export function Stage(props) {
-    const {isSignedIn, isOwner, updateNextStage, stageLevel} = props;
+    const {isSignedIn, isOwner, readOnlyMode, updateNextStage, stageLevel} = props;
 
     return (<div>
         <Container className='py-5'>
@@ -15,6 +15,7 @@ export function Stage(props) {
                             match={match}
                             isSignedIn={isSignedIn}
                             isOwner={isOwner}
+                            readOnlyMode={readOnlyMode}
                             onFinish={updateNextStage}
                             stageLevel={stageLevel}
                         />

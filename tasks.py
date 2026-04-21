@@ -18,6 +18,20 @@ E2E_DIR = ROOT / "e2e"
 
 DEFAULT_API_URL = "http://127.0.0.1:3000"
 DEFAULT_FRONTEND_URL = "http://127.0.0.1:3001"
+
+FRONTEND_INSTANCES_LEADER_FOLLOWER = [
+    {
+        "name": "leader",
+        "api_url": "http://127.0.0.1:3002",
+        "port": 4002,
+    },
+    {
+        "name": "follower",
+        "api_url": "http://127.0.0.1:3003",
+        "port": 4003,
+    },
+]
+
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 3001
 DEFAULT_NODE_VERSION = "24"
@@ -161,6 +175,48 @@ def start(c, api_url=DEFAULT_API_URL, host=DEFAULT_HOST, port=DEFAULT_PORT, inst
         env={"TURNIERE_API_URL": api_url, "HOST": host, "PORT": str(port)},
         node_version=node_version,
     )
+
+@task(name="start-leader-follower-frontends")
+def start_leader_follower_frontends(
+    c,
+    host=DEFAULT_HOST,
+    node_version=DEFAULT_NODE_VERSION,
+):
+    """
+    Start multiple frontend dev servers based on FRONTEND_INSTANCES.
+    """
+
+    processes: list[tuple[str, subprocess.Popen, str]] = []
+
+    try:
+        # wait for all backends
+        for instance in FRONTEND_INSTANCES_LEADER_FOLLOWER:
+            print(f"Waiting for {instance['name']} backend...")
+            _wait_for_url(f"{instance['api_url'].rstrip('/')}/healthz")
+
+        # start all frontends
+        for instance in FRONTEND_INSTANCES_LEADER_FOLLOWER:
+            proc, log = _start_background_frontend(
+                api_url=instance["api_url"],
+                host=host,
+                port=int(instance["port"]),
+                node_version=node_version,
+            )
+            processes.append((instance["name"], proc, log))
+            print(f"{instance['name'].capitalize()} frontend: http://localhost:{instance['port']}")
+
+        # keep alive
+        while True:
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("\nStopping frontends...")
+
+    finally:
+        # this will happen on manual termination (e.g. keyboard Interrupt)
+        for name, proc, log in processes:
+            _stop_background_process(proc)
+            print(f"{name.capitalize()} log: {log}")
 
 
 @task(name="e2e-install")
@@ -352,10 +408,10 @@ def e2e_docker(c, backend_version="latest", keep_running=False):
     exit_error = None
 
     try:
-        # Always rebuild and recreate the local frontend before Playwright runs.
-        # Without this, repeated local E2E runs can silently reuse an older
-        # container image and exercise stale fullscreen code.
-        _compose(["build", "frontend"], env=env)
+        # Always rebuild frontend and E2E containers before Playwright runs.
+        # Without this, repeated local E2E runs can silently reuse older
+        # images and exercise stale app code or stale test specs.
+        _compose(["build", "frontend", "e2e"], env=env)
         _compose(
             ["up", "-d", "--force-recreate", "postgres", "backend", "frontend"],
             env=env,

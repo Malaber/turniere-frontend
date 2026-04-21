@@ -497,3 +497,53 @@ export async function seedIrrelevantTieScenario(): Promise<SeededTournament> {
   tournament = await fetchTournament(client, tournament.id);
   return { tournament, code: tournament.code };
 }
+
+export async function seedReadOnlyFollowerTournament(): Promise<SeededTournament> {
+  const client = await makeClient();
+  const created = await client.post<Tournament>('/tournaments', playoffOnlyPayload(4));
+  expectStatus(created, 201, 'create base tournament for read only follower');
+
+  const tournamentId = (created.json as { id: number }).id;
+  const updated = await client.patch<Tournament>(`/tournaments/${tournamentId}`, {
+    read_only_mode: true,
+    sync_auth_token: 'shared-secret',
+  });
+  expectStatus(updated, 200, 'enable read only mode on follower tournament');
+
+  const tournament = await fetchTournament(client, tournamentId);
+  return { tournament, code: tournament.code };
+}
+
+export async function seedLeaderFollowerSyncPair(): Promise<{
+  leader: Tournament;
+  follower: Tournament;
+  syncToken: string;
+}> {
+  const client = await makeClient();
+  const syncToken = `playwright-sync-${Date.now()}`;
+
+  const leaderCreated = await client.post<Tournament>('/tournaments', groupStagePayload(2, 4, 4));
+  expectStatus(leaderCreated, 201, 'create leader tournament for sync pair');
+  const leaderId = (leaderCreated.json as { id: number }).id;
+
+  const followerBaseCreated = await client.post<Tournament>('/tournaments', playoffOnlyPayload(4));
+  expectStatus(followerBaseCreated, 201, 'create base follower tournament for sync pair');
+  const followerId = (followerBaseCreated.json as { id: number }).id;
+
+  const followerConfigured = await client.patch<Tournament>(`/tournaments/${followerId}`, {
+    read_only_mode: true,
+    sync_auth_token: syncToken,
+  });
+  expectStatus(followerConfigured, 200, 'configure follower tournament for sync pair');
+
+  const syncTargetUrl = `${backendUrl}/tournaments/${followerId}/sync_state`;
+  const leaderConfigured = await client.patch<Tournament>(`/tournaments/${leaderId}`, {
+    sync_target_url: syncTargetUrl,
+    sync_auth_token: syncToken,
+  });
+  expectStatus(leaderConfigured, 200, 'configure leader sync pair');
+
+  const leader = await fetchTournament(client, leaderId);
+  const follower = await fetchTournament(client, followerId);
+  return { leader, follower, syncToken };
+}
