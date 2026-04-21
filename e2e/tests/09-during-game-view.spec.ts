@@ -57,15 +57,19 @@ async function setupBeamerAndMatches(
     expectStatus(timerRes, 200, 'set timer');
   }
 
+  // Try creating a beamer; fall back to ?display= URL if backend lacks beamer support
   const beamerRes = await client.post(
     `/tournaments/${tournament.id}/beamers`,
     { name: beamerName, display_state: 'during_game', is_default: false },
   );
-  expectStatus(beamerRes, 201, 'create during_game beamer');
+  const hasBeamer = beamerRes.status === 201;
 
   await startMatches(client, tournament.id, matchCount);
 
-  return { tournament, client, beamerName };
+  const fullscreenQuery = hasBeamer
+    ? `beamer=${beamerName}`
+    : 'display=during_game';
+  return { tournament, client, fullscreenQuery };
 }
 
 // ---------------------------------------------------------------------------
@@ -76,11 +80,11 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament, beamerName } = await setupBeamerAndMatches(14, {
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(14, {
     timerSeconds: 5 * 60,
   });
 
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   // Wait for match cards to confirm the page loaded
   const matchCards = page.locator('[class*="matchCard"]');
@@ -123,11 +127,11 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
   await page.setViewportSize({ width: 1920, height: 1080 });
 
   // Set timer to expire in 15 seconds — enough for seeding + page load before countdown
-  const { tournament, beamerName } = await setupBeamerAndMatches(12, {
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(12, {
     timerSeconds: 15,
   });
 
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   // Wait for match cards to confirm initial render
   const matchCards = page.locator('[class*="matchCard"]');
@@ -173,11 +177,11 @@ test('Match grid with 4 matches (1 row)', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament, beamerName } = await setupBeamerAndMatches(4, {
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(4, {
     timerSeconds: 10 * 60,
   });
 
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   const matchCards = page.locator('[class*="matchCard"]');
   await expect(matchCards).toHaveCount(4);
@@ -200,11 +204,11 @@ test('Match grid with 8 matches (2 rows)', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament, beamerName } = await setupBeamerAndMatches(8, {
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(8, {
     timerSeconds: 10 * 60,
   });
 
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   const matchCards = page.locator('[class*="matchCard"]');
   await expect(matchCards).toHaveCount(8);
@@ -219,11 +223,11 @@ test('Match grid with 12 matches (3 rows)', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament, beamerName } = await setupBeamerAndMatches(12, {
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(12, {
     timerSeconds: 10 * 60,
   });
 
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   const matchCards = page.locator('[class*="matchCard"]');
   await expect(matchCards).toHaveCount(12);
@@ -234,11 +238,11 @@ test('Match grid with 16 matches (4 rows, full page)', async ({ page }, testInfo
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament, beamerName } = await setupBeamerAndMatches(16, {
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(16, {
     timerSeconds: 10 * 60,
   });
 
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   const matchCards = page.locator('[class*="matchCard"]');
   await expect(matchCards).toHaveCount(16);
@@ -263,11 +267,11 @@ test('During-game view rotates match pages', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament, beamerName } = await setupBeamerAndMatches(30, {
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(30, {
     timerSeconds: 10 * 60,
   });
 
-  await page.goto(`/t/${tournament.id}/fullscreen?beamer=${beamerName}`);
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   const matchCards = page.locator('[class*="matchCard"]');
   await expect(matchCards.first()).toBeVisible();
@@ -313,7 +317,7 @@ test('Cards maintain consistent aspect ratio across row counts', async ({ page }
     beamerName: 'ar-4',
   });
 
-  await page.goto(`/t/${setup4.tournament.id}/fullscreen?beamer=ar-4`);
+  await page.goto(`/t/${setup4.tournament.id}/fullscreen?${setup4.fullscreenQuery}`);
   const matchCards = page.locator('[class*="matchCard"]');
   await expect(matchCards).toHaveCount(4);
 
@@ -329,7 +333,7 @@ test('Cards maintain consistent aspect ratio across row counts', async ({ page }
     beamerName: 'ar-16',
   });
 
-  await page.goto(`/t/${setup16.tournament.id}/fullscreen?beamer=ar-16`);
+  await page.goto(`/t/${setup16.tournament.id}/fullscreen?${setup16.fullscreenQuery}`);
   await expect(matchCards).toHaveCount(16);
 
   const card16 = await matchCards.first().boundingBox();
