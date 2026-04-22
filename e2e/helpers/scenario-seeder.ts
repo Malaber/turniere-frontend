@@ -383,17 +383,21 @@ export async function seedAndPlayToCompletion(teamCount = 8): Promise<SeededTour
 }
 
 export async function seedRelevantDeciderScenario(): Promise<DeciderScenario> {
+  return seedAdvancingDeciderScenario();
+}
+
+export async function seedAdvancingDeciderScenario(): Promise<DeciderScenario> {
   const client = await makeClient();
   const payload = groupStagePayload(1, 4, 2);
 
   const created = await client.post<Tournament>('/tournaments', payload);
-  expectStatus(created, 201, 'create relevant decider scenario tournament');
+  expectStatus(created, 201, 'create advancing decider scenario tournament');
 
   let tournament = await fetchTournament(client, (created.json as { id: number }).id);
   const groupStage = groupStageOf(tournament);
   const group = groupStage.groups[0];
   if (!group) {
-    throw new Error('Expected a group in the relevant decider scenario');
+    throw new Error('Expected a group in the advancing decider scenario');
   }
 
   const matchByTeams = (teamA: string, teamB: string): Match => {
@@ -407,10 +411,10 @@ export async function seedRelevantDeciderScenario(): Promise<DeciderScenario> {
     return match;
   };
 
-  await playMatchWithExactScores(client, matchByTeams('G1-S1', 'G1-S2'), { 'G1-S1': 3, 'G1-S2': 1 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S1', 'G1-S2'), { 'G1-S1': 2, 'G1-S2': 2 });
   await playMatchWithExactScores(client, matchByTeams('G1-S1', 'G1-S3'), { 'G1-S1': 3, 'G1-S3': 1 });
   await playMatchWithExactScores(client, matchByTeams('G1-S1', 'G1-S4'), { 'G1-S1': 3, 'G1-S4': 1 });
-  await playMatchWithExactScores(client, matchByTeams('G1-S2', 'G1-S3'), { 'G1-S2': 2, 'G1-S3': 2 });
+  await playMatchWithExactScores(client, matchByTeams('G1-S2', 'G1-S3'), { 'G1-S2': 3, 'G1-S3': 1 });
   await playMatchWithExactScores(client, matchByTeams('G1-S2', 'G1-S4'), { 'G1-S2': 3, 'G1-S4': 1 });
   await playMatchWithExactScores(client, matchByTeams('G1-S3', 'G1-S4'), { 'G1-S3': 3, 'G1-S4': 1 });
 
@@ -421,7 +425,7 @@ export async function seedRelevantDeciderScenario(): Promise<DeciderScenario> {
     code: tournament.code,
     groupId: group.id,
     stageId: groupStage.id,
-    relevantTeamNames: ['G1-S2', 'G1-S3'],
+    relevantTeamNames: ['G1-S1', 'G1-S2'],
   };
 }
 
