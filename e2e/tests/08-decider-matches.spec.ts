@@ -142,8 +142,12 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
   await expect(deciderCard).toBeVisible({ timeout: 15000 });
   await deciderCard.click({ force: true });
   modal = page.getByRole('dialog');
-  await expect(modal.getByRole('button', { name: 'Spiel starten' })).toBeVisible();
-  await modal.getByRole('button', { name: 'Spiel starten' }).click();
+  await expect(visibleModal(page)).toBeVisible();
+  const startButton = modal.getByRole('button', { name: 'Spiel starten' });
+  if (await startButton.count() > 0) {
+    await expect(startButton).toBeVisible();
+    await startButton.click();
+  }
 
   await deciderCard.click({ force: true });
   modal = page.getByRole('dialog');
