@@ -1,4 +1,4 @@
-import {getRequest} from './backendApi';
+import {getRequest, patchRequest} from './backendApi';
 import {getState} from '../api';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
 import {mergeTournamentSyncMetadata} from '../utils/tournamentSyncMetadata';
@@ -69,13 +69,38 @@ export function getTournamentTimerEnd(tournamentId, successCallback, errorCallba
 
 export function getBeamerByName(tournamentCode, beamerName, successCallback, errorCallback) {
     const encodedName = encodeURIComponent(beamerName || '');
-    const path = '/tournaments/' + tournamentCode
-        + '/beamers/by_name?name=' + encodedName;
+    const path = '/tournaments/' + tournamentCode +
+        '/beamers/by_name?name=' + encodedName;
     getRequest(getState(), path)
         .then(response => {
             successCallback(response.status, response.data);
         })
         .catch(errorCallback);
+}
+
+export function updateTeamActionItem(itemId, completed, successCallback, errorCallback) {
+    patchRequest(getState(), '/team_action_items/' + itemId, {completed: completed})
+        .then(response => {
+            successCallback(response.status, convertTeamActionItem(response.data));
+        })
+        .catch(errorCallback);
+}
+
+export function updateTeamActionItemByKeyAndTeam(tournamentId, key, teamId, completed, successCallback, errorCallback) {
+    patchRequest(
+        getState(),
+        '/tournaments/' + tournamentId + '/team_action_lists/' + encodeURIComponent(key) + '/teams/' + teamId,
+        {completed: completed}
+    ).then(response => {
+        successCallback(response.status, convertTeamActionItem(response.data));
+    }).catch(errorCallback);
+}
+
+export function convertTeamActionListsSnapshot(apiTeamActionLists) {
+    if (!Array.isArray(apiTeamActionLists)) {
+        return [];
+    }
+    return apiTeamActionLists.map(apiList => convertTeamActionList(apiList));
 }
 
 function convertTournament(apiTournament) {
@@ -108,8 +133,35 @@ function convertTournament(apiTournament) {
         ownerUsername: apiTournament.owner_username,
         groupStage: groupStage,
         playoffStages: playoffStages,
+        teamActionLists: convertTeamActionListsSnapshot(apiTournament.team_action_lists),
         teams: apiTournament.teams,
         timerEnd: apiTournament.timer_end ? new Date(apiTournament.timer_end) : null
+    };
+}
+
+function convertTeamActionList(apiList) {
+    const teamActionItems = Array.isArray(apiList.team_action_items) ?
+        apiList.team_action_items.map(apiItem => convertTeamActionItem(apiItem)) :
+        [];
+    return {
+        id: apiList.id,
+        name: apiList.name,
+        key: apiList.key,
+        actionName: apiList.action_name,
+        source: apiList.source,
+        teamActionItems: teamActionItems
+    };
+}
+
+function convertTeamActionItem(apiItem) {
+    return {
+        id: apiItem.id,
+        completed: apiItem.completed === true,
+        completedAt: apiItem.completed_at ? new Date(apiItem.completed_at) : null,
+        team: apiItem.team ? {
+            id: apiItem.team.id,
+            name: apiItem.team.name
+        } : null
     };
 }
 
