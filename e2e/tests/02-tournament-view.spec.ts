@@ -41,7 +41,7 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
   const { tournament: t3 } = await seedGroupStageAndRunToBeforeFinal(4, 4, 8);
 
   await page.goto(`/t/${t3.id}`);
-  const statusBarActions = page.locator('.me-auto');
+  const statusBarActions = page.locator('.me-auto.btn-group');
   const statisticsAction = statusBarActions.getByRole('button', { name: 'Statistiken' });
   const fullscreenAction = statusBarActions.getByRole('button', { name: 'Vollbild-Ansicht' });
   await expect(statisticsAction).toBeVisible({ timeout: 120000 });

@@ -36,6 +36,15 @@ interface TournamentResponse {
   team_action_lists: TeamActionList[];
 }
 
+function randomKey(prefix: string): string {
+  const letters = 'abcdefghijklmnopqrstuvwxyz';
+  let suffix = '';
+  for (let i = 0; i < 8; i += 1) {
+    suffix += letters[Math.floor(Math.random() * letters.length)];
+  }
+  return `${prefix}_${suffix}`;
+}
+
 async function makeOwnerClient(): Promise<ApiClient> {
   const client = new ApiClient(backendUrl);
   const login = await client.login(e2eEmail, e2ePassword);
@@ -148,7 +157,7 @@ test('Owner can create a new team action list and other viewer receives it live'
   await viewerPage.goto(`/t/${tournament.id}/checklists`);
   await viewerPage.waitForLoadState('networkidle');
 
-  const listKey = `owner_created_${Date.now()}`;
+  const listKey = randomKey('owner_created');
   const listName = `Owner Created ${Date.now()}`;
   const actionName = 'Collect item';
 
@@ -183,7 +192,7 @@ test('Create list form enforces required inputs and duplicate keys', async ({ co
   await page.getByTestId('create-team-action-list-button').click();
   await expect(page.getByText('Bitte Name, Schlüssel und Aktionsname ausfüllen.')).toBeVisible();
 
-  const duplicateKey = `duplicate_key_${Date.now()}`;
+  const duplicateKey = randomKey('duplicate_key');
   await page.fill('#team-action-list-name', 'List One');
   await page.fill('#team-action-list-key', duplicateKey);
   await page.fill('#team-action-list-action-name', 'Do one');
