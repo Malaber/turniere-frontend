@@ -1,4 +1,4 @@
-import {Button, Modal, ModalBody, ModalFooter, ModalHeader} from 'reactstrap';
+import {Button, Input, Modal, ModalBody, ModalFooter, ModalHeader} from 'reactstrap';
 import React, {Component} from 'react';
 import {EditableMatchTable} from './EditableMatchTable';
 import {MatchTable} from './MatchTable';
@@ -10,7 +10,8 @@ export class MatchModal extends Component {
         super(props);
         this.state = {
             scoreTeam1: this.initialScoreFor(this.props.match.team1),
-            scoreTeam2: this.initialScoreFor(this.props.match.team2)
+            scoreTeam2: this.initialScoreFor(this.props.match.team2),
+            swapTargetId: this.initialSwapTargetId(this.props.swapTargets)
         };
         this.updateScoreTeam1 = this.updateScoreTeam1.bind(this);
         this.updateScoreTeam2 = this.updateScoreTeam2.bind(this);
@@ -18,19 +19,36 @@ export class MatchModal extends Component {
         this.onSubmitScoresError = this.onSubmitScoresError.bind(this);
         this.onSubmitScoresSuccess = this.onSubmitScoresSuccess.bind(this);
         this.initialScoreFor = this.initialScoreFor.bind(this);
+        this.initialSwapTargetId = this.initialSwapTargetId.bind(this);
+        this.updateSwapTargetId = this.updateSwapTargetId.bind(this);
+        this.swapMatchPosition = this.swapMatchPosition.bind(this);
     }
 
     componentDidUpdate(prevProps) {
         if (prevProps.match.id !== this.props.match.id || prevProps.match.state !== this.props.match.state) {
             this.setState({
                 scoreTeam1: this.initialScoreFor(this.props.match.team1),
-                scoreTeam2: this.initialScoreFor(this.props.match.team2)
+                scoreTeam2: this.initialScoreFor(this.props.match.team2),
+                swapTargetId: this.initialSwapTargetId(this.props.swapTargets)
             });
+        }
+        const previousTargets = prevProps.swapTargets || [];
+        const nextTargets = this.props.swapTargets || [];
+        if (previousTargets !== nextTargets && nextTargets.length > 0 &&
+            !nextTargets.some(target => String(target.id) === this.state.swapTargetId)) {
+            this.setState({swapTargetId: this.initialSwapTargetId(nextTargets)});
         }
     }
 
     initialScoreFor(team) {
         return this.props.match.decider ? team.hiddenScore : team.score;
+    }
+
+    initialSwapTargetId(swapTargets) {
+        if (!Array.isArray(swapTargets) || swapTargets.length === 0) {
+            return '';
+        }
+        return String(swapTargets[0].id);
     }
 
     updateScoreTeam1(newScore) {
@@ -39,6 +57,10 @@ export class MatchModal extends Component {
 
     updateScoreTeam2(newScore) {
         this.setState({scoreTeam2: newScore});
+    }
+
+    updateSwapTargetId(event) {
+        this.setState({swapTargetId: event.target.value});
     }
 
     submitScores() {
@@ -63,12 +85,27 @@ export class MatchModal extends Component {
             'Der Spielstand wurde geändert.', 'success', 2000);
     }
 
+    swapMatchPosition() {
+        if (typeof this.props.onSwapMatchPosition !== 'function' || this.state.swapTargetId === '') {
+            return;
+        }
+        const otherMatchId = Number(this.state.swapTargetId);
+        if (!Number.isFinite(otherMatchId)) {
+            return;
+        }
+        this.props.toggle();
+        this.props.onSwapMatchPosition(this.props.match.id, otherMatchId);
+    }
+
     render() {
         let title;
         let actionButton = '';
         let submitScoresButton = '';
         let matchTable = <MatchTable match={this.props.match} matchStatus={this.props.match.state}/>;
         let scoreHint = null;
+        const canSwapMatchPosition = this.props.canSwapMatchPosition &&
+            Array.isArray(this.props.swapTargets) && this.props.swapTargets.length > 0;
+        let swapControls = null;
         // possible states: single_team not_ready not_started in_progress finished
         switch (this.props.match.state) {
         case 'in_progress':
@@ -109,6 +146,25 @@ export class MatchModal extends Component {
             actionButton = <Button color='primary' onClick={this.props.startMatch}>Spiel starten</Button>;
             break;
         }
+        if (canSwapMatchPosition) {
+            swapControls = (
+                <div className='me-auto d-flex align-items-center gap-2' data-testid='swap-match-position-controls'>
+                    <span className='text-muted'>Tauschen mit</span>
+                    <Input type='select' value={this.state.swapTargetId} onChange={this.updateSwapTargetId}
+                        disabled={this.props.swapInProgress} data-testid='swap-match-position-select'>
+                        {this.props.swapTargets.map(target => (
+                            <option key={target.id} value={target.id}>
+                                Sp. {target.position}: {target.team1.name} vs. {target.team2.name}
+                            </option>
+                        ))}
+                    </Input>
+                    <Button color='secondary' onClick={this.swapMatchPosition} disabled={this.props.swapInProgress}
+                        data-testid='swap-match-position-button'>
+                        {this.props.swapInProgress ? 'Tauscht...' : 'Position tauschen'}
+                    </Button>
+                </div>
+            );
+        }
         return (<Modal isOpen={this.props.isOpen} toggle={this.props.toggle}
             fade={false} contentClassName='match-modal-content'>
             <ModalHeader toggle={this.props.toggle}>{title}</ModalHeader>
@@ -117,6 +173,7 @@ export class MatchModal extends Component {
                 {scoreHint}
             </ModalBody>
             <ModalFooter>
+                {swapControls}
                 {submitScoresButton}
                 {actionButton}
                 <Button color='secondary' onClick={this.props.toggle}>Abbrechen</Button>

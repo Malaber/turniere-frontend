@@ -353,6 +353,21 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
             action.parameters.errorCallback();
         });
         return Object.assign({}, state, {});
+    case actionTypesTournamentinfo.SWAP_MATCH_POSITIONS:
+        patchRequest(action.state, '/matches/' + action.parameters.matchId + '/swap', {
+            other_match_id: action.parameters.otherMatchId
+        }).then(resp => {
+            storeOptionalToken(resp);
+            action.parameters.successCallback(resp.data);
+        }).catch(error => {
+            if (error.response) {
+                storeOptionalToken(error.response);
+                action.parameters.errorCallback(error.response.data, error.response.status);
+            } else {
+                action.parameters.errorCallback(null, -1);
+            }
+        });
+        return Object.assign({}, state, {});
     case actionTypesTournamentinfo.CLEAR:
 
         return Object.assign({}, state, {});
@@ -645,6 +660,19 @@ export function endMatch(matchId, successCallback, errorCallback) {
         type: actionTypesTournamentinfo.END_MATCH,
         parameters: {
             matchId: matchId,
+            successCallback: successCallback,
+            errorCallback: errorCallback
+        },
+        state: getState()
+    });
+}
+
+export function swapMatchPositions(matchId, otherMatchId, successCallback, errorCallback) {
+    __store.dispatch({
+        type: actionTypesTournamentinfo.SWAP_MATCH_POSITIONS,
+        parameters: {
+            matchId: matchId,
+            otherMatchId: otherMatchId,
             successCallback: successCallback,
             errorCallback: errorCallback
         },

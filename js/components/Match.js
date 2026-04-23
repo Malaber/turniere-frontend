@@ -26,6 +26,12 @@ export class Match extends React.Component {
         this.changeScores = this.changeScores.bind(this);
     }
 
+    componentDidUpdate(prevProps) {
+        if (prevProps.match !== this.props.match) {
+            this.setState({match: this.props.match});
+        }
+    }
+
     toggleModal() {
         const {isSignedIn, isOwner, readOnlyMode} = this.props;
 
@@ -167,7 +173,11 @@ export class Match extends React.Component {
             </Card>
             <small className='text-muted'>{smallMessage}</small>
             <MatchModal title='Match' isOpen={this.state.modal} toggle={this.toggleModal} match={this.state.match}
-                startMatch={this.startMatch} endMatch={this.endMatch} changeScores={this.changeScores}/>
+                startMatch={this.startMatch} endMatch={this.endMatch} changeScores={this.changeScores}
+                canSwapMatchPosition={this.props.canSwapMatchPosition === true}
+                swapTargets={this.props.swapTargets || []}
+                swapInProgress={this.props.swapInProgress === true}
+                onSwapMatchPosition={this.props.onSwapMatchPosition}/>
         </div>);
     }
 }

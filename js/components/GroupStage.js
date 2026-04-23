@@ -9,7 +9,7 @@ import {sortMatchesByPositionAscending} from '../utils/sorting';
 import {
     FaChevronDown, FaCircleExclamation, FaCircleInfo
 } from 'react-icons/fa6';
-import {createDeciderMatch, finishGroupStage} from '../api';
+import {createDeciderMatch, finishGroupStage, swapMatchPositions as apiSwapMatchPositions} from '../api';
 
 export default class GroupStage extends Component {
     constructor(props) {
@@ -120,7 +120,8 @@ export class Group extends Component {
             ...props.group,
             showMatches: false,
             creatingDeciderKey: null,
-            decisionModalScore: null
+            decisionModalScore: null,
+            swappingMatchId: null
         };
         this.reload = this.reload.bind(this);
         this.handleToggle = this.handleToggle.bind(this);
@@ -131,6 +132,9 @@ export class Group extends Component {
         this.onCreateDeciderError = this.onCreateDeciderError.bind(this);
         this.openDecisionModal = this.openDecisionModal.bind(this);
         this.closeDecisionModal = this.closeDecisionModal.bind(this);
+        this.swapMatchPositions = this.swapMatchPositions.bind(this);
+        this.onSwapMatchPositionsSuccess = this.onSwapMatchPositionsSuccess.bind(this);
+        this.onSwapMatchPositionsError = this.onSwapMatchPositionsError.bind(this);
     }
 
     handleToggle() {
@@ -177,6 +181,28 @@ export class Group extends Component {
         this.setState({decisionModalScore: null});
     }
 
+    swapMatchPositions(matchId, otherMatchId) {
+        this.setState({swappingMatchId: matchId});
+        apiSwapMatchPositions(matchId, otherMatchId, this.onSwapMatchPositionsSuccess, this.onSwapMatchPositionsError);
+    }
+
+    onSwapMatchPositionsSuccess() {
+        notify.show('Die Positionen wurden getauscht.', 'success', 2500);
+        this.setState({swappingMatchId: null});
+        this.reload();
+    }
+
+    onSwapMatchPositionsError(errorBody, statusCode) {
+        let errorMessage = 'Die Match-Positionen konnten nicht getauscht werden.';
+        if (statusCode === 422 && errorBody && typeof errorBody.error === 'string') {
+            errorMessage = errorBody.error;
+        } else if (statusCode === 404) {
+            errorMessage = 'Das Ziel-Match wurde nicht gefunden.';
+        }
+        notify.show(errorMessage, 'error', 3000);
+        this.setState({swappingMatchId: null});
+    }
+
     render() {
         const teamIds = new Set();
         this.state.matches.forEach(match => {
@@ -196,17 +222,27 @@ export class Group extends Component {
                             toggle={this.handleToggle}
                         />
                         <Collapse isOpen={this.state.showMatches}>
-                            {this.state.matches.sort(sortMatchesByPositionAscending()).map(match => (
-                                <Match
-                                    match={match}
-                                    isSignedIn={this.props.isSignedIn}
-                                    isOwner={this.props.isOwner}
-                                    readOnlyMode={this.props.readOnlyMode}
-                                    onChange={this.reload}
-                                    onFinish={this.reload}
-                                    key={match.id}
-                                />
-                            ))}
+                            {this.state.matches.sort(sortMatchesByPositionAscending()).map(match => {
+                                const swapTargets = this.state.matches
+                                    .filter(otherMatch => otherMatch.id !== match.id)
+                                    .sort(sortMatchesByPositionAscending());
+                                return (
+                                    <Match
+                                        match={match}
+                                        isSignedIn={this.props.isSignedIn}
+                                        isOwner={this.props.isOwner}
+                                        readOnlyMode={this.props.readOnlyMode}
+                                        onChange={this.reload}
+                                        onFinish={this.reload}
+                                        key={match.id}
+                                        canSwapMatchPosition={this.props.isSignedIn && this.props.isOwner &&
+                                            !this.props.readOnlyMode}
+                                        swapTargets={swapTargets}
+                                        swapInProgress={this.state.swappingMatchId === match.id}
+                                        onSwapMatchPosition={this.swapMatchPositions}
+                                    />
+                                );
+                            })}
                         </Collapse>
                         <GroupScoresTable scores={this.state.scores} teams={this.props.teams} groupId={this.state.id}
                             isOwner={this.props.isOwner} isSignedIn={this.props.isSignedIn}
