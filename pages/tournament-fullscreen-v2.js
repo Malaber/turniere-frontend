@@ -62,7 +62,9 @@ class Main extends React.Component {
         this.updateMatches = this.updateMatches.bind(this);
         this.updateTimerEnd = this.updateTimerEnd.bind(this);
         this.updateTournament = this.updateTournament.bind(this);
-        this.onDisplayStateChange = this.onDisplayStateChange.bind(this);
+        this.connectBeamerSocket = this.connectBeamerSocket.bind(this);
+        this.refreshBeamerConfig = this.refreshBeamerConfig.bind(this);
+        this.onBeamerMessage = this.onBeamerMessage.bind(this);
     }
 
     componentDidMount() {
@@ -74,29 +76,7 @@ class Main extends React.Component {
         if (forcedDisplayState) {
             this.updateMatches();
         } else {
-            // Fetch beamer config
-            getBeamerByName(code, beamerName,
-                (status, beamer) => {
-                    this.setState({
-                        displayState: beamer.display_state,
-                        beamerName: beamer.name,
-                        qrCodeUrl: beamer.qr_code_url,
-                        logoUrl: beamer.logo_url
-                    }, () => {
-                        this.updateMatches();
-                    });
-                },
-                () => {
-                    // Beamer not found — use defaults
-                    this.updateMatches();
-                }
-            );
-        }
-
-        // Connect Socket.IO for live state changes
-        if (!forcedDisplayState) {
-            const socket = connectToBeamerSocket(beamerName, this.onDisplayStateChange);
-            this.setState({socket});
+            this.refreshBeamerConfig(code, beamerName);
         }
 
         // Fetch tournament metadata
@@ -131,8 +111,61 @@ class Main extends React.Component {
         }
     }
 
-    onDisplayStateChange(newState) {
-        this.setState({displayState: newState, loadedMatches: false}, () => {
+    connectBeamerSocket(beamerName) {
+        if (this.state.socket) {
+            this.state.socket.disconnect();
+        }
+
+        const socket = connectToBeamerSocket({
+            tournamentId: this.props.query.code,
+            beamerName,
+            onMessage: this.onBeamerMessage
+        });
+        this.setState({socket});
+    }
+
+    refreshBeamerConfig(code, beamerName) {
+        getBeamerByName(code, beamerName,
+            (status, beamer) => {
+                this.setState({
+                    displayState: beamer.display_state,
+                    beamerName: beamer.name,
+                    qrCodeUrl: beamer.qr_code_url,
+                    logoUrl: beamer.logo_url,
+                    loadedMatches: false
+                }, () => {
+                    this.connectBeamerSocket(beamer.name);
+                    this.updateMatches();
+                });
+            },
+            () => {
+                this.updateMatches();
+            }
+        );
+    }
+
+    onBeamerMessage(message) {
+        const beamer = message.beamer;
+        if (!beamer) {
+            return;
+        }
+
+        if (message.type === 'beamer.deleted') {
+            this.refreshBeamerConfig(this.props.query.code, this.props.query.beamer || beamer.name);
+            return;
+        }
+
+        const reconnectNeeded = this.state.beamerName !== beamer.name;
+        this.setState({
+            displayState: beamer.display_state,
+            beamerName: beamer.name,
+            qrCodeUrl: beamer.qr_code_url,
+            logoUrl: beamer.logo_url,
+            loadedMatches: false
+        }, () => {
+            if (reconnectNeeded) {
+                this.connectBeamerSocket(beamer.name);
+            }
             this.updateMatches();
         });
     }

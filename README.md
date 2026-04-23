@@ -31,6 +31,8 @@ $ TURNIERE_API_URL=https://api.turnie.re yarn run dev
 $ TURNIERE_API_URL=http://localhost:3000 yarn run dev
 ```
 The environment variable `TURNIERE_API_URL` must contain an valid url to a [turniere backend server](https://github.com/turniere/turniere-backend).
+Fullscreen/beamer live updates also come from same backend via ActionCable at `/cable`.
+No separate `TURNIERE_MATCH_URL` is required.
  
 In production environment the server runs on port 80, otherwise on port 3001.
 

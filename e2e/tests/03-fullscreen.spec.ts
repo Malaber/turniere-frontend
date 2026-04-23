@@ -121,3 +121,34 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
   await expect(page.locator('[class*="matchCard"]').first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'fullscreen_beamer_between_games');
 });
+
+test('Fullscreen beamer page updates live from backend ActionCable only', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
+
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+  const createBeamer = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
+    name: 'live-projector',
+    display_state: 'matches_all',
+  });
+  expectStatus(createBeamer, 201, 'create live beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=live-projector`);
+  await expect(page.getByText(/Anzeige: alle/i)).toBeVisible({ timeout: 20_000 });
+
+  const firstUpdate = await client.patch(
+    `/tournaments/${tournament.id}/beamers/${createBeamer.json.id}`,
+    { display_state: 'matches_in_progress' },
+  );
+  expectStatus(firstUpdate, 200, 'update beamer to in-progress');
+  await expect(page.getByText(/Anzeige: laufend/i)).toBeVisible({ timeout: 10_000 });
+
+  const secondUpdate = await client.patch(
+    `/tournaments/${tournament.id}/beamers/${createBeamer.json.id}`,
+    { display_state: 'matches_finished' },
+  );
+  expectStatus(secondUpdate, 200, 'update beamer to finished');
+  await expect(page.getByText(/Anzeige: beendet/i)).toBeVisible({ timeout: 10_000 });
+});
