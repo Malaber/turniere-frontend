@@ -12,6 +12,7 @@ import {LinkButton} from '../js/components/LinkButton';
 import {LoadingPage} from '../js/components/LoadingPage';
 import {
     convertTeamActionListsSnapshot,
+    createTeamActionList as createTeamActionListRequest,
     getTournament,
     updateTeamActionItem,
     updateTeamActionItemByKeyAndTeam
@@ -45,6 +46,7 @@ class ChecklistsPage extends React.Component {
                     isSignedIn={isSignedIn}
                     readOnlyMode={isReadOnly}
                     onSetTeamActionItemState={this.props.onSetTeamActionItemState}
+                    onCreateTeamActionList={this.props.onCreateTeamActionList}
                 />
             </div>
         );
@@ -101,6 +103,11 @@ class TeamActionListsSection extends React.Component {
                     <p className='text-muted mb-3'>
                         Team-Checklisten werden live synchronisiert. Änderung immer als Zielzustand senden.
                     </p>
+                    {canMutate &&
+                        <CreateTeamActionListForm
+                            tournamentId={this.props.tournamentId}
+                            onCreateTeamActionList={this.props.onCreateTeamActionList}
+                        />}
                     {!canMutate &&
                         <Alert color='secondary' className='mb-3'>
                             Nur Turnier-Owner kann Status ändern.
@@ -151,6 +158,102 @@ class TeamActionListsSection extends React.Component {
     }
 }
 
+class CreateTeamActionListForm extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+            name: '',
+            key: '',
+            actionName: '',
+            source: 'group_stage_survivors',
+            creating: false,
+            errorMessage: ''
+        };
+        this.onCreate = this.onCreate.bind(this);
+    }
+
+    onCreate(event) {
+        event.preventDefault();
+        if (!this.state.name.trim() || !this.state.key.trim() || !this.state.actionName.trim()) {
+            this.setState({errorMessage: 'Bitte Name, Schlüssel und Aktionsname ausfüllen.'});
+            return;
+        }
+
+        this.setState({creating: true, errorMessage: ''});
+        this.props.onCreateTeamActionList({
+            tournamentId: this.props.tournamentId,
+            payload: {
+                name: this.state.name.trim(),
+                key: this.state.key.trim(),
+                action_name: this.state.actionName.trim(),
+                source: this.state.source
+            },
+            onSuccess: () => {
+                this.setState({
+                    name: '',
+                    key: '',
+                    actionName: '',
+                    creating: false,
+                    errorMessage: ''
+                });
+            },
+            onError: status => {
+                this.setState({
+                    creating: false,
+                    errorMessage: buildTeamActionListCreateErrorMessage(status)
+                });
+            }
+        });
+    }
+
+    render() {
+        return (<form className='border rounded p-3 mb-3' onSubmit={this.onCreate}
+            data-testid='create-team-action-list-form'>
+            <h6 className='mb-3'>Neue Checkliste anlegen</h6>
+            {this.state.errorMessage &&
+                <Alert color='danger' className='mb-3'>
+                    {this.state.errorMessage}
+                </Alert>}
+            <div className='row g-2'>
+                <div className='col-12 col-md-4'>
+                    <label className='form-label mb-1' htmlFor='team-action-list-name'>Name</label>
+                    <input id='team-action-list-name' className='form-control'
+                        value={this.state.name} onChange={event => this.setState({name: event.target.value})}
+                        placeholder='Playoff token collection' />
+                </div>
+                <div className='col-12 col-md-4'>
+                    <label className='form-label mb-1' htmlFor='team-action-list-key'>Schlüssel</label>
+                    <input id='team-action-list-key' className='form-control'
+                        value={this.state.key} onChange={event => this.setState({key: event.target.value})}
+                        placeholder='playoff_token_collection' />
+                </div>
+                <div className='col-12 col-md-4'>
+                    <label className='form-label mb-1' htmlFor='team-action-list-action-name'>Aktionsname</label>
+                    <input id='team-action-list-action-name' className='form-control'
+                        value={this.state.actionName}
+                        onChange={event => this.setState({actionName: event.target.value})}
+                        placeholder='Collect playoff token' />
+                </div>
+                <div className='col-12 col-md-6'>
+                    <label className='form-label mb-1' htmlFor='team-action-list-source'>Quelle</label>
+                    <select id='team-action-list-source' className='form-select'
+                        value={this.state.source}
+                        onChange={event => this.setState({source: event.target.value})}>
+                        <option value='group_stage_survivors'>group_stage_survivors</option>
+                    </select>
+                </div>
+                <div className='col-12 col-md-6 d-flex align-items-end'>
+                    <button type='submit' className='btn btn-primary w-100'
+                        disabled={this.state.creating}
+                        data-testid='create-team-action-list-button'>
+                        {this.state.creating ? 'Erstellt...' : 'Checkliste anlegen'}
+                    </button>
+                </div>
+            </div>
+        </form>);
+    }
+}
+
 function buildTeamActionItemPendingKey(listKey, item) {
     const teamId = item.team ? item.team.id : 'unknown-team';
     return listKey + '-' + teamId;
@@ -183,6 +286,28 @@ function buildTeamActionListsErrorMessage(status) {
         return 'Follower-Modus: Änderungen gesperrt.';
     }
     return 'Änderung fehlgeschlagen. Bitte erneut versuchen.';
+}
+
+function buildTeamActionListCreateErrorMessage(status) {
+    if (status === 401) {
+        return 'Nicht eingeloggt.';
+    }
+    if (status === 403) {
+        return 'Nur Turnier-Owner darf Checklisten anlegen.';
+    }
+    if (status === 404) {
+        return 'Erstellen nicht verfügbar.';
+    }
+    if (status === 409) {
+        return 'Schlüssel bereits vergeben.';
+    }
+    if (status === 422) {
+        return 'Eingaben ungültig oder Schlüssel bereits vergeben.';
+    }
+    if (status === 423) {
+        return 'Follower-Modus: Erstellen gesperrt.';
+    }
+    return 'Checkliste konnte nicht angelegt werden.';
 }
 
 function StatusBar(props) {
@@ -242,6 +367,7 @@ class Main extends React.Component {
         this.replaceTeamActionListsFromSnapshot = this.replaceTeamActionListsFromSnapshot.bind(this);
         this.setTeamActionItemState = this.setTeamActionItemState.bind(this);
         this.setTeamActionItemStateByResponse = this.setTeamActionItemStateByResponse.bind(this);
+        this.createTeamActionList = this.createTeamActionList.bind(this);
     }
 
     componentDidMount() {
@@ -432,6 +558,27 @@ class Main extends React.Component {
         updateTeamActionItemByKeyAndTeam(tournamentId, listKey, teamId, completed, onPatchSuccess, onPatchError);
     }
 
+    createTeamActionList({tournamentId, payload, onSuccess, onError}) {
+        createTeamActionListRequest(tournamentId, payload, (status, createdTeamActionList) => {
+            this.setState(prevState => {
+                if (!prevState.tournament || !Array.isArray(prevState.tournament.teamActionLists)) {
+                    return null;
+                }
+                const withoutExisting = prevState.tournament.teamActionLists
+                    .filter(list => list.id !== createdTeamActionList.id);
+                return {
+                    tournament: Object.assign({}, prevState.tournament, {
+                        teamActionLists: [...withoutExisting, createdTeamActionList]
+                    })
+                };
+            });
+            onSuccess(status, createdTeamActionList);
+        }, error => {
+            const status = error && error.response ? error.response.status : -1;
+            onError(status, error);
+        });
+    }
+
     render() {
         const tournamentName = this.state.tournament === null ?
             'Checklisten' :
@@ -448,6 +595,7 @@ class Main extends React.Component {
                 <TournamentChecklistsPage
                     tournament={tournament}
                     onSetTeamActionItemState={this.setTeamActionItemState}
+                    onCreateTeamActionList={this.createTeamActionList}
                 />
                 <Footer/>
             </div>);

@@ -134,6 +134,71 @@ test('Team action list renders with metadata and item checkboxes', async ({ cont
   await keyframe(page, testInfo, 'team_action_lists_render');
 });
 
+test('Owner can create a new team action list and other viewer receives it live', async ({ context, browser, page }, testInfo) => {
+  await injectAuth(context, loadAuthState());
+  const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
+
+  await page.goto(`/t/${tournament.id}/checklists`);
+  await page.waitForLoadState('networkidle');
+
+  await expect(page.getByTestId('create-team-action-list-form')).toBeVisible();
+
+  const viewerContext = await browser.newContext();
+  const viewerPage = await viewerContext.newPage();
+  await viewerPage.goto(`/t/${tournament.id}/checklists`);
+  await viewerPage.waitForLoadState('networkidle');
+
+  const listKey = `owner_created_${Date.now()}`;
+  const listName = `Owner Created ${Date.now()}`;
+  const actionName = 'Collect item';
+
+  await page.fill('#team-action-list-name', listName);
+  await page.fill('#team-action-list-key', listKey);
+  await page.fill('#team-action-list-action-name', actionName);
+  await page.getByTestId('create-team-action-list-button').click();
+
+  await expect(page.getByText(listName)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(listKey)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(actionName)).toBeVisible({ timeout: 20_000 });
+
+  await expect.poll(async () => {
+    return await viewerPage.getByText(listName).isVisible();
+  }, {
+    timeout: 20_000,
+    message: 'wait for created list on second viewer via websocket'
+  }).toBe(true);
+
+  await keyframe(page, testInfo, 'team_action_list_created_owner');
+  await keyframe(viewerPage, testInfo, 'team_action_list_created_viewer');
+  await viewerContext.close();
+});
+
+test('Create list form enforces required inputs and duplicate keys', async ({ context, page }, testInfo) => {
+  await injectAuth(context, loadAuthState());
+  const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
+
+  await page.goto(`/t/${tournament.id}/checklists`);
+  await page.waitForLoadState('networkidle');
+
+  await page.getByTestId('create-team-action-list-button').click();
+  await expect(page.getByText('Bitte Name, Schlüssel und Aktionsname ausfüllen.')).toBeVisible();
+
+  const duplicateKey = `duplicate_key_${Date.now()}`;
+  await page.fill('#team-action-list-name', 'List One');
+  await page.fill('#team-action-list-key', duplicateKey);
+  await page.fill('#team-action-list-action-name', 'Do one');
+  await page.getByTestId('create-team-action-list-button').click();
+  await expect(page.getByText('List One')).toBeVisible({ timeout: 20_000 });
+
+  await page.fill('#team-action-list-name', 'List Two');
+  await page.fill('#team-action-list-key', duplicateKey);
+  await page.fill('#team-action-list-action-name', 'Do two');
+  await page.getByTestId('create-team-action-list-button').click();
+  await expect(page.getByText(/Schlüssel bereits vergeben|Eingaben ungültig/)).toBeVisible({ timeout: 20_000 });
+
+  await keyframe(page, testInfo, 'team_action_list_create_validation_errors');
+});
+
 test('Owner can toggle item complete/incomplete with idempotent state updates', async ({ context, page }, testInfo) => {
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
@@ -235,6 +300,7 @@ test('Non-owner UI blocked and read-only mode returns 423 on update', async ({ c
   const blockedCheckbox = checkboxByItem(page, item);
   await expect(page.getByText('Nur Turnier-Owner kann Status ändern.')).toBeVisible();
   await expect(blockedCheckbox).toBeDisabled();
+  await expect(page.getByTestId('create-team-action-list-form')).toHaveCount(0);
   await keyframe(page, testInfo, 'team_action_non_owner_blocked');
 
   const readOnlyToggle = await ownerClient.patch(`/tournaments/${tournament.id}`, { read_only_mode: true });
@@ -242,6 +308,21 @@ test('Non-owner UI blocked and read-only mode returns 423 on update', async ({ c
 
   const updateReadOnlyItem = await ownerClient.patch(`/team_action_items/${item.id}`, { completed: true });
   expect(updateReadOnlyItem.status).toBe(423);
+});
+
+test('Owner in read-only tournament cannot use create list form', async ({ context, page }) => {
+  await injectAuth(context, loadAuthState());
+  const ownerClient = await makeOwnerClient();
+  const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
+
+  const readOnlyToggle = await ownerClient.patch(`/tournaments/${tournament.id}`, { read_only_mode: true });
+  expectStatus(readOnlyToggle, 200, `set tournament ${tournament.id} read only for create form check`);
+
+  await page.goto(`/t/${tournament.id}/checklists`);
+  await page.waitForLoadState('networkidle');
+
+  await expect(page.getByTestId('create-team-action-list-form')).toHaveCount(0);
+  await expect(page.getByText('Nur Turnier-Owner kann Status ändern.')).toBeVisible();
 });
 
 test('Invalid update usage returns 401 and 404 statuses', async () => {

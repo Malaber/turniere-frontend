@@ -1,4 +1,4 @@
-import {getRequest, patchRequest} from './backendApi';
+import {getRequest, patchRequest, postRequest} from './backendApi';
 import {getState} from '../api';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
 import {mergeTournamentSyncMetadata} from '../utils/tournamentSyncMetadata';
@@ -94,6 +94,14 @@ export function updateTeamActionItemByKeyAndTeam(tournamentId, key, teamId, comp
     ).then(response => {
         successCallback(response.status, convertTeamActionItem(response.data));
     }).catch(errorCallback);
+}
+
+export function createTeamActionList(tournamentId, payload, successCallback, errorCallback) {
+    postRequest(getState(), '/tournaments/' + tournamentId + '/team_action_lists', payload)
+        .then(response => {
+            successCallback(response.status, convertTeamActionList(response.data));
+        })
+        .catch(errorCallback);
 }
 
 export function convertTeamActionListsSnapshot(apiTeamActionLists) {
