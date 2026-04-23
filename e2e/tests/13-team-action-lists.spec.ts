@@ -8,6 +8,12 @@ const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
 const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 const TEAM_ACTION_LIST_KEY = 'group_stage_survivor_playoff_tokens';
+const DEFAULT_TEAM_ACTION_LIST_PAYLOAD = {
+  name: 'Playoff token collection',
+  key: TEAM_ACTION_LIST_KEY,
+  action_name: 'Collect playoff token',
+  source: 'group_stage_survivors'
+};
 
 test.setTimeout(360_000);
 
@@ -85,6 +91,19 @@ async function waitForTeamActionList(
   };
 }
 
+async function ensureTeamActionList(
+  client: ApiClient,
+  tournamentId: number,
+  payload: { name: string; key: string; action_name: string; source: string } = DEFAULT_TEAM_ACTION_LIST_PAYLOAD
+): Promise<TeamActionList> {
+  const createResponse = await client.post(`/tournaments/${tournamentId}/team_action_lists`, payload);
+  if (![201, 422].includes(createResponse.status)) {
+    throw new Error(`create team action list failed with status ${createResponse.status}`);
+  }
+  const { list } = await waitForTeamActionList(client, tournamentId, payload.key);
+  return list;
+}
+
 function firstTeamActionItemOrThrow(list: TeamActionList): TeamActionItem {
   const first = list.team_action_items[0];
   if (!first) {
@@ -128,7 +147,7 @@ test('Team action list renders with metadata and item checkboxes', async ({ cont
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
   const client = await makeOwnerClient();
-  const { list } = await waitForTeamActionList(client, tournament.id);
+  const list = await ensureTeamActionList(client, tournament.id);
 
   await page.goto(`/t/${tournament.id}`);
   await expect(page.getByRole('button', { name: 'Checklisten' })).toBeVisible();
@@ -212,7 +231,7 @@ test('Owner can toggle item complete/incomplete with idempotent state updates', 
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
   const client = await makeOwnerClient();
-  const { list } = await waitForTeamActionList(client, tournament.id);
+  const list = await ensureTeamActionList(client, tournament.id);
   const item = firstTeamActionItemOrThrow(list);
 
   await page.goto(`/t/${tournament.id}/checklists`);
@@ -265,7 +284,7 @@ test('Websocket snapshot propagates owner update to another viewer', async ({ co
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
   const client = await makeOwnerClient();
-  const { list } = await waitForTeamActionList(client, tournament.id);
+  const list = await ensureTeamActionList(client, tournament.id);
   const item = firstTeamActionItemOrThrow(list);
 
   const ownerPage = await context.newPage();
@@ -299,7 +318,7 @@ test('Websocket snapshot propagates owner update to another viewer', async ({ co
 test('Non-owner UI blocked and read-only mode returns 423 on update', async ({ context, page }, testInfo) => {
   const ownerClient = await makeOwnerClient();
   const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
-  const { list } = await waitForTeamActionList(ownerClient, tournament.id);
+  const list = await ensureTeamActionList(ownerClient, tournament.id);
   const item = firstTeamActionItemOrThrow(list);
 
   await injectFakeNonOwner(context);
@@ -337,7 +356,7 @@ test('Owner in read-only tournament cannot use create list form', async ({ conte
 test('Invalid update usage returns 401 and 404 statuses', async () => {
   const ownerClient = await makeOwnerClient();
   const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
-  const { list } = await waitForTeamActionList(ownerClient, tournament.id);
+  const list = await ensureTeamActionList(ownerClient, tournament.id);
   const item = firstTeamActionItemOrThrow(list);
   const unauthenticatedClient = new ApiClient(backendUrl);
 
