@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import React from 'react';
 import {connect} from 'react-redux';
-import {Alert, Badge, ButtonGroup} from 'reactstrap';
+import {Alert, Badge} from 'reactstrap';
 
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import {Footer} from '../js/components/Footer';
@@ -187,12 +187,12 @@ function buildTeamActionListsErrorMessage(status) {
 
 function StatusBar(props) {
     return (<TournamentStatusBar>
-        <ButtonGroup className='me-auto'>
+        <div className='d-flex flex-wrap gap-2 me-auto'>
             <EditButton tournamentId={props.tournament.id} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
             <StatisticsButton tournamentId={props.tournament.id}/>
             <FullscreenButton tournamentId={props.tournament.id}/>
             <BackButton tournamentId={props.tournament.id}/>
-        </ButtonGroup>
+        </div>
     </TournamentStatusBar>);
 }
 

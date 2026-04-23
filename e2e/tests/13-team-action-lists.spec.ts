@@ -255,13 +255,11 @@ test('Invalid update usage returns 401 and 404 statuses', async () => {
   expect(unauthUpdate.status).toBe(401);
 
   const invalidItemUpdate = await ownerClient.patch('/team_action_items/999999999', { completed: true });
-  // Backend currently answers 500 for unknown item-id updates; keep non-success assertion explicit.
-  expect([404, 500]).toContain(invalidItemUpdate.status);
+  expect(invalidItemUpdate.status).toBe(404);
 
   const invalidBusinessKeyUpdate = await ownerClient.patch(
     `/tournaments/${tournament.id}/team_action_lists/unknown_key/teams/${item.team?.id}`,
     { completed: true }
   );
-  // Backend currently answers 500 for invalid list key/team combinations; keep non-success assertion explicit.
-  expect([404, 500]).toContain(invalidBusinessKeyUpdate.status);
+  expect(invalidBusinessKeyUpdate.status).toBe(404);
 });
