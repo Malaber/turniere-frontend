@@ -4,6 +4,7 @@ import React from 'react';
 export function MatchTable(props) {
     const displayedTeam1Score = props.match.decider ? props.match.team1.hiddenScore : props.match.team1.score;
     const displayedTeam2Score = props.match.decider ? props.match.team2.hiddenScore : props.match.team2.score;
+    const shouldMarkLoser = !props.match.decider;
     let team1Class;
     let team2Class;
     // possible states: single_team not_ready not_started in_progress finished
@@ -16,10 +17,10 @@ export function MatchTable(props) {
         }
         if (props.match.winnerTeamId === props.match.team1.id) {
             team1Class = 'font-weight-bold';
-            team2Class = 'lost-team';
+            team2Class = shouldMarkLoser ? 'lost-team' : undefined;
         }
         if (props.match.winnerTeamId === props.match.team2.id) {
-            team1Class = 'lost-team';
+            team1Class = shouldMarkLoser ? 'lost-team' : undefined;
             team2Class = 'font-weight-bold';
         }
         break;

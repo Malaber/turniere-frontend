@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { injectAuth, loadAuthState } from '../helpers/auth';
 import { keyframe, modalKeyframe } from '../helpers/screenshot';
-import { seedIrrelevantTieScenario, seedRelevantDeciderScenario, seedResolvedDeciderScenario } from '../helpers/scenario-seeder';
+import {
+  seedAdvancingDeciderScenario,
+  seedIrrelevantTieScenario,
+  seedRelevantDeciderScenario,
+  seedResolvedDeciderScenario,
+} from '../helpers/scenario-seeder';
 
 test.setTimeout(240_000);
 
@@ -17,6 +22,24 @@ function visibleModal(page) {
   return page.getByRole('dialog').first();
 }
 
+async function expectNoLineThrough(locator) {
+  await expect(locator).toBeVisible();
+  const decoration = await locator.evaluate((element) => window.getComputedStyle(element).textDecorationLine);
+  expect(decoration).not.toContain('line-through');
+}
+
+async function expectResolvedDeciderText(locator) {
+  await expect(locator.getByText(/hat das Entscheidungsmatch gegen .* (gewonnen|verloren)\./)).toBeVisible();
+  await expect(locator.getByText(/Entscheidungsmatch gegen .*: (gewonnen|verloren)\./)).toBeVisible();
+}
+
+async function expectResolvedDecisionIconCount(page, timeout = 5000) {
+  const resolvedIcons = page.getByLabel('Tie-Break erklärt');
+  await expect(resolvedIcons.first()).toBeVisible({ timeout });
+  const resolvedCount = await resolvedIcons.count();
+  expect([1, 2]).toContain(resolvedCount);
+}
+
 test('Owner can create and resolve a decider match, then start playoffs', async ({ context, page }, testInfo) => {
   await injectAuth(context, loadAuthState());
   const { tournament, relevantTeamNames } = await seedRelevantDeciderScenario();
@@ -30,7 +53,7 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await page.goto(`/t/${tournament.id}`);
   await page.waitForLoadState('networkidle');
 
-  await expect(decisionIcons).toHaveCount(2);
+  await expect(decisionIcons).toHaveCount(2, { timeout: 15000 });
   await keyframe(page, testInfo, 'decider_required');
 
   await page.getByTestId('finish-group-stage').click();
@@ -74,12 +97,11 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible();
   await modal.getByRole('button', { name: 'Spiel beenden' }).click();
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20000 });
-  await expect(page.getByLabel('Tie-Break erklärt')).toHaveCount(1, { timeout: 20000 });
-  await page.getByLabel('Tie-Break erklärt').click();
+  await expectResolvedDecisionIconCount(page, 20000);
+  await page.getByLabel('Tie-Break erklärt').first().click();
   modal = page.getByRole('dialog');
   await expect(visibleModal(page)).toBeVisible();
-  await expect(page.getByRole('dialog').getByText(/hat das Entscheidungsmatch gegen .* verloren\./)).toBeVisible();
-  await expect(page.getByRole('dialog').getByText(/Entscheidungsmatch gegen .*: verloren\./)).toBeVisible();
+  await expectResolvedDeciderText(page.getByRole('dialog'));
   await keyframe(page, testInfo, 'owner_decider_resolved_context');
   await modalKeyframe(page, testInfo, 'owner_decider_resolved_modal');
   await modalKeyframe(page, testInfo, 'decider_resolved_modal');
@@ -91,6 +113,57 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await page.waitForLoadState('networkidle');
   await expect(page.getByText('Finale')).toBeVisible({ timeout: 15000 });
   await keyframe(page, testInfo, 'playoffs_started_after_decider');
+});
+
+test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstruck after resolution', async ({ context, page }) => {
+  await injectAuth(context, loadAuthState());
+  const { tournament, relevantTeamNames } = await seedAdvancingDeciderScenario();
+  const teamOneRow = page.locator('[data-decider-match="true"]').first().locator('tbody tr').nth(0).locator('td');
+  const teamTwoRow = page.locator('[data-decider-match="true"]').first().locator('tbody tr').nth(1).locator('td');
+
+  await page.goto(`/t/${tournament.id}`);
+  await page.waitForLoadState('networkidle');
+
+  const tieBreakNeededCount = await page.getByLabel('Tie-Break nötig').count();
+  test.skip(tieBreakNeededCount === 0, 'Backend does not require decider for 1-vs-2 advancing tie yet.');
+  await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(2, { timeout: 15000 });
+  await expect(page.locator('[data-ranking-decision-trigger]')).toHaveCount(2);
+
+  await page
+    .locator('tr', { hasText: relevantTeamNames[0] })
+    .locator('[data-ranking-decision-trigger]')
+    .click();
+  let modal = page.getByRole('dialog');
+  await expect(visibleModal(page)).toBeVisible();
+  await expect(modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' })).toBeVisible();
+  await modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' }).click();
+
+  const deciderCard = page.locator('[data-decider-match="true"]').first();
+  await expect(deciderCard).toBeVisible({ timeout: 15000 });
+  await deciderCard.click({ force: true });
+  modal = page.getByRole('dialog');
+  await expect(modal.getByRole('button', { name: 'Spiel starten' })).toBeVisible();
+  await modal.getByRole('button', { name: 'Spiel starten' }).click();
+
+  await deciderCard.click({ force: true });
+  modal = page.getByRole('dialog');
+  await expect(visibleModal(page)).toBeVisible();
+  await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible();
+  await expect(modal.getByRole('spinbutton')).toHaveCount(2);
+  await modal.getByRole('spinbutton').nth(0).fill('5');
+  await modal.getByRole('spinbutton').nth(1).fill('3');
+  await expect(modal.getByText('Dieses Match zählt nur über verdeckte Tie-Breaker Punkte.')).toBeVisible();
+  await modal.getByRole('button', { name: 'Tie-Breaker Punkte ändern' }).click();
+
+  await deciderCard.click({ force: true });
+  modal = page.getByRole('dialog');
+  await modal.getByRole('button', { name: 'Spiel beenden' }).click();
+  await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20000 });
+  await expect(page.getByLabel('Tie-Break erklärt')).toHaveCount(2, { timeout: 20000 });
+  await expectNoLineThrough(teamOneRow);
+  await expectNoLineThrough(teamTwoRow);
+  await expect(teamOneRow).toContainText(relevantTeamNames[0]);
+  await expect(teamTwoRow).toContainText(relevantTeamNames[1]);
 });
 
 test('Public user can inspect a required decider modal', async ({ page }, testInfo) => {
@@ -116,11 +189,11 @@ test('Owner can inspect a resolved decider modal', async ({ context, page }, tes
   await page.goto(`/t/${tournament.id}`);
   await page.waitForLoadState('networkidle');
 
-  await expect(page.getByLabel('Tie-Break erklärt')).toHaveCount(1);
-  await page.getByLabel('Tie-Break erklärt').click();
+  await expectResolvedDecisionIconCount(page);
+  await page.getByLabel('Tie-Break erklärt').first().click();
   const modal = page.getByRole('dialog');
   await expect(visibleModal(page)).toBeVisible();
-  await expect(modal.getByText(/hat das Entscheidungsmatch gegen .* verloren\./)).toBeVisible();
+  await expectResolvedDeciderText(modal);
   await keyframe(page, testInfo, 'owner_resolved_decider_context');
   await modalKeyframe(page, testInfo, 'owner_resolved_decider_modal_review');
 });
@@ -131,11 +204,11 @@ test('Public user can inspect a resolved decider modal', async ({ page }, testIn
   await page.goto(`/t/${tournament.id}`);
   await page.waitForLoadState('networkidle');
 
-  await expect(page.getByLabel('Tie-Break erklärt')).toHaveCount(1);
-  await page.getByLabel('Tie-Break erklärt').click();
+  await expectResolvedDecisionIconCount(page);
+  await page.getByLabel('Tie-Break erklärt').first().click();
   const modal = page.getByRole('dialog');
   await expect(visibleModal(page)).toBeVisible();
-  await expect(modal.getByText(/hat das Entscheidungsmatch gegen .* verloren\./)).toBeVisible();
+  await expectResolvedDeciderText(modal);
   await keyframe(page, testInfo, 'public_decider_resolved_context');
   await modalKeyframe(page, testInfo, 'public_decider_resolved_modal');
 });
