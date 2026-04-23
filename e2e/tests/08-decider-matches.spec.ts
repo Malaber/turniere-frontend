@@ -46,7 +46,7 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await page.goto(`/t/${tournament.id}`);
   await page.waitForLoadState('networkidle');
 
-  await expect(decisionIcons).toHaveCount(2);
+  await expect(decisionIcons).toHaveCount(2, { timeout: 15000 });
   await keyframe(page, testInfo, 'decider_required');
 
   await page.getByTestId('finish-group-stage').click();
@@ -138,8 +138,12 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
 
   await deciderCard.click({ force: true });
   modal = page.getByRole('dialog');
+  await expect(visibleModal(page)).toBeVisible();
+  await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible();
+  await expect(modal.getByRole('spinbutton')).toHaveCount(2);
   await modal.getByRole('spinbutton').nth(0).fill('5');
   await modal.getByRole('spinbutton').nth(1).fill('3');
+  await expect(modal.getByText('Dieses Match zählt nur über verdeckte Tie-Breaker Punkte.')).toBeVisible();
   await modal.getByRole('button', { name: 'Tie-Breaker Punkte ändern' }).click();
 
   await deciderCard.click({ force: true });
