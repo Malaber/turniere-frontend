@@ -122,6 +122,8 @@ test('Team action list renders with metadata and item checkboxes', async ({ cont
   const { list } = await waitForTeamActionList(client, tournament.id);
 
   await page.goto(`/t/${tournament.id}`);
+  await expect(page.getByRole('button', { name: 'Checklisten' })).toBeVisible();
+  await page.goto(`/t/${tournament.id}/checklists`);
   await page.waitForLoadState('networkidle');
 
   await expect(page.getByRole('heading', { name: 'Team Action Lists' })).toBeVisible();
@@ -139,7 +141,7 @@ test('Owner can toggle item complete/incomplete with idempotent state updates', 
   const { list } = await waitForTeamActionList(client, tournament.id);
   const item = firstTeamActionItemOrThrow(list);
 
-  await page.goto(`/t/${tournament.id}`);
+  await page.goto(`/t/${tournament.id}/checklists`);
   await page.waitForLoadState('networkidle');
 
   const checkbox = checkboxByItem(page, item);
@@ -196,8 +198,8 @@ test('Websocket snapshot propagates owner update to another viewer', async ({ co
   const viewerContext = await browser.newContext();
   const viewerPage = await viewerContext.newPage();
 
-  await ownerPage.goto(`/t/${tournament.id}`);
-  await viewerPage.goto(`/t/${tournament.id}`);
+  await ownerPage.goto(`/t/${tournament.id}/checklists`);
+  await viewerPage.goto(`/t/${tournament.id}/checklists`);
   await ownerPage.waitForLoadState('networkidle');
   await viewerPage.waitForLoadState('networkidle');
 
@@ -227,7 +229,7 @@ test('Non-owner UI blocked and read-only mode returns 423 on update', async ({ c
   const item = firstTeamActionItemOrThrow(list);
 
   await injectFakeNonOwner(context);
-  await page.goto(`/t/${tournament.id}`);
+  await page.goto(`/t/${tournament.id}/checklists`);
   await page.waitForLoadState('networkidle');
 
   const blockedCheckbox = checkboxByItem(page, item);
