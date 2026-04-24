@@ -3,11 +3,9 @@ import React from 'react';
 import {connect} from 'react-redux';
 import {Alert, Badge, ButtonGroup} from 'reactstrap';
 
-
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import {Footer} from '../js/components/Footer';
 import {TurniereNavigation} from '../js/components/Navigation';
-
 import {PlayoffStages} from '../js/components/PlayoffStages';
 import GroupStage from '../js/components/GroupStage';
 import {TournamentBigImage} from '../js/components/TournamentBigImage';
@@ -17,6 +15,8 @@ import {LoadingPage} from '../js/components/LoadingPage';
 import {getTournament} from '../js/redux/tournamentApi';
 import {FavoriteBar} from '../js/components/FavoriteBar';
 import {ScrollToTopButton} from '../js/components/ScrollToTopButton';
+import {connectToTimerSocket} from '../js/utils/beamerSocket';
+import {normalizeTimerState} from '../js/utils/timerState';
 
 class PrivateTournamentPage extends React.Component {
     render() {
@@ -62,10 +62,11 @@ class PrivateTournamentPage extends React.Component {
 
 function StatusBar(props) {
     return (<TournamentStatusBar>
-        <ButtonGroup className='me-auto'>
+        <ButtonGroup className='me-auto flex-wrap'>
             <EditButton tournamentId={props.tournament.id} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
             <StatisticsButton tournamentId={props.tournament.id}/>
             <FullscreenButton tournamentId={props.tournament.id}/>
+            <ChecklistsButton tournamentId={props.tournament.id}/>
         </ButtonGroup>
     </TournamentStatusBar>);
 }
@@ -82,6 +83,11 @@ function FullscreenButton(props) {
     </LinkButton>);
 }
 
+function ChecklistsButton(props) {
+    return (<LinkButton href={'/t/' + props.tournamentId + '/checklists'}>
+        Checklisten
+    </LinkButton>);
+}
 
 function mapStateToTournamentPageProperties(state) {
     const {isSignedIn, username} = state.userinfo;
@@ -105,10 +111,17 @@ class Main extends React.Component {
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
         this.reloadTournament = this.reloadTournament.bind(this);
+        this.onTimerMessage = this.onTimerMessage.bind(this);
     }
 
     componentDidMount() {
         this.reloadTournament();
+    }
+
+    componentWillUnmount() {
+        if (this.timerSocket) {
+            this.timerSocket.disconnect();
+        }
     }
 
     reloadTournament() {
@@ -117,6 +130,12 @@ class Main extends React.Component {
 
     onTournamentRequestSuccess(requestStatus, tournament) {
         this.setState({status: requestStatus, tournament: tournament, loaded: true});
+        if (!this.timerSocket && tournament.id) {
+            this.timerSocket = connectToTimerSocket({
+                tournamentId: tournament.id,
+                onMessage: this.onTimerMessage
+            });
+        }
     }
 
     onTournamentRequestError(error) {
@@ -127,6 +146,23 @@ class Main extends React.Component {
         }
     }
 
+    onTimerMessage(message) {
+        if (message.type && message.type !== 'timer.updated') {
+            return;
+        }
+
+        this.setState(prev => {
+            if (!prev.tournament) {
+                return null;
+            }
+
+            return {
+                tournament: Object.assign({}, prev.tournament, {
+                    timerState: normalizeTimerState(message)
+                })
+            };
+        });
+    }
 
     render() {
         const tournamentName = this.state.tournament === null ? 'Turnier' : this.state.tournament.name;

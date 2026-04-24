@@ -34,9 +34,9 @@ function MatchesViewHeader(props) {
                 {props.filterLabel && <i>Anzeige: {props.filterLabel}</i>}
             </div>
             <NavbarBrand>{props.title}</NavbarBrand>
-            {props.timerEnd &&
+            {props.timerState && props.timerState.mode &&
                 <div className="ml-auto timer-container">
-                    Spielzeit: <NavbarBrand><Timer timerEnd={props.timerEnd}/></NavbarBrand>
+                    Spielzeit: <NavbarBrand><Timer timerState={props.timerState}/></NavbarBrand>
                 </div>
             }
         </Navbar>
@@ -48,7 +48,7 @@ export function MatchesView(props) {
     return (<div>
         <MatchesViewHeader
             title={props.tournamentMeta ? props.tournamentMeta.name : ''}
-            timerEnd={props.timerEnd}
+            timerState={props.timerState}
             filterLabel={props.filterLabel}
         />
         <Matches matches={props.matches}/>

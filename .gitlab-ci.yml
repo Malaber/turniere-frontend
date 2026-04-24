@@ -20,6 +20,8 @@ frontend e2e:
   stage: test
   tags:
     - docker
+  needs:
+    - job: build_image
   image: mcr.microsoft.com/playwright:v1.52.0-noble
   services:
     - name: postgres:16

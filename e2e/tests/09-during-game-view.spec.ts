@@ -49,10 +49,9 @@ async function setupBeamerAndMatches(
   await client.login(e2eEmail, e2ePassword);
 
   if (timerSeconds !== undefined) {
-    const timerEnd = new Date(Date.now() + timerSeconds * 1000).toISOString();
     const timerRes = await client.patch(
-      `/tournaments/${tournament.id}/set_timer_end`,
-      { timer_end: timerEnd },
+      `/tournaments/${tournament.id}/timer`,
+      { timestamp_seconds: timerSeconds },
     );
     expectStatus(timerRes, 200, 'set timer');
   }

@@ -22,8 +22,8 @@ function TournamentProperties(props) {
             </ListGroupItem>
             <ListGroupItem>Turnier-Code: <b>{props.code}</b></ListGroupItem>
             <ListGroupItem>von <b>{props.ownerUsername}</b></ListGroupItem>
-            {props.timerEnd &&
-                <ListGroupItem>Spielzeit: <Timer timerEnd={props.timerEnd} /></ListGroupItem>
+            {props.timerState && props.timerState.mode &&
+                <ListGroupItem>Spielzeit: <Timer timerState={props.timerState} /></ListGroupItem>
             }
         </ListGroup>
     );
