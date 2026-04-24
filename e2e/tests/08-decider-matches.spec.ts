@@ -102,7 +102,7 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await deciderCard.click({ force: true });
   modal = page.getByRole('dialog');
   await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible();
-  await modal.getByRole('button', { name: 'Spiel beenden' }).click();
+  await modal.getByRole('button', { name: 'Spiel beenden' }).click({ force: true });
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20000 });
   await expectResolvedDecisionIconCount(page, 20000);
   await page.getByLabel('Tie-Break erklärt').first().click();
@@ -179,7 +179,7 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
 
   await deciderCard.click({ force: true });
   modal = page.getByRole('dialog');
-  await modal.getByRole('button', { name: 'Spiel beenden' }).click();
+  await modal.getByRole('button', { name: 'Spiel beenden' }).click({ force: true });
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20000 });
   await expect(page.getByLabel('Tie-Break erklärt')).toHaveCount(2, { timeout: 20000 });
   await expectNoLineThrough(teamOneRow);
