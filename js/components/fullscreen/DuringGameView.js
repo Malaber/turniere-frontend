@@ -1,6 +1,7 @@
 import React from 'react';
 import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
+import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
 import styles from './DuringGameView.module.css';
 
 
@@ -32,7 +33,7 @@ function AnimatedDigit({value}) {
 class AnimatedTimer extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {timeLeft: null};
+        this.state = {display: getTimerDisplay(props.timerState, Date.now())};
         this.timerRef = React.createRef();
         this.tick = this.tick.bind(this);
     }
@@ -42,12 +43,14 @@ class AnimatedTimer extends React.Component {
     }
 
     componentDidUpdate(prevProps) {
-        if (prevProps.timerEnd !== this.props.timerEnd) {
+        if (prevProps.timerState !== this.props.timerState) {
             clearInterval(this.intervalId);
-            if (this.props.timerEnd) {
+            if (this.props.timerState && this.props.timerState.mode) {
                 this.startInterval();
             } else {
-                this.setState({timeLeft: null});
+                this.setState({
+                    display: getTimerDisplay(this.props.timerState, Date.now())
+                });
             }
         }
     }
@@ -57,22 +60,21 @@ class AnimatedTimer extends React.Component {
     }
 
     startInterval() {
-        if (!this.props.timerEnd) return;
+        if (!this.props.timerState || !this.props.timerState.mode) return;
         this.tick();
         this.intervalId = setInterval(this.tick, 1000);
     }
 
     tick() {
-        const now = new Date();
-        const remaining = this.props.timerEnd - now;
-        const timeLeft = remaining > 0 ? remaining : 0;
+        const display = getTimerDisplay(this.props.timerState, Date.now());
 
-        this.setState({timeLeft}, () => {
-            const secs = Math.floor(timeLeft / 1000);
+        this.setState({display}, () => {
+            const secs = Math.floor(display.ms / 1000);
 
-            // Report phase to parent
             if (this.props.onPhaseChange) {
-                if (timeLeft === 0) {
+                if (!display.active || display.mode !== TIMER_MODE_COUNTDOWN) {
+                    this.props.onPhaseChange('normal');
+                } else if (display.ms === 0) {
                     this.props.onPhaseChange('finished');
                 } else if (secs <= COUNTDOWN_THRESHOLD_S) {
                     this.props.onPhaseChange('countdown');
@@ -81,8 +83,12 @@ class AnimatedTimer extends React.Component {
                 }
             }
 
-            // Restart bump animation each second in last 10s
-            if (secs <= COUNTDOWN_THRESHOLD_S && secs > 0 && this.timerRef.current) {
+            if (
+                display.mode === TIMER_MODE_COUNTDOWN &&
+                secs <= COUNTDOWN_THRESHOLD_S &&
+                secs > 0 &&
+                this.timerRef.current
+            ) {
                 const el = this.timerRef.current;
                 el.style.animation = 'none';
                 void el.offsetWidth;
@@ -92,10 +98,10 @@ class AnimatedTimer extends React.Component {
     }
 
     render() {
-        const {timeLeft} = this.state;
-        if (timeLeft === null) return null;
+        const {display} = this.state;
+        if (!display.active) return null;
 
-        if (timeLeft === 0) {
+        if (display.mode === TIMER_MODE_COUNTDOWN && display.ms === 0) {
             return (
                 <div className={styles.timerFinished}>
                     Spiel vorbei!
@@ -103,11 +109,11 @@ class AnimatedTimer extends React.Component {
             );
         }
 
-        const totalSeconds = Math.floor(timeLeft / 1000);
+        const totalSeconds = Math.floor(display.ms / 1000);
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
-        const isUrgent = totalSeconds <= 10;
+        const isUrgent = display.mode === TIMER_MODE_COUNTDOWN && totalSeconds <= 10;
 
         const chars = [];
         if (hours > 0) {
@@ -119,8 +125,8 @@ class AnimatedTimer extends React.Component {
         String(seconds).padStart(2, '0').split('')
             .forEach(c => chars.push(c));
 
-        const cls = styles.timer
-            + (isUrgent ? ' ' + styles.timerUrgent : '');
+        const cls = styles.timer +
+            (isUrgent ? ' ' + styles.timerUrgent : '');
 
         return (
             <div ref={this.timerRef} className={cls}>
@@ -149,10 +155,10 @@ class AnimatedTimer extends React.Component {
 function FullscreenMatchCard({match, index}) {
     const team1 = match.team1;
     const team2 = match.team2;
-    const score1 = match.decider
-        ? team1.hiddenScore : team1.score;
-    const score2 = match.decider
-        ? team2.hiddenScore : team2.score;
+    const score1 = match.decider ?
+        team1.hiddenScore : team1.score;
+    const score2 = match.decider ?
+        team2.hiddenScore : team2.score;
 
     const finished = match.state === 'finished';
     const t1Win = finished && match.winnerTeamId === team1.id;
@@ -161,9 +167,9 @@ function FullscreenMatchCard({match, index}) {
     const t2Cls = t2Win ? styles.teamNameWinner : styles.teamName;
 
     const delay = (index * 0.06) + 's';
-    const badge = match.group
-        ? match.group.number
-        : match.position;
+    const badge = match.group ?
+        match.group.number :
+        match.position;
 
     return (
         <div
@@ -193,7 +199,7 @@ export class DuringGameView extends React.Component {
         super(props);
         this.state = {
             pageIndex: 0,
-            timerPhase: 'normal', // 'normal' | 'countdown' | 'finished'
+            timerPhase: 'normal' // 'normal' | 'countdown' | 'finished'
         };
         this.cyclePage = this.cyclePage.bind(this);
         this.onTimerPhaseChange = this.onTimerPhaseChange.bind(this);
@@ -239,21 +245,20 @@ export class DuringGameView extends React.Component {
     }
 
     render() {
-        const {matches, timerEnd} = this.props;
+        const {matches, timerState} = this.props;
         const {pageIndex, timerPhase} = this.state;
+        const hasTimer = timerState && timerState.mode;
         const takeover = timerPhase === 'countdown' || timerPhase === 'finished';
 
-        const sorted = matches
-            ? [...matches].sort(sortMatchesByPositionAscending())
-            : [];
+        const sorted = matches ?
+            [...matches].sort(sortMatchesByPositionAscending()) :
+            [];
         const totalPages = Math.ceil(sorted.length / MATCHES_PER_PAGE);
         const start = pageIndex * MATCHES_PER_PAGE;
         const page = sorted.slice(start, start + MATCHES_PER_PAGE);
 
         // Choose grid columns: 4 cols for a full page, fewer when < 4 matches
         const cols = Math.min(4, page.length);
-        const rows = cols > 0 ? Math.ceil(page.length / cols) : 0;
-
         let matchContent;
         if (matches == null) {
             matchContent = (
@@ -274,7 +279,7 @@ export class DuringGameView extends React.Component {
                     className={styles.matchGrid}
                     key={pageIndex}
                     style={{
-                        gridTemplateColumns: 'repeat(' + cols + ', 1fr)',
+                        gridTemplateColumns: 'repeat(' + cols + ', 1fr)'
                     }}
                 >
                     {page.map((m, i) =>
@@ -295,9 +300,9 @@ export class DuringGameView extends React.Component {
             return (
                 <div className={styles.duringGameRoot}>
                     <div className={styles.timerTakeover}>
-                        {timerEnd ? (
+                        {hasTimer ? (
                             <AnimatedTimer
-                                timerEnd={timerEnd}
+                                timerState={timerState}
                                 onPhaseChange={this.onTimerPhaseChange}
                             />
                         ) : (
@@ -307,7 +312,7 @@ export class DuringGameView extends React.Component {
                         )}
                     </div>
 
-<style global jsx>{`
+                    <style global jsx>{`
                         body {
                             background: #ffffff;
                         }
@@ -319,9 +324,9 @@ export class DuringGameView extends React.Component {
         return (
             <div className={styles.duringGameRoot}>
                 <div className={styles.timerContainer}>
-                    {timerEnd ? (
+                    {hasTimer ? (
                         <AnimatedTimer
-                            timerEnd={timerEnd}
+                            timerState={timerState}
                             onPhaseChange={this.onTimerPhaseChange}
                         />
                     ) : (
@@ -346,7 +351,7 @@ export class DuringGameView extends React.Component {
                     </div>
                 )}
 
-<style global jsx>{`
+                <style global jsx>{`
                     body {
                         background: #ffffff;
                     }
