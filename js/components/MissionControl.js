@@ -103,7 +103,7 @@ export class MissionControl extends React.Component {
                                 <h2 className='h4 mb-1'>Mission Control</h2>
                                 <div className='text-muted'>Live-Steuerung fuer Turnierleitung</div>
                             </div>
-                            <Button color='dark' outline onClick={this.toggleOpen}>
+                            <Button color='dark' outline onClick={this.toggleOpen} data-testid='mission-control-toggle'>
                                 {this.state.open ? 'Ausblenden' : 'Oeffnen'}
                             </Button>
                         </div>
@@ -225,6 +225,7 @@ class MissionTimer extends React.Component {
                     </Col>
                     <Col md='3'>
                         <Button color='primary' className='w-100'
+                            data-testid='mission-timer-countdown-minutes'
                             disabled={this.props.disabled || this.state.running}
                             onClick={this.setCountdownMinutes}>
                             Countdown starten
@@ -237,6 +238,7 @@ class MissionTimer extends React.Component {
                     </Col>
                     <Col md='3'>
                         <Button color='secondary' className='w-100'
+                            data-testid='mission-timer-countdown-timestamp'
                             disabled={this.props.disabled || this.state.running || !this.state.timestamp}
                             onClick={this.setCountdownTimestamp}>
                             Endzeit setzen
@@ -245,10 +247,12 @@ class MissionTimer extends React.Component {
                 </Row>
                 <div className='d-flex gap-2 flex-wrap mt-2'>
                     <Button color='info' disabled={this.props.disabled || this.state.running}
+                        data-testid='mission-timer-countup'
                         onClick={this.startCountup}>
                         Countup starten
                     </Button>
                     <Button color='outline-danger' disabled={this.props.disabled || this.state.running}
+                        data-testid='mission-timer-clear'
                         onClick={this.clearTimer}>
                         Timer loeschen
                     </Button>
@@ -266,6 +270,7 @@ function MissionNextMatches(props) {
             <div className='d-flex gap-2 flex-wrap'>
                 {groupStage && groupStage.state !== 'finished' &&
                     <Button color='success'
+                        data-testid='mission-start-next-groups'
                         disabled={props.disabled || props.actionRunning === 'group'}
                         onClick={props.onStartGroupMatches}>
                         Naechste Gruppenmatches starten
@@ -485,7 +490,8 @@ class MissionMatchCard extends React.Component {
         const editable = match.state === 'in_progress' && !this.props.disabled;
         const canStart = match.state === 'not_started' && !this.props.disabled;
         return (
-            <form onSubmit={this.submit} className='mission-control-match border rounded p-2'>
+            <form onSubmit={this.submit} className='mission-control-match border rounded p-2'
+                data-testid='mission-match-card'>
                 <div className='d-flex justify-content-between align-items-center mb-2'>
                     <strong>Sp. {match.position}</strong>
                     <Badge color={match.state === 'in_progress' ? 'warning' : 'secondary'}>
@@ -504,10 +510,12 @@ class MissionMatchCard extends React.Component {
                 <div className='d-flex gap-2'>
                     {canStart &&
                         <Button color='outline-primary' size='sm' type='button'
+                            data-testid='mission-match-start'
                             disabled={this.state.running} onClick={this.startMatch}>
                             Start
                         </Button>}
                     <Button color='primary' size='sm' type='submit'
+                        data-testid='mission-match-save'
                         disabled={!editable || this.state.running}>
                         Speichern
                     </Button>
@@ -566,6 +574,7 @@ class MissionTeams extends React.Component {
                                     onChange={event => this.setTeamName(team.id, event.target.value)}
                                     disabled={this.props.disabled}/>
                                 <Button color='secondary' outline
+                                    data-testid='mission-team-save'
                                     disabled={this.props.disabled || this.state.savingTeamId === team.id}
                                     onClick={() => this.saveTeamName(team)}>
                                     Speichern

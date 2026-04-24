@@ -28,6 +28,15 @@ async function startMatches(
     });
     expectStatus(started, 200, `start match ${match.id}`);
   }
+
+  await expect.poll(async () => {
+    const started = await client.get<Array<{ id: number; state: string }>>(
+      `/tournaments/${tournamentId}/matches`,
+      { state: 'in_progress' },
+    );
+    expectStatus(started, 200, 'fetch started matches');
+    return started.json.length;
+  }, { timeout: 20_000 }).toBe(count);
 }
 
 test('Fullscreen beamer page renders with default fallback', async ({ page }, testInfo) => {
@@ -112,12 +121,12 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=during_game`);
   await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible({ timeout: 15000 });
-  await expect(page.locator('[class*="matchCard"]').first()).toBeVisible();
+  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible();
   await keyframe(page, testInfo, 'fullscreen_beamer_during_game');
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=between_games`);
   await expect(page.getByText(/Nächste Spiele/)).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('[class*="matchCard"]').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'fullscreen_beamer_between_games');
 });
 
