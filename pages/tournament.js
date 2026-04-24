@@ -3,11 +3,9 @@ import React from 'react';
 import {connect} from 'react-redux';
 import {Alert, Badge, ButtonGroup} from 'reactstrap';
 
-
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import {Footer} from '../js/components/Footer';
 import {TurniereNavigation} from '../js/components/Navigation';
-
 import {PlayoffStages} from '../js/components/PlayoffStages';
 import GroupStage from '../js/components/GroupStage';
 import {TournamentBigImage} from '../js/components/TournamentBigImage';
@@ -64,10 +62,11 @@ class PrivateTournamentPage extends React.Component {
 
 function StatusBar(props) {
     return (<TournamentStatusBar>
-        <ButtonGroup className='me-auto'>
+        <ButtonGroup className='me-auto flex-wrap'>
             <EditButton tournamentId={props.tournament.id} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
             <StatisticsButton tournamentId={props.tournament.id}/>
             <FullscreenButton tournamentId={props.tournament.id}/>
+            <ChecklistsButton tournamentId={props.tournament.id}/>
         </ButtonGroup>
     </TournamentStatusBar>);
 }
@@ -84,6 +83,11 @@ function FullscreenButton(props) {
     </LinkButton>);
 }
 
+function ChecklistsButton(props) {
+    return (<LinkButton href={'/t/' + props.tournamentId + '/checklists'}>
+        Checklisten
+    </LinkButton>);
+}
 
 function mapStateToTournamentPageProperties(state) {
     const {isSignedIn, username} = state.userinfo;
@@ -159,7 +163,6 @@ class Main extends React.Component {
             };
         });
     }
-
 
     render() {
         const tournamentName = this.state.tournament === null ? 'Turnier' : this.state.tournament.name;
