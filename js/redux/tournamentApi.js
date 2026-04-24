@@ -2,6 +2,7 @@ import {getRequest} from './backendApi';
 import {getState} from '../api';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
 import {mergeTournamentSyncMetadata} from '../utils/tournamentSyncMetadata';
+import {normalizeTimerState, normalizeTournamentTimerState} from '../utils/timerState';
 
 export function getTournament(code, successCallback, errorCallback) {
     getRequest(getState(), '/tournaments/' + code)
@@ -53,24 +54,18 @@ export function getTournamentMatches(tournamentId, successCallback, errorCallbac
         .catch(errorCallback);
 }
 
-export function getTournamentTimerEnd(tournamentId, successCallback, errorCallback) {
-    getRequest(getState(), '/tournaments/' + tournamentId + '/timer_end')
+export function getTournamentTimerState(tournamentId, successCallback, errorCallback) {
+    getRequest(getState(), '/tournaments/' + tournamentId + '/timer')
         .then(response => {
-            let timerEndDate;
-            if (response.data.timer_end === null) {
-                timerEndDate = null;
-            } else {
-                timerEndDate = new Date(response.data.timer_end);
-            }
-            successCallback(response.status, timerEndDate);
+            successCallback(response.status, normalizeTimerState(response.data));
         })
         .catch(errorCallback);
 }
 
 export function getBeamerByName(tournamentCode, beamerName, successCallback, errorCallback) {
     const encodedName = encodeURIComponent(beamerName || '');
-    const path = '/tournaments/' + tournamentCode
-        + '/beamers/by_name?name=' + encodedName;
+    const path = '/tournaments/' + tournamentCode +
+        '/beamers/by_name?name=' + encodedName;
     getRequest(getState(), path)
         .then(response => {
             successCallback(response.status, response.data);
@@ -109,7 +104,7 @@ function convertTournament(apiTournament) {
         groupStage: groupStage,
         playoffStages: playoffStages,
         teams: apiTournament.teams,
-        timerEnd: apiTournament.timer_end ? new Date(apiTournament.timer_end) : null
+        timerState: normalizeTournamentTimerState(apiTournament)
     };
 }
 

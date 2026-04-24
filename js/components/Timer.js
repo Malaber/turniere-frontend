@@ -1,24 +1,35 @@
 import React from 'react';
+import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../utils/timerState';
 
-export function Timer({timerEnd}) {
-    const [timeLeft, setTimeLeft] = React.useState(null);
+export function Timer({timerState}) {
+    const [display, setDisplay] = React.useState(
+        getTimerDisplay(timerState, Date.now())
+    );
 
     React.useEffect(() => {
-        if (timerEnd) {
-            const intervalId = setInterval(() => {
-                const now = new Date();
-                const timeLeft = timerEnd - now;
-                setTimeLeft(timeLeft > 0 ? timeLeft : 0);
-            }, 1000);
-            return () => clearInterval(intervalId);
+        if (!timerState || !timerState.mode) {
+            setDisplay(getTimerDisplay(timerState, Date.now()));
+            return undefined;
         }
-    }, [timerEnd]);
 
-    const formatTimeLeft = timeLeft => {
-        if (timeLeft === 0) return 'Spiel vorbei!';
-        const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+        const tick = () => setDisplay(getTimerDisplay(timerState, Date.now()));
+        tick();
+        const intervalId = setInterval(tick, 1000);
+        return () => clearInterval(intervalId);
+    }, [timerState]);
+
+    const formatTimeLeft = nextDisplay => {
+        if (!nextDisplay.active) return '';
+        if (
+            nextDisplay.mode === TIMER_MODE_COUNTDOWN &&
+            nextDisplay.ms === 0
+        ) {
+            return 'Spiel vorbei!';
+        }
+
+        const hours = Math.floor(nextDisplay.ms / (1000 * 60 * 60));
+        const minutes = Math.floor((nextDisplay.ms % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((nextDisplay.ms % (1000 * 60)) / 1000);
         const formattedSeconds = seconds < 10 ? '0' + seconds : seconds;
 
         let formattedTimeLeft = '';
@@ -29,5 +40,5 @@ export function Timer({timerEnd}) {
         return formattedTimeLeft;
     };
 
-    return <span>{formatTimeLeft(timeLeft)}</span>;
+    return <span>{formatTimeLeft(display)}</span>;
 }

@@ -4,9 +4,10 @@ import {Container, Spinner} from 'reactstrap';
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import {
     getBeamerByName, getTournament, getTournamentMatches,
-    getTournamentMeta, getTournamentTimerEnd
+    getTournamentMeta, getTournamentTimerState
 } from '../js/redux/tournamentApi';
-import {connectToBeamerSocket} from '../js/utils/beamerSocket';
+import {connectToBeamerSocket, connectToTimerSocket} from '../js/utils/beamerSocket';
+import {normalizeTimerState} from '../js/utils/timerState';
 import {MatchesView} from '../js/components/fullscreen/MatchesView';
 import {GroupsView} from '../js/components/fullscreen/GroupsView';
 import {DuringGameView} from '../js/components/fullscreen/DuringGameView';
@@ -47,7 +48,7 @@ class Main extends React.Component {
             tournamentMeta: null,
             tournament: null,
             matches: [],
-            timerEnd: null,
+            timerState: {mode: null, timestampIso: null},
             displayState: props.query.display || 'matches_all',
             beamerName: props.query.beamer || 'default',
             qrCodeUrl: null,
@@ -56,15 +57,18 @@ class Main extends React.Component {
             loadedMatches: false,
             metaStatus: null,
             matchesStatus: null,
-            socket: null
+            socket: null,
+            timerSocket: null
         };
 
         this.updateMatches = this.updateMatches.bind(this);
-        this.updateTimerEnd = this.updateTimerEnd.bind(this);
+        this.updateTimerState = this.updateTimerState.bind(this);
         this.updateTournament = this.updateTournament.bind(this);
         this.connectBeamerSocket = this.connectBeamerSocket.bind(this);
+        this.connectTimerSocket = this.connectTimerSocket.bind(this);
         this.refreshBeamerConfig = this.refreshBeamerConfig.bind(this);
         this.onBeamerMessage = this.onBeamerMessage.bind(this);
+        this.onTimerMessage = this.onTimerMessage.bind(this);
     }
 
     componentDidMount() {
@@ -82,7 +86,11 @@ class Main extends React.Component {
         // Fetch tournament metadata
         getTournamentMeta(code,
             (status, meta) => {
-                this.setState({metaStatus: status, tournamentMeta: meta, loadedMeta: true});
+                this.setState({
+                    metaStatus: status,
+                    tournamentMeta: meta,
+                    loadedMeta: true
+                }, () => this.connectTimerSocket(meta.id));
             },
             error => {
                 const s = error.response ? error.response.status : -1;
@@ -93,21 +101,22 @@ class Main extends React.Component {
         // Fetch full tournament data (for groups view)
         this.updateTournament();
 
-        // Start timer polling
-        this.updateTimerEnd();
+        // Initial timer snapshot. Live replacements arrive through ActionCable.
+        this.updateTimerState();
 
         // Set up polling intervals
         this.matchesIntervalId = setInterval(this.updateMatches, 10000);
-        this.timerEndIntervalId = setInterval(this.updateTimerEnd, 10000);
         this.tournamentIntervalId = setInterval(this.updateTournament, 15000);
     }
 
     componentWillUnmount() {
         clearInterval(this.matchesIntervalId);
-        clearInterval(this.timerEndIntervalId);
         clearInterval(this.tournamentIntervalId);
         if (this.state.socket) {
             this.state.socket.disconnect();
+        }
+        if (this.state.timerSocket) {
+            this.state.timerSocket.disconnect();
         }
     }
 
@@ -122,6 +131,22 @@ class Main extends React.Component {
             onMessage: this.onBeamerMessage
         });
         this.setState({socket});
+    }
+
+    connectTimerSocket(tournamentId) {
+        if (!tournamentId) {
+            return;
+        }
+
+        if (this.state.timerSocket) {
+            return;
+        }
+
+        const timerSocket = connectToTimerSocket({
+            tournamentId,
+            onMessage: this.onTimerMessage
+        });
+        this.setState({timerSocket});
     }
 
     refreshBeamerConfig(code, beamerName) {
@@ -170,6 +195,14 @@ class Main extends React.Component {
         });
     }
 
+    onTimerMessage(message) {
+        if (message.type && message.type !== 'timer.updated') {
+            return;
+        }
+
+        this.setState({timerState: normalizeTimerState(message)});
+    }
+
     updateMatches() {
         const code = this.props.query.code;
         const backendFilter = DISPLAY_STATE_TO_BACKEND_FILTER[this.state.displayState];
@@ -185,24 +218,26 @@ class Main extends React.Component {
         );
     }
 
-    updateTimerEnd() {
+    updateTimerState() {
         const code = this.props.query.code;
-        getTournamentTimerEnd(code,
-            (status, timerEnd) => this.setState({timerEnd}),
-            error => console.error('Failed to fetch timer end:', error)
+        getTournamentTimerState(code,
+            (status, timerState) => this.setState({timerState}),
+            error => console.error('Failed to fetch timer state:', error)
         );
     }
 
     updateTournament() {
         const code = this.props.query.code;
         getTournament(code,
-            (status, tournament) => this.setState({tournament}),
+            (status, tournament) => this.setState({tournament}, () => {
+                this.connectTimerSocket(tournament.id);
+            }),
             error => console.error('Failed to fetch tournament:', error)
         );
     }
 
     renderView() {
-        const {displayState, tournamentMeta, matches, timerEnd, tournament} = this.state;
+        const {displayState, tournamentMeta, matches, timerState, tournament} = this.state;
         const {qrCodeUrl, logoUrl} = this.state;
 
         switch (displayState) {
@@ -215,12 +250,12 @@ class Main extends React.Component {
             return <DuringGameView
                 tournamentMeta={tournamentMeta}
                 matches={matches}
-                timerEnd={timerEnd}/>;
+                timerState={timerState}/>;
         case 'between_games':
             return <BetweenGamesView
                 tournamentMeta={tournamentMeta}
                 matches={this.state.loadedMatches ? matches : null}
-                timerEnd={timerEnd}/>;
+                timerState={timerState}/>;
         case 'matches_all':
         case 'matches_in_progress':
         case 'matches_upcoming':
@@ -230,7 +265,7 @@ class Main extends React.Component {
             return <MatchesView
                 tournamentMeta={tournamentMeta}
                 matches={this.state.loadedMatches ? matches : null}
-                timerEnd={timerEnd}
+                timerState={timerState}
                 filterLabel={DISPLAY_STATE_LABELS[displayState]}
             />;
         }

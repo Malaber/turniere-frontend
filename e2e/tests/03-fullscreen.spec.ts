@@ -102,10 +102,9 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
 
-  const timerEnd = new Date(Date.now() + 5 * 60 * 1000).toISOString();
   const timerRes = await client.patch(
-    `/tournaments/${tournament.id}/set_timer_end`,
-    { timer_end: timerEnd },
+    `/tournaments/${tournament.id}/timer`,
+    { timestamp_seconds: 5 * 60 },
   );
   expectStatus(timerRes, 200, 'set timer');
 
@@ -151,4 +150,29 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
   );
   expectStatus(secondUpdate, 200, 'update beamer to finished');
   await expect(page.getByText(/Anzeige: beendet/i)).toBeVisible({ timeout: 10_000 });
+});
+
+test('Fullscreen timer updates live for countup mode', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
+
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  await page.goto(`/t/${tournament.id}/fullscreen?display=matches_all`);
+  await expect(page.getByText(/Anzeige: alle/i)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
+
+  const anchor = new Date(Date.now() - 3 * 60 * 1000 - 15 * 1000).toISOString();
+  const timerRes = await client.patch(
+    `/tournaments/${tournament.id}/timer`,
+    { timestamp: anchor, timer_mode: 'countup' },
+  );
+  expectStatus(timerRes, 200, 'start countup timer');
+
+  await expect(page.getByText(/Spielzeit:/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.timer-container')).toContainText(/3:1[0-9]|3:2[0-9]/, {
+    timeout: 10_000,
+  });
 });
