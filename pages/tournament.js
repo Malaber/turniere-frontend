@@ -15,6 +15,8 @@ import {LoadingPage} from '../js/components/LoadingPage';
 import {getTournament} from '../js/redux/tournamentApi';
 import {FavoriteBar} from '../js/components/FavoriteBar';
 import {ScrollToTopButton} from '../js/components/ScrollToTopButton';
+import {connectToTimerSocket} from '../js/utils/beamerSocket';
+import {normalizeTimerState} from '../js/utils/timerState';
 
 class PrivateTournamentPage extends React.Component {
     render() {
@@ -109,10 +111,17 @@ class Main extends React.Component {
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
         this.reloadTournament = this.reloadTournament.bind(this);
+        this.onTimerMessage = this.onTimerMessage.bind(this);
     }
 
     componentDidMount() {
         this.reloadTournament();
+    }
+
+    componentWillUnmount() {
+        if (this.timerSocket) {
+            this.timerSocket.disconnect();
+        }
     }
 
     reloadTournament() {
@@ -121,6 +130,12 @@ class Main extends React.Component {
 
     onTournamentRequestSuccess(requestStatus, tournament) {
         this.setState({status: requestStatus, tournament: tournament, loaded: true});
+        if (!this.timerSocket && tournament.id) {
+            this.timerSocket = connectToTimerSocket({
+                tournamentId: tournament.id,
+                onMessage: this.onTimerMessage
+            });
+        }
     }
 
     onTournamentRequestError(error) {
@@ -129,6 +144,24 @@ class Main extends React.Component {
         } else {
             this.setState({status: -1, loaded: true});
         }
+    }
+
+    onTimerMessage(message) {
+        if (message.type && message.type !== 'timer.updated') {
+            return;
+        }
+
+        this.setState(prev => {
+            if (!prev.tournament) {
+                return null;
+            }
+
+            return {
+                tournament: Object.assign({}, prev.tournament, {
+                    timerState: normalizeTimerState(message)
+                })
+            };
+        });
     }
 
     render() {
