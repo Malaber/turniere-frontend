@@ -125,21 +125,25 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  // Set timer to expire in 15 seconds — enough for seeding + page load before countdown
-  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(12, {
-    timerSeconds: 15,
+  // Load with a long timer first so slower CI still captures normal match cards
+  // before the countdown takeover starts.
+  const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(12, {
+    timerSeconds: 10 * 60,
   });
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   // Wait for match cards to confirm initial render
   const matchCards = page.locator('[class*="matchCard"]');
-  await expect(matchCards.first()).toBeVisible();
+  await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'before_countdown');
 
   // Match cards should be visible in normal mode
   const cardsVisibleBefore = await matchCards.count();
   expect(cardsVisibleBefore).toBeGreaterThan(0);
+
+  const timerRes = await client.patch(`/tournaments/${tournament.id}/timer`, { timestamp_seconds: 15 });
+  expectStatus(timerRes, 200, 'start countdown timer');
 
   // Wait for countdown phase (timer <= 10s triggers takeover)
   const timerTakeover = page.locator('[class*="timerTakeover"]');

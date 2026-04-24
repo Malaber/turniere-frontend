@@ -140,6 +140,17 @@ export class Group extends Component {
         }
     }
 
+    componentDidUpdate(prevProps) {
+        if (prevProps.group !== this.props.group) {
+            this.setState(prevState => ({
+                ...this.props.group,
+                showMatches: prevState.showMatches,
+                creatingDeciderKey: prevState.creatingDeciderKey,
+                decisionModalScore: prevState.decisionModalScore
+            }));
+        }
+    }
+
     reload() {
         getGroup(this.state.id, this.onReloadSuccess, this.onReloadError);
     }

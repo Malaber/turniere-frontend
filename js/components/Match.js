@@ -34,6 +34,12 @@ export class Match extends React.Component {
         }
     }
 
+    componentDidUpdate(prevProps) {
+        if (prevProps.match !== this.props.match) {
+            this.setState({match: this.props.match});
+        }
+    }
+
     startMatch() {
         startMatch(this.state.match.id, this.onStartMatchSuccess, this.onStartMatchError);
     }

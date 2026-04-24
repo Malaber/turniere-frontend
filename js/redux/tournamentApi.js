@@ -7,7 +7,7 @@ import {normalizeTimerState, normalizeTournamentTimerState} from '../utils/timer
 export function getTournament(code, successCallback, errorCallback) {
     getRequest(getState(), '/tournaments/' + code)
         .then(response => {
-            successCallback(response.status, convertTournament(mergeTournamentSyncMetadata(response.data)));
+            successCallback(response.status, convertTournamentSnapshot(response.data));
         })
         .catch(errorCallback);
 }
@@ -44,11 +44,8 @@ export function getTournamentMatches(tournamentId, successCallback, errorCallbac
     getRequest(getState(), '/tournaments/' + tournamentId + '/matches' + matchFilter)
         .then(response => {
             successCallback(
-                response.status, response.data.sort(
-                    (a, b) => a.position > b.position
-                ).map(
-                    match => convertMatch(match)
-                )
+                response.status,
+                convertMatchesSnapshot(response.data)
             );
         })
         .catch(errorCallback);
@@ -106,7 +103,9 @@ export function convertTeamActionListsSnapshot(apiTeamActionLists) {
     return apiTeamActionLists.map(apiList => convertTeamActionList(apiList));
 }
 
-function convertTournament(apiTournament) {
+export function convertTournamentSnapshot(apiTournament, cachedMetadata = null) {
+    apiTournament = mergeTournamentSyncMetadata(apiTournament, cachedMetadata);
+
     let groupStage = null;
     const playoffStages = [];
     for (const apiStage of apiTournament.stages) {
@@ -140,6 +139,15 @@ function convertTournament(apiTournament) {
         teams: apiTournament.teams,
         timerState: normalizeTournamentTimerState(apiTournament)
     };
+}
+
+export function convertMatchesSnapshot(apiMatches) {
+    if (!Array.isArray(apiMatches)) {
+        return [];
+    }
+    return apiMatches.sort(sortMatchesByPositionAscending()).map(
+        match => convertMatch(match)
+    );
 }
 
 function convertTeamActionList(apiList) {
@@ -205,7 +213,7 @@ function convertMatch(apiMatch, allowUndecided) {
         decider: apiMatch.decider === true,
         allowUndecided: allowUndecided,
         scoreMode: scoreMode,
-        winnerTeamId: apiMatch.winner === null ? null : apiMatch.winner.id,
+        winnerTeamId: apiMatch.winner ? apiMatch.winner.id : null,
         position: apiMatch.position + 1,
         group: apiMatch.group ? {id: apiMatch.group.id, number: apiMatch.group.number} : null
     };
