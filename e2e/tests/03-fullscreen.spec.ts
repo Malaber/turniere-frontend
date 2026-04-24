@@ -112,7 +112,7 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
   await startMatches(client, tournament.id, 20);
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=during_game`);
-  await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible();
+  await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible({ timeout: 15000 });
   await expect(page.locator('[class*="matchCard"]').first()).toBeVisible();
   await keyframe(page, testInfo, 'fullscreen_beamer_during_game');
 

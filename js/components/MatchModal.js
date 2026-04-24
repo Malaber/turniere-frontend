@@ -11,7 +11,8 @@ export class MatchModal extends Component {
         this.state = {
             scoreTeam1: this.initialScoreFor(this.props.match.team1),
             scoreTeam2: this.initialScoreFor(this.props.match.team2),
-            swapTargetId: this.initialSwapTargetId(this.props.swapTargets)
+            swapTargetId: this.initialSwapTargetId(this.props.swapTargets),
+            swapControlsExpanded: false
         };
         this.updateScoreTeam1 = this.updateScoreTeam1.bind(this);
         this.updateScoreTeam2 = this.updateScoreTeam2.bind(this);
@@ -22,6 +23,7 @@ export class MatchModal extends Component {
         this.initialSwapTargetId = this.initialSwapTargetId.bind(this);
         this.updateSwapTargetId = this.updateSwapTargetId.bind(this);
         this.swapMatchPosition = this.swapMatchPosition.bind(this);
+        this.toggleSwapControls = this.toggleSwapControls.bind(this);
     }
 
     componentDidUpdate(prevProps) {
@@ -29,7 +31,8 @@ export class MatchModal extends Component {
             this.setState({
                 scoreTeam1: this.initialScoreFor(this.props.match.team1),
                 scoreTeam2: this.initialScoreFor(this.props.match.team2),
-                swapTargetId: this.initialSwapTargetId(this.props.swapTargets)
+                swapTargetId: this.initialSwapTargetId(this.props.swapTargets),
+                swapControlsExpanded: false
             });
         }
         const previousTargets = prevProps.swapTargets || [];
@@ -97,6 +100,12 @@ export class MatchModal extends Component {
         this.props.onSwapMatchPosition(this.props.match.id, otherMatchId);
     }
 
+    toggleSwapControls() {
+        this.setState(prevState => ({
+            swapControlsExpanded: !prevState.swapControlsExpanded
+        }));
+    }
+
     render() {
         let title;
         let actionButton = '';
@@ -148,20 +157,33 @@ export class MatchModal extends Component {
         }
         if (canSwapMatchPosition) {
             swapControls = (
-                <div className='me-auto d-flex align-items-center gap-2' data-testid='swap-match-position-controls'>
-                    <span className='text-muted'>Tauschen mit</span>
-                    <Input type='select' value={this.state.swapTargetId} onChange={this.updateSwapTargetId}
-                        disabled={this.props.swapInProgress} data-testid='swap-match-position-select'>
-                        {this.props.swapTargets.map(target => (
-                            <option key={target.id} value={target.id}>
-                                Sp. {target.position}: {target.team1.name} vs. {target.team2.name}
-                            </option>
-                        ))}
-                    </Input>
-                    <Button color='secondary' onClick={this.swapMatchPosition} disabled={this.props.swapInProgress}
-                        data-testid='swap-match-position-button'>
-                        {this.props.swapInProgress ? 'Tauscht...' : 'Position tauschen'}
+                <div className='me-auto d-flex align-items-end gap-2' data-testid='swap-match-position-controls'>
+                    <Button
+                        color='link'
+                        className='p-0 text-muted text-decoration-none'
+                        onClick={this.toggleSwapControls}
+                        data-testid='swap-match-position-toggle'
+                    >
+                        {this.state.swapControlsExpanded ? 'Tauschoptionen ausblenden' : 'Position tauschen'}
                     </Button>
+                    {this.state.swapControlsExpanded && (
+                        <div className='d-flex align-items-center gap-2'>
+                            <span className='text-muted'>mit</span>
+                            <Input type='select' value={this.state.swapTargetId} onChange={this.updateSwapTargetId}
+                                disabled={this.props.swapInProgress} data-testid='swap-match-position-select'>
+                                {this.props.swapTargets.map(target => (
+                                    <option key={target.id} value={target.id}>
+                                        Sp. {target.position}: {target.team1.name} vs. {target.team2.name}
+                                    </option>
+                                ))}
+                            </Input>
+                            <Button color='secondary' onClick={this.swapMatchPosition}
+                                disabled={this.props.swapInProgress}
+                                data-testid='swap-match-position-button'>
+                                {this.props.swapInProgress ? 'Tauscht...' : 'Tauschen'}
+                            </Button>
+                        </div>
+                    )}
                 </div>
             );
         }

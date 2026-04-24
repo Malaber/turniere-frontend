@@ -80,6 +80,9 @@ test('Owner can swap group match positions and backend persists new order', asyn
 
   await sourceCard.click();
   await expect(page.getByTestId('swap-match-position-controls')).toBeVisible();
+  await expect(page.getByTestId('swap-match-position-select')).toHaveCount(0);
+  await page.getByTestId('swap-match-position-toggle').click();
+  await expect(page.getByTestId('swap-match-position-select')).toBeVisible();
   await page.getByTestId('swap-match-position-select').selectOption(String(targetMatch.id));
   await modalKeyframe(page, testInfo, 'swap_modal_before_submit');
 
@@ -137,6 +140,9 @@ test('Owner sees dedicated not-found error on swap target missing', async ({ con
   await page.locator('[data-match-id]').first().click();
 
   await expect(page.getByTestId('swap-match-position-controls')).toBeVisible();
+  await expect(page.getByTestId('swap-match-position-select')).toHaveCount(0);
+  await page.getByTestId('swap-match-position-toggle').click();
+  await expect(page.getByTestId('swap-match-position-select')).toBeVisible();
   await modalKeyframe(page, testInfo, 'swap_modal_not_found_before_submit');
 
   await page.route('**/matches/*/swap', async (route) => {
@@ -163,6 +169,9 @@ test('Owner sees backend validation message for invalid swap', async ({ context,
   await page.locator('[data-match-id]').first().click();
 
   await expect(page.getByTestId('swap-match-position-controls')).toBeVisible();
+  await expect(page.getByTestId('swap-match-position-select')).toHaveCount(0);
+  await page.getByTestId('swap-match-position-toggle').click();
+  await expect(page.getByTestId('swap-match-position-select')).toBeVisible();
   await modalKeyframe(page, testInfo, 'swap_modal_422_before_submit');
 
   await page.route('**/matches/*/swap', async (route) => {

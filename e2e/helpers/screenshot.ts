@@ -12,8 +12,23 @@ function screenshotPath(testInfo: TestInfo, name: string): string {
 async function waitForSettledLayout(page: Page): Promise<void> {
   await page.waitForTimeout(250);
   await page.evaluate(async () => {
-    const animations = document.getAnimations().filter((animation) => animation.playState === 'running');
-    await Promise.allSettled(animations.map((animation) => animation.finished));
+    const waitFor = document.getAnimations().filter((animation) => {
+      if (animation.playState !== 'running') {
+        return false;
+      }
+      const timing = animation.effect?.getComputedTiming?.();
+      if (!timing) {
+        return true;
+      }
+      if (timing.iterations === Infinity) {
+        return false;
+      }
+      return true;
+    });
+    await Promise.race([
+      Promise.allSettled(waitFor.map((animation) => animation.finished)),
+      new Promise((resolve) => setTimeout(resolve, 1000)),
+    ]);
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   });
 }
