@@ -119,7 +119,6 @@ export class BeamerTimerEffects extends React.Component {
 
         const secondsRemaining = Math.floor(display.ms / 1000);
         if (secondsRemaining <= 0) {
-            this.stopActiveSounds('timer-finished');
             if (!this.finishedTriggered) {
                 this.finishedTriggered = true;
                 triggerConfetti();
@@ -181,9 +180,15 @@ export class BeamerTimerEffects extends React.Component {
         audio.volume = cue.volume;
         this.activeSounds.push(audio);
 
+        const removeAudio = () => {
+            this.activeSounds = this.activeSounds.filter(activeAudio => activeAudio !== audio);
+            emitDebugEvent('sound-ended', {cue: cue.key, src: cue.src});
+        };
+
+        audio.addEventListener('ended', removeAudio, {once: true});
+
         const startPlayback = () => {
             try {
-                audio.currentTime = elapsedSeconds;
                 const playResult = audio.play();
                 if (playResult && playResult.catch) {
                     playResult.catch(error => {
@@ -201,10 +206,39 @@ export class BeamerTimerEffects extends React.Component {
             }
         };
 
+        const seekThenPlay = () => {
+            let fallbackId = null;
+            let didStart = false;
+            const playOnce = () => {
+                if (didStart) return;
+                didStart = true;
+                if (fallbackId) {
+                    clearTimeout(fallbackId);
+                    fallbackId = null;
+                }
+                startPlayback();
+            };
+
+            try {
+                audio.currentTime = elapsedSeconds;
+            } catch (error) {
+                emitDebugEvent('sound-seek-error', {
+                    cue: cue.key,
+                    message: error.message
+                });
+                startPlayback();
+                return;
+            }
+
+            audio.addEventListener('seeked', playOnce, {once: true});
+            audio.addEventListener('canplay', playOnce, {once: true});
+            fallbackId = setTimeout(playOnce, 500);
+        };
+
         if (audio.readyState >= 1) {
-            startPlayback();
+            seekThenPlay();
         } else {
-            audio.addEventListener('loadedmetadata', startPlayback, {once: true});
+            audio.addEventListener('loadedmetadata', seekThenPlay, {once: true});
             audio.load();
         }
     }
