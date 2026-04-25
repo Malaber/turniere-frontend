@@ -1,5 +1,6 @@
 import {Table} from 'reactstrap';
 import React from 'react';
+import {TeamName} from './TeamName';
 
 export function MatchTable(props) {
     const displayedTeam1Score = props.match.decider ? props.match.team1.hiddenScore : props.match.team1.score;
@@ -33,10 +34,12 @@ export function MatchTable(props) {
         break;
     }
     if (props.match.state === 'single_team') {
-        return (<Table className='mb-0'>
+        return (<Table className='mb-0' style={{tableLayout: 'fixed', width: '100%'}}>
             <tbody>
                 <tr>
-                    <td className={'border-top-0 ' + team1Class}>{props.match.team1.name}</td>
+                    <td className={'border-top-0 ' + team1Class}>
+                        <TeamName name={props.match.team1.name}/>
+                    </td>
                 </tr>
                 <tr>
                     <td className={'border-bottom-0 ' + props.borderColor + ' ' + team2Class}>kein Gegner</td>
@@ -44,16 +47,20 @@ export function MatchTable(props) {
             </tbody>
         </Table>);
     } else {
-        return (<Table className='mb-0'>
+        return (<Table className='mb-0' style={{tableLayout: 'fixed', width: '100%'}}>
             <tbody>
                 <tr>
-                    <th className='stage border-top-0'>{displayedTeam1Score}</th>
-                    <td className={'border-top-0 ' + team1Class}>{props.match.team1.name}</td>
+                    <th className='stage border-top-0' style={{width: '2.5rem'}}>{displayedTeam1Score}</th>
+                    <td className={'border-top-0 ' + team1Class}>
+                        <TeamName name={props.match.team1.name}/>
+                    </td>
                 </tr>
                 <tr>
-                    <th className={'stage border-bottom-0 ' + props.borderColor}>{displayedTeam2Score}</th>
+                    <th className={'stage border-bottom-0 ' + props.borderColor} style={{width: '2.5rem'}}>
+                        {displayedTeam2Score}
+                    </th>
                     <td className={'border-bottom-0 ' + props.borderColor + ' ' + team2Class}>
-                        {props.match.team2.name}
+                        <TeamName name={props.match.team2.name}/>
                     </td>
                 </tr>
             </tbody>

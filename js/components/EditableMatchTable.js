@@ -1,23 +1,24 @@
 import React from 'react';
 import {Button, Input, InputGroup, Table} from 'reactstrap';
+import {TeamName} from './TeamName';
 
 export function EditableMatchTable(props) {
     const team1Score = props.match.decider ? props.match.team1.hiddenScore : props.match.team1.score;
     const team2Score = props.match.decider ? props.match.team2.hiddenScore : props.match.team2.score;
 
-    return (<Table className='mb-0'>
+    return (<Table className='mb-0' style={{tableLayout: 'fixed', width: '100%'}}>
         <tbody>
             <tr>
                 <td className='scoreInput border-top-0'>
                     <ScoreInput score={team1Score} update={props.updateScoreTeam1}/>
                 </td>
-                <td className='align-middle border-top-0'>{props.match.team1.name}</td>
+                <td className='align-middle border-top-0'><TeamName name={props.match.team1.name}/></td>
             </tr>
             <tr>
                 <td className='scoreInput'>
                     <ScoreInput score={team2Score} update={props.updateScoreTeam2}/>
                 </td>
-                <td className='align-middle'>{props.match.team2.name}</td>
+                <td className='align-middle'><TeamName name={props.match.team2.name}/></td>
             </tr>
         </tbody>
     </Table>);

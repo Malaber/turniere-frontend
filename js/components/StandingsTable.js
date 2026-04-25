@@ -1,4 +1,5 @@
 import React from 'react';
+import {TeamName} from './TeamName';
 import {
     Button,
     Card,
@@ -26,10 +27,10 @@ export class StandingsTable extends React.Component {
             <Card className="shadow-sm">
                 <CardBody>
                     <h1 className="custom-font">Aktuelle Rangliste</h1>
-                    <Table className="mt-3 mb-0">
+                    <Table className="mt-3 mb-0" style={{tableLayout: 'fixed', width: '100%'}}>
                         <thead>
                             <tr>
-                                <th>#</th>
+                                <th style={{width: '3rem'}}>#</th>
                                 <th>Team Name</th>
                                 <th className="text-center">Match Differenz</th>
                                 <th className="text-center">Punkt Differenz</th>
@@ -75,7 +76,7 @@ class TeamRow extends React.Component {
         return (
             <tr className={this.props.className}>
                 <td>{ this.props.teamToShow.rank }</td>
-                <td className="w-100">{ this.props.teamToShow.team_name }</td>
+                <td className="w-100"><TeamName name={this.props.teamToShow.team_name}/></td>
                 <td className="text-center">{ this.props.teamToShow.win_loss_differential }</td>
                 <td className="text-center">{ this.props.teamToShow.point_differential }</td>
             </tr>

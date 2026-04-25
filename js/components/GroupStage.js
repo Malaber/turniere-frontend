@@ -10,6 +10,7 @@ import {
     FaChevronDown, FaCircleExclamation, FaCircleInfo
 } from 'react-icons/fa6';
 import {createDeciderMatch, finishGroupStage, swapMatchPositions as apiSwapMatchPositions} from '../api';
+import {TeamName} from './TeamName';
 
 export default class GroupStage extends Component {
     constructor(props) {
@@ -74,7 +75,12 @@ export default class GroupStage extends Component {
                         <div><strong>Playoffs können noch nicht gestartet werden.</strong></div>
                         {this.state.blockingTies.map((tie, index) => (
                             <div key={index}>
-                                Gruppe {tie.group_number}: {tie.team_names.join(' vs. ')}
+                                Gruppe {tie.group_number}: {tie.team_names.map((teamName, teamIndex) => (
+                                    <React.Fragment key={teamName}>
+                                        {teamIndex > 0 && ' vs. '}
+                                        <TeamName name={teamName} inline/>
+                                    </React.Fragment>
+                                ))}
                                 {' '}brauchen ein Entscheidungsmatch.
                             </div>
                         ))}
@@ -321,7 +327,7 @@ function GroupScoresTableRow(props) {
             <td>{props.score.position}</td>
             <td>
                 <div className='d-flex align-items-center justify-content-between gap-2'>
-                    <span className='text-break'>{props.score.team.name}</span>
+                    <TeamName name={props.score.team.name}/>
                     {decisionButton}
                 </div>
             </td>
@@ -383,12 +389,12 @@ function RankingDecisionModal(props) {
                 </p>
                 {rankingDecision.resolved_by === 'direct_comparison' &&
                     <p className='mb-3'>
-                        Direkter Vergleich gegen {rankingDecision.compared_with_team_name}:{' '}
+                        Direkter Vergleich gegen <TeamName name={rankingDecision.compared_with_team_name} inline/>:{' '}
                         {translateResult(rankingDecision.direct_comparison_result)}.
                     </p>}
                 {rankingDecision.resolved_by === 'hidden_points' &&
                     <p className='mb-3'>
-                        Entscheidungsmatch gegen {rankingDecision.compared_with_team_name}:{' '}
+                        Entscheidungsmatch gegen <TeamName name={rankingDecision.compared_with_team_name} inline/>:{' '}
                         {translateResult(rankingDecision.hidden_points_result)}.
                     </p>}
                 {rankingDecision.needs_decider_match && rankingDecision.decider_match_id &&
@@ -424,21 +430,34 @@ function modalTitleFor(rankingDecision) {
 
 function modalExplanationFor(score, rankingDecision) {
     if (rankingDecision.needs_decider_match) {
-        return `${score.team.name} und ${rankingDecision.compared_with_team_name} sind nach Punkten, Differenz, ` +
-            'geworfenen Bechern und direktem Vergleich weiterhin gleichauf. Deshalb braucht es ein ' +
-            'Entscheidungsmatch.';
+        return (<>
+            <TeamName name={score.team.name} inline/> und{' '}
+            <TeamName name={rankingDecision.compared_with_team_name} inline/>
+            {' '}sind nach Punkten, Differenz, geworfenen Bechern und direktem Vergleich weiterhin gleichauf.
+            Deshalb braucht es ein Entscheidungsmatch.
+        </>);
     }
     if (rankingDecision.resolved_by === 'direct_comparison') {
-        return `${score.team.name} wurde über den direkten Vergleich gegen ` +
-            `${rankingDecision.compared_with_team_name} einsortiert.`;
+        return (<>
+            <TeamName name={score.team.name} inline/>
+            {' '}wurde über den direkten Vergleich gegen{' '}
+            <TeamName name={rankingDecision.compared_with_team_name} inline/> einsortiert.
+        </>);
     }
     if (rankingDecision.resolved_by === 'hidden_points') {
-        return `${score.team.name} hat das Entscheidungsmatch gegen ` +
-            `${rankingDecision.compared_with_team_name} ${translateResult(rankingDecision.hidden_points_result)}.`;
+        return (<>
+            <TeamName name={score.team.name} inline/>
+            {' '}hat das Entscheidungsmatch gegen{' '}
+            <TeamName name={rankingDecision.compared_with_team_name} inline/>
+            {' '}{translateResult(rankingDecision.hidden_points_result)}.
+        </>);
     }
     if (rankingDecision.resolved_by === 'tie') {
-        return `${score.team.name} bleibt mit ${rankingDecision.compared_with_team_name} gleichauf. ` +
-            'Dieser Gleichstand blockiert die Playoffs nicht.';
+        return (<>
+            <TeamName name={score.team.name} inline/> bleibt mit{' '}
+            <TeamName name={rankingDecision.compared_with_team_name} inline/> gleichauf.
+            {' '}Dieser Gleichstand blockiert die Playoffs nicht.
+        </>);
     }
     return 'Die Platzierung wurde über zusätzliche Tie-Break Informationen entschieden.';
 }

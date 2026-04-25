@@ -36,9 +36,9 @@ export function putRequest(state, url, data) {
 }
 
 function generateHeaders(state) {
-    const userinfo = state?.userinfo;
+    const userinfo = state && state.userinfo;
 
-    if (userinfo?.accesstoken && userinfo?.client && userinfo?.uid) {
+    if (userinfo && userinfo.accesstoken && userinfo.client && userinfo.uid) {
         return {
             'access-token': userinfo.accesstoken,
             'client': userinfo.client,

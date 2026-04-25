@@ -22,6 +22,7 @@ import {
 import {sortMatchesByPositionAscending} from '../utils/sorting';
 import {TIMER_MODE_COUNTDOWN, TIMER_MODE_COUNTUP} from '../utils/timerState';
 import {TournamentSettingsForm} from './TournamentSettingsForm';
+import {TeamName} from './TeamName';
 
 function stageName(level) {
     const names = ['Finale', 'Halbfinale', 'Viertelfinale', 'Achtelfinale'];
@@ -796,20 +797,21 @@ function MissionStageBlock(props) {
 
 function MissionGroupTable(props) {
     return (
-        <Table size='sm' bordered responsive className='mission-control-group-table'>
+        <Table size='sm' bordered responsive className='mission-control-group-table'
+            style={{tableLayout: 'fixed', width: '100%'}}>
             <thead>
                 <tr>
-                    <th>#</th>
+                    <th style={{width: '3rem'}}>#</th>
                     <th>Team</th>
-                    <th>Punkte</th>
-                    <th>Differenz</th>
+                    <th style={{width: '5rem'}}>Punkte</th>
+                    <th style={{width: '5rem'}}>Differenz</th>
                 </tr>
             </thead>
             <tbody>
                 {props.group.scores.map(score => (
                     <tr key={score.id}>
                         <td>{score.position}</td>
-                        <td>{score.team.name}</td>
+                        <td><TeamName name={score.team.name}/></td>
                         <td>{score.group_points}</td>
                         <td>{score.difference_in_points}</td>
                     </tr>
@@ -931,9 +933,13 @@ class MissionMatchCard extends React.Component {
                     </Badge>
                 </div>
                 {match.decider && <div className='text-muted mb-2'>Entscheidungsmatch</div>}
-                <Label>{match.team1.name}</Label>
+                <Label className='w-100'>
+                    <TeamName name={match.team1.name}/>
+                </Label>
                 <Input type='number' value={this.state.score1} onChange={this.setScore1} disabled={!editable}/>
-                <Label className='mt-2'>{match.team2.name}</Label>
+                <Label className='mt-2 w-100'>
+                    <TeamName name={match.team2.name}/>
+                </Label>
                 <Input type='number' value={this.state.score2} onChange={this.setScore2} disabled={!editable}/>
                 <FormGroup check className='my-2'>
                     <Input

@@ -1,0 +1,15 @@
+.teamName {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-overflow: "...";
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.inline {
+    display: inline-block;
+    vertical-align: bottom;
+}

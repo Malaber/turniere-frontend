@@ -32,6 +32,11 @@ yarn start
 No dedicate test runner exists today (`"test"` script just exits 1).
 Lint is configured via ESLint (`.eslintrc.json`).
 
+## Git Workflow
+
+Never amend commits. Always create small follow-up commits instead, so history
+stays easy to review.
+
 ## Key Configuration
 
 The only runtime env var consumed by the frontend is:

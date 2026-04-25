@@ -2,6 +2,7 @@ import React from 'react';
 import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
 import styles from './BetweenGamesView.module.css';
+import {TeamName} from '../TeamName';
 
 
 const MATCHES_PER_PAGE = 32;
@@ -12,9 +13,9 @@ function MatchCard({match, index}) {
     const team1 = match.team1;
     const team2 = match.team2;
     const delay = (index * 0.03) + 's';
-    const badge = match.group
-        ? match.group.number
-        : match.position;
+    const badge = match.group ?
+        match.group.number :
+        match.position;
 
     return (
         <div
@@ -24,14 +25,10 @@ function MatchCard({match, index}) {
         >
             <div className={styles.matchContent}>
                 <div className={styles.matchTeamRow}>
-                    <span className={styles.teamName} data-testid="fullscreen-team-name">
-                        {team1.name}
-                    </span>
+                    <TeamName name={team1.name} className={styles.teamName} testId="fullscreen-team-name"/>
                 </div>
                 <div className={styles.matchTeamRow}>
-                    <span className={styles.teamName} data-testid="fullscreen-team-name">
-                        {team2.name}
-                    </span>
+                    <TeamName name={team2.name} className={styles.teamName} testId="fullscreen-team-name"/>
                 </div>
             </div>
             <div className={styles.matchBadge} data-testid="fullscreen-match-badge">
@@ -49,10 +46,9 @@ function ChunkDots({total, active}) {
             {Array.from({length: total}, (_, i) =>
                 <span
                     key={i}
-                    className={
-                        i === active
-                            ? styles.dotActive : styles.dot
-                    }
+                    className={i === active ?
+                        styles.dotActive :
+                        styles.dot}
                     data-testid="fullscreen-page-dot"
                 />
             )}

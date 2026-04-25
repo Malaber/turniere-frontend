@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
 import { ApiClient, expectStatus } from '../helpers/api-client';
+import {
+  LONG_TEAM_NAME_SENTENCE,
+  LONG_TEAM_NAME_SINGLE_WORD,
+} from '../helpers/scenario-seeder';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
 const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
@@ -19,9 +23,8 @@ function longNamePayload() {
 
   for (let g = 0; g < groups; g++) {
     for (let s = 0; s < perGroup; s++) {
-      // e.g. "Sportverein Musterstadt G1-S1!!" — 32+ chars
-      const base = `Sportverein Musterstadt G${g + 1}-S${s + 1}`;
-      const name = base.padEnd(32, '!');
+      const base = s % 2 === 0 ? LONG_TEAM_NAME_SINGLE_WORD : LONG_TEAM_NAME_SENTENCE;
+      const name = `${base} G${g + 1}-S${s + 1}`;
       teams.push({ name, group: g });
     }
   }
@@ -76,6 +79,15 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   // Team names are rendered (CSS handles truncation via text-overflow)
   const teamNames = page.getByTestId('fullscreen-team-name');
   await expect(teamNames).toHaveCount(64); // 32 matches × 2 teams
+  const singleWordName = teamNames.filter({ hasText: LONG_TEAM_NAME_SINGLE_WORD }).first();
+  const sentenceName = teamNames.filter({ hasText: LONG_TEAM_NAME_SENTENCE }).first();
+  await expect(singleWordName).toHaveAttribute('title', new RegExp(LONG_TEAM_NAME_SINGLE_WORD));
+  await expect(sentenceName).toHaveAttribute('title', new RegExp(LONG_TEAM_NAME_SENTENCE));
+  await expect(singleWordName).toHaveCSS('overflow-x', 'hidden');
+  expect(await singleWordName.evaluate(el => getComputedStyle(el).textOverflow)).toMatch(/ellipsis|"\.\.\."/);
+  expect(await sentenceName.evaluate(el => getComputedStyle(el).textOverflow)).toMatch(/ellipsis|"\.\.\."/);
+  expect(await singleWordName.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
+  expect(await sentenceName.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
 
   // Group number badges should be present
   const badges = page.getByTestId('fullscreen-match-badge');
