@@ -19,7 +19,7 @@ async function scrollToLocator(locator: Locator) {
 }
 
 function statusText(page: Page, text: string | RegExp) {
-  return page.locator('small.text-muted').filter({ hasText: text }).locator('visible=true').first();
+  return page.locator('small.text-muted:visible').filter({ hasText: text }).first();
 }
 
 test('Public tournament view renders group-stage and playoff data', async ({ page }, testInfo) => {
@@ -120,6 +120,7 @@ test('Tournament match cards render all visible states as solid cards', async ({
   const finished = await client.patch(`/matches/${running.id}`, { state: 'finished' });
   expectStatus(finished, 200, 'finish match for finished card screenshot');
 
+  await page.reload();
   const finishedStatus = statusText(page, /Gewinner:/);
   await expect(finishedStatus).toBeVisible({ timeout: 10000 });
   await scrollToLocator(finishedStatus);
