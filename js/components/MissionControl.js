@@ -1,16 +1,22 @@
 import React from 'react';
 import {
-    Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
+    Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Nav, NavItem, NavLink, Row, Table,
+    TabContent, TabPane
 } from 'reactstrap';
+import {FaLock, FaSearch, FaSlidersH, FaTrash, FaUsers} from 'react-icons/fa';
 import {notify} from 'react-notify-toast';
 import {
+    createBeamer,
+    deleteBeamer,
     endMatch,
+    getBeamers,
     setTournamentTimer,
     startMatch,
     startNextGroupMatches,
     startNextStageMatches,
     submitDeciderMatchScores,
     submitMatchScores,
+    updateBeamer,
     updateTeamName
 } from '../api';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
@@ -35,6 +41,52 @@ function errorMessage(errorBody, fallback) {
         return errorBody.error;
     }
     return fallback;
+}
+
+const DISPLAY_STATES = [
+    {value: 'matches_all', label: 'Alle Matches'},
+    {value: 'matches_in_progress', label: 'Laufende Matches'},
+    {value: 'matches_upcoming', label: 'Kommende Matches'},
+    {value: 'matches_not_started', label: 'Bereit zum Starten'},
+    {value: 'matches_finished', label: 'Beendete Matches'},
+    {value: 'groups', label: 'Gruppenstand'},
+    {value: 'between_games', label: 'Zwischen den Spielen'},
+    {value: 'during_game', label: 'Waehrend dem Spiel'}
+];
+
+function displayStateLabel(value) {
+    const match = DISPLAY_STATES.find(state => state.value === value);
+    return match ? match.label : value;
+}
+
+function matchStateLabel(state) {
+    if (state === 'in_progress') {
+        return 'In Progress';
+    }
+    if (state === 'not_started') {
+        return 'Not Started';
+    }
+    if (state === 'finished') {
+        return 'Finished';
+    }
+    return state;
+}
+
+function matchStateClass(state) {
+    if (state === 'in_progress') {
+        return 'is-progress';
+    }
+    if (state === 'finished') {
+        return 'is-finished';
+    }
+    if (state === 'not_started') {
+        return 'is-not-started';
+    }
+    return 'is-live';
+}
+
+function nextPlayoffTable(match) {
+    return Math.ceil(match.position / 2);
 }
 
 export class MissionControl extends React.Component {
@@ -180,7 +232,7 @@ export class MissionControl extends React.Component {
                             </TabPane>
 
                             <TabPane tabId='beamer'>
-                                <MissionBeamer tournament={tournament} />
+                                <MissionBeamer tournament={tournament} disabled={!canControl} />
                             </TabPane>
 
                             <TabPane tabId='starts'>
@@ -244,20 +296,146 @@ export class MissionControl extends React.Component {
     }
 }
 
-function MissionBeamer(props) {
-    return (
-        <section className='mission-control-section'>
-            <h3 className='h5'>Beamer</h3>
-            <div className='d-flex gap-2 flex-wrap'>
-                <Button color='primary' href={'/t/' + props.tournament.id + '/fullscreen'}>
-                    Vollbild-Ansicht oeffnen
-                </Button>
-                <Button color='secondary' outline href={'/t/' + props.tournament.id + '/fullscreen?beamer=default'}>
-                    Standard-Beamer
-                </Button>
-            </div>
-        </section>
-    );
+class MissionBeamer extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {beamers: [], name: '', running: false};
+        this.setName = this.setName.bind(this);
+        this.reload = this.reload.bind(this);
+        this.create = this.create.bind(this);
+        this.onError = this.onError.bind(this);
+    }
+
+    componentDidMount() {
+        this.reload();
+    }
+
+    reload() {
+        getBeamers(this.props.tournament.id,
+            beamers => this.setState({beamers: beamers || [], running: false}),
+            this.onError);
+    }
+
+    setName(event) {
+        this.setState({name: event.target.value});
+    }
+
+    create(event) {
+        event.preventDefault();
+        if (!this.state.name.trim()) {
+            return;
+        }
+        this.setState({running: true});
+        createBeamer(this.props.tournament.id, {
+            name: this.state.name.trim(),
+            display_state: 'matches_all'
+        }, () => {
+            notify.show('Beamer wurde erstellt.', 'success', 2000);
+            this.setState({name: ''});
+            this.reload();
+        }, this.onError);
+    }
+
+    update(beamer, displayState) {
+        this.setState({running: true});
+        updateBeamer(this.props.tournament.id, beamer.id, {
+            display_state: displayState
+        }, () => {
+            notify.show('Beamer wurde aktualisiert.', 'success', 2000);
+            this.reload();
+        }, this.onError);
+    }
+
+    remove(beamer) {
+        this.setState({running: true});
+        deleteBeamer(this.props.tournament.id, beamer.id, () => {
+            notify.show('Beamer wurde geloescht.', 'success', 2000);
+            this.reload();
+        }, this.onError);
+    }
+
+    onError(errorBody) {
+        notify.show(errorMessage(errorBody, 'Beamer konnte nicht aktualisiert werden.'), 'error', 3000);
+        this.setState({running: false});
+    }
+
+    render() {
+        return (
+            <section className='mission-control-section mission-pane-beamer' data-testid='mission-beamer-control'>
+                <h3 className='h5 mission-pane-heading'>Aktive Beamer</h3>
+                <Table responsive bordered className='mission-beamer-table'>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Anzeige</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {this.state.beamers.map(beamer => (
+                            <tr key={beamer.id}>
+                                <td className='mission-beamer-name'>{beamer.name}</td>
+                                <td>
+                                    <div className='mission-beamer-display'>
+                                        <Input
+                                            type='select'
+                                            value={beamer.display_state || 'matches_all'}
+                                            disabled={this.state.running || this.props.disabled}
+                                            data-testid={'mission-beamer-display-' + beamer.id}
+                                            onChange={event => this.update(beamer, event.target.value)}>
+                                            {DISPLAY_STATES.map(state => (
+                                                <option key={state.value} value={state.value}>{state.label}</option>
+                                            ))}
+                                        </Input>
+                                        <Button color='primary' disabled={this.state.running || this.props.disabled}
+                                            onClick={() => this.update(beamer, beamer.display_state || 'matches_all')}>
+                                            Aktualisieren
+                                        </Button>
+                                        <Button color='link'
+                                            href={'/t/' + this.props.tournament.id +
+                                            '/fullscreen?beamer=' + encodeURIComponent(beamer.name)}
+                                            target='_blank'>
+                                            {displayStateLabel(beamer.display_state || 'matches_all')}
+                                        </Button>
+                                    </div>
+                                </td>
+                                <td>
+                                    <Button outline color='danger'
+                                        disabled={this.state.running || this.props.disabled}
+                                        data-testid={'mission-beamer-delete-' + beamer.id}
+                                        onClick={() => this.remove(beamer)}>
+                                        <FaTrash aria-hidden='true' /> Loeschen
+                                    </Button>
+                                </td>
+                            </tr>
+                        ))}
+                        {this.state.beamers.length === 0 &&
+                            <tr>
+                                <td colSpan='3' className='text-muted'>Keine Beamer vorhanden.</td>
+                            </tr>}
+                    </tbody>
+                </Table>
+
+                <hr className='my-4' />
+
+                <form onSubmit={this.create} className='mission-beamer-create'>
+                    <h3 className='h5 mission-pane-heading'>Neuen Beamer erstellen</h3>
+                    <Label for='missionBeamerName'>Name</Label>
+                    <Input id='missionBeamerName'
+                        value={this.state.name}
+                        onChange={this.setName}
+                        disabled={this.state.running || this.props.disabled}
+                        placeholder='z.B. Hauptbeamer'
+                        data-testid='mission-beamer-name' />
+                    <Button type='submit' color='primary' className='mt-3'
+                        disabled={this.state.running || this.props.disabled || !this.state.name.trim()}
+                        data-testid='mission-beamer-create'>
+                        Beamer erstellen
+                    </Button>
+                </form>
+            </section>
+        );
+    }
 }
 
 function MissionTournamentSettings(props) {
@@ -276,8 +454,9 @@ function MissionTournamentSettings(props) {
 class MissionTimer extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {minutes: 15, timestamp: '', running: false};
+        this.state = {minutes: 15, seconds: '00', timestamp: '', running: false};
         this.setMinutes = this.setMinutes.bind(this);
+        this.setSeconds = this.setSeconds.bind(this);
         this.setTimestamp = this.setTimestamp.bind(this);
         this.setCountdownMinutes = this.setCountdownMinutes.bind(this);
         this.setCountdownTimestamp = this.setCountdownTimestamp.bind(this);
@@ -291,12 +470,22 @@ class MissionTimer extends React.Component {
         this.setState({minutes: event.target.value});
     }
 
+    setSeconds(event) {
+        this.setState({seconds: event.target.value});
+    }
+
     setTimestamp(event) {
         this.setState({timestamp: event.target.value});
     }
 
     setCountdownMinutes() {
-        const seconds = parseInt(this.state.minutes, 10) * 60;
+        const minutes = parseInt(this.state.minutes || 0, 10);
+        const remainderSeconds = parseInt(this.state.seconds || 0, 10);
+        const seconds = (minutes * 60) + remainderSeconds;
+        this.patchTimer({timestamp_seconds: seconds, timer_mode: TIMER_MODE_COUNTDOWN});
+    }
+
+    setQuickCountdown(seconds) {
         this.patchTimer({timestamp_seconds: seconds, timer_mode: TIMER_MODE_COUNTDOWN});
     }
 
@@ -333,44 +522,90 @@ class MissionTimer extends React.Component {
             this.props.timerState.mode + ' ' + this.props.timerState.timestampIso :
             'kein Timer';
         return (
-            <section className='mission-control-section'>
-                <h3 className='h5'>Timer</h3>
-                <div className='text-muted mb-2'>{currentTimer}</div>
-                <Row className='g-2 align-items-end'>
-                    <Col md='3'>
-                        <Label for='missionTimerMinutes'>Minuten</Label>
-                        <Input id='missionTimerMinutes' type='number' min='1'
-                            value={this.state.minutes} onChange={this.setMinutes}/>
+            <section className='mission-control-section mission-pane-timer' data-testid='mission-timer-control'>
+                <div className='d-flex justify-content-between align-items-center flex-wrap gap-2'>
+                    <h3 className='h5 mission-pane-heading'>Countdown starten</h3>
+                    <span className='text-muted small'>{currentTimer}</span>
+                </div>
+                <Row className='g-3'>
+                    <Col lg='4'>
+                        <div className='mission-control-panel'>
+                            <h4>Schnellstart</h4>
+                            <p>Starte einen Countdown mit vordefinierter Dauer.</p>
+                            <div className='mission-quick-grid'>
+                                <button type='button' className='mission-quick-button'
+                                    disabled={this.props.disabled || this.state.running}
+                                    data-testid='mission-timer-quick-20'
+                                    onClick={() => this.setQuickCountdown(20 * 60)}>
+                                    <strong>20:00</strong>
+                                    <span>20 Minuten</span>
+                                </button>
+                                <button type='button' className='mission-quick-button'
+                                    disabled={this.props.disabled || this.state.running}
+                                    data-testid='mission-timer-quick-15s'
+                                    onClick={() => this.setQuickCountdown(15)}>
+                                    <strong>00:15</strong>
+                                    <span>15 Sekunden</span>
+                                </button>
+                            </div>
+                        </div>
                     </Col>
-                    <Col md='3'>
-                        <Button color='primary' className='w-100'
-                            data-testid='mission-timer-countdown-minutes'
-                            disabled={this.props.disabled || this.state.running}
-                            onClick={this.setCountdownMinutes}>
-                            Countdown starten
-                        </Button>
+                    <Col lg='4'>
+                        <div className='mission-control-panel'>
+                            <h4>Manuelle Dauer</h4>
+                            <p>Starte einen Countdown mit eigener Zeit.</p>
+                            <Row className='g-2'>
+                                <Col>
+                                    <Label for='missionTimerMinutes'>Minuten</Label>
+                                    <Input id='missionTimerMinutes' type='number' min='0'
+                                        value={this.state.minutes} onChange={this.setMinutes}/>
+                                </Col>
+                                <Col>
+                                    <Label for='missionTimerSeconds'>Sekunden</Label>
+                                    <Input id='missionTimerSeconds' type='number' min='0' max='59'
+                                        value={this.state.seconds} onChange={this.setSeconds}/>
+                                </Col>
+                            </Row>
+                            <Button color='primary' className='w-100 mt-3'
+                                data-testid='mission-timer-countdown-minutes'
+                                disabled={this.props.disabled || this.state.running}
+                                onClick={this.setCountdownMinutes}>
+                                Countdown starten
+                            </Button>
+                        </div>
                     </Col>
-                    <Col md='3'>
-                        <Label for='missionTimerTimestamp'>Endzeit</Label>
-                        <Input id='missionTimerTimestamp' type='datetime-local'
-                            value={this.state.timestamp} onChange={this.setTimestamp}/>
-                    </Col>
-                    <Col md='3'>
-                        <Button color='secondary' className='w-100'
-                            data-testid='mission-timer-countdown-timestamp'
-                            disabled={this.props.disabled || this.state.running || !this.state.timestamp}
-                            onClick={this.setCountdownTimestamp}>
-                            Endzeit setzen
-                        </Button>
+                    <Col lg='4'>
+                        <div className='mission-control-panel'>
+                            <h4>Bis Zeitpunkt</h4>
+                            <p>Starte einen Countdown bis zu einem bestimmten Zeitpunkt.</p>
+                            <Input id='missionTimerTimestamp' type='datetime-local'
+                                value={this.state.timestamp} onChange={this.setTimestamp}/>
+                            <Button color='primary' className='w-100 mt-3'
+                                data-testid='mission-timer-countdown-timestamp'
+                                disabled={this.props.disabled || this.state.running || !this.state.timestamp}
+                                onClick={this.setCountdownTimestamp}>
+                                Countdown bis Zeitpunkt starten
+                            </Button>
+                        </div>
                     </Col>
                 </Row>
-                <div className='d-flex gap-2 flex-wrap mt-2'>
-                    <Button color='info' disabled={this.props.disabled || this.state.running}
+
+                <div className='mission-control-panel mt-3'>
+                    <h3 className='h5 mission-pane-heading'>Countup starten</h3>
+                    <p>Starte einen aufwaertszaehlenden Timer.</p>
+                    <Button color='info' className='mission-countup-button'
+                        disabled={this.props.disabled || this.state.running}
                         data-testid='mission-timer-countup'
                         onClick={this.startCountup}>
                         Countup starten
                     </Button>
-                    <Button color='outline-danger' disabled={this.props.disabled || this.state.running}
+                </div>
+
+                <div className='mission-control-panel mt-3'>
+                    <h3 className='h5 mission-pane-heading'>Timer verwalten</h3>
+                    <p>Alle aktiven Timer stoppen und zuruecksetzen.</p>
+                    <Button outline color='danger' className='w-100'
+                        disabled={this.props.disabled || this.state.running}
                         data-testid='mission-timer-clear'
                         onClick={this.clearTimer}>
                         Timer loeschen
@@ -383,10 +618,37 @@ class MissionTimer extends React.Component {
 
 function MissionNextMatches(props) {
     const groupStage = props.tournament.groupStage;
+    const groups = groupStage ? groupStage.groups.map(group => ({
+        key: 'group-' + group.id,
+        title: 'Gruppe ' + group.number,
+        badge: group.matches.length + ' Matches',
+        matches: group.matches,
+        playoff: false
+    })) : [];
+    const stages = props.tournament.playoffStages.map(stage => ({
+        key: 'stage-' + stage.id,
+        title: stageName(stage.level),
+        badge: stage.matches.length + ' Matches',
+        stage: stage,
+        matches: stage.matches,
+        playoff: true
+    }));
+    const rows = groups.concat(stages);
+
     return (
-        <section className='mission-control-section'>
-            <h3 className='h5'>Naechste Matches</h3>
-            <div className='d-flex gap-2 flex-wrap'>
+        <section className='mission-control-section mission-pane-matches' data-testid='mission-match-control'>
+            <div className='mission-match-toolbar'>
+                <div className='mission-match-search'>
+                    <FaSearch aria-hidden='true' />
+                    <Input type='search' placeholder='Matches suchen...' aria-label='Matches suchen' />
+                </div>
+                <Button color='link' className='mission-filter-reset'>x Filter zuruecksetzen</Button>
+                <Button outline color='secondary' className='mission-view-button'>
+                    <FaSlidersH aria-hidden='true' /> Ansicht anpassen
+                </Button>
+            </div>
+
+            <div className='d-flex gap-2 flex-wrap mb-3'>
                 {groupStage && groupStage.state !== 'finished' &&
                     <Button color='success'
                         data-testid='mission-start-next-groups'
@@ -402,7 +664,58 @@ function MissionNextMatches(props) {
                     </Button>
                 ))}
             </div>
+
+            {rows.map(row => (
+                <div key={row.key} className='mission-match-stage'>
+                    <h3 className='h5 mission-pane-heading'>
+                        {row.title}
+                        <Badge color='light' className='mission-stage-badge'>{row.badge}</Badge>
+                    </h3>
+                    <div className='mission-match-grid'>
+                        {row.matches.sort(sortMatchesByPositionAscending()).map(match => (
+                            <MissionStartMatchCard key={match.id} match={match} playoff={row.playoff} />
+                        ))}
+                    </div>
+                </div>
+            ))}
+
+            <div className='mission-status-legend'>
+                <span><i className='is-live'></i>Live</span>
+                <span><i className='is-progress'></i>In Progress</span>
+                <span><i className='is-not-started'></i>Not Started</span>
+                <span><i className='is-finished'></i>Finished</span>
+            </div>
         </section>
+    );
+}
+
+function MissionStartMatchCard(props) {
+    const match = props.match;
+    const stateClass = matchStateClass(match.state);
+    const stateLabel = match.state === 'in_progress' ? 'Live' : matchStateLabel(match.state);
+    const tableLabel = 'G' + (match.group ? match.group.number : Math.max(1, match.position)) + '-S' + match.position;
+    return (
+        <div className={'mission-start-card ' + stateClass} data-testid='mission-start-match-card'>
+            <div className='mission-start-table'>{tableLabel}</div>
+            <div className='mission-start-row'>
+                <span><FaUsers aria-hidden='true' />{match.team1.name}</span>
+                <Input type='number' value={scoreFor(match, 'team1')} readOnly
+                    aria-label={match.team1.name + ' score'} />
+            </div>
+            <div className='mission-start-row'>
+                <span><FaUsers aria-hidden='true' />{match.team2.name}</span>
+                <Input type='number' value={scoreFor(match, 'team2')} readOnly
+                    aria-label={match.team2.name + ' score'} />
+            </div>
+            <div className='mission-start-meta'>
+                <span><i className={stateClass}></i>{stateLabel}</span>
+                <span><FaLock aria-hidden='true' />Locked</span>
+            </div>
+            {props.playoff &&
+                <div className='mission-next-table'>
+                    Tisch {match.position} <span>-&gt;</span> Tisch {nextPlayoffTable(match)}
+                </div>}
+        </div>
     );
 }
 
