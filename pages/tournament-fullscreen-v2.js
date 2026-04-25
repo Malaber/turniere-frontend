@@ -14,6 +14,7 @@ import {MatchesView} from '../js/components/fullscreen/MatchesView';
 import {GroupsView} from '../js/components/fullscreen/GroupsView';
 import {DuringGameView} from '../js/components/fullscreen/DuringGameView';
 import {BetweenGamesView} from '../js/components/fullscreen/BetweenGamesView';
+import {BeamerTimerEffects} from '../js/components/fullscreen/BeamerTimerEffects';
 
 
 const DISPLAY_STATE_LABELS = {
@@ -389,6 +390,7 @@ class Main extends React.Component {
                 <Head>
                     <title>{tournamentMeta.name}: turnie.re</title>
                 </Head>
+                <BeamerTimerEffects timerState={this.state.timerState}/>
                 {this.renderView()}
             </div>);
         }
