@@ -113,6 +113,8 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
             email: action.parameters.email,
             password: action.parameters.password
         }).then(resp => {
+            storeOptionalToken(resp);
+
             __store.dispatch({
                 type: actionTypesUserinfo.LOGIN_RESULT_SUCCESS,
                 parameters: {
@@ -120,7 +122,6 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
                     successCallback: action.parameters.successCallback
                 }
             });
-            storeOptionalToken(resp);
         }).catch(error => {
             if (error.response) {
                 __store.dispatch({
@@ -171,8 +172,12 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
     case actionTypesUserinfo.VERIFY_CREDENTIALS:
         getRequest(action.state, '/users/validate_token').then(resp => {
             storeOptionalToken(resp);
-        }).catch(() => {
-            __store.dispatch({type: actionTypesUserinfo.CLEAR});
+        }).catch(error => {
+            if (error.response && error.response.status === 401) {
+                __store.dispatch({type: actionTypesUserinfo.CLEAR});
+            } else {
+                console.warn('validate_token failed, not clearing auth', error);
+            }
         });
         return Object.assign({}, state, {});
     case actionTypesUserinfo.CHANGE_MAIL:
