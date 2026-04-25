@@ -27,6 +27,12 @@ export class Match extends React.Component {
         this.changeScores = this.changeScores.bind(this);
     }
 
+    componentDidUpdate(prevProps) {
+        if (prevProps.match !== this.props.match) {
+            this.setState({match: this.props.match});
+        }
+    }
+
     toggleModal() {
         const {isSignedIn, isOwner, readOnlyMode} = this.props;
 
