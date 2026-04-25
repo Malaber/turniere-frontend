@@ -19,7 +19,7 @@ async function scrollToLocator(locator: Locator) {
 }
 
 function statusText(page: Page, text: string | RegExp) {
-  return page.locator('small.text-muted').filter({ hasText: text }).first();
+  return page.locator('small.text-muted').filter({ hasText: text }).locator('visible=true').first();
 }
 
 test('Public tournament view renders group-stage and playoff data', async ({ page }, testInfo) => {
