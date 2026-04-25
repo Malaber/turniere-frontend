@@ -38,13 +38,6 @@ export function putRequest(state, url, data) {
 function generateHeaders(state) {
     const userinfo = state?.userinfo;
 
-    console.log("AUTH HEADER DEBUG", {
-        isSignedIn: state?.userinfo?.isSignedIn,
-        accesstoken: !!state?.userinfo?.accesstoken,
-        client: !!state?.userinfo?.client,
-        uid: state?.userinfo?.uid
-    });
-
     if (userinfo?.accesstoken && userinfo?.client && userinfo?.uid) {
         return {
             'access-token': userinfo.accesstoken,

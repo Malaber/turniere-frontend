@@ -113,8 +113,6 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
             email: action.parameters.email,
             password: action.parameters.password
         }).then(resp => {
-            console.log("LOGIN HEADERS", resp.headers);
-
             storeOptionalToken(resp);
 
             __store.dispatch({
