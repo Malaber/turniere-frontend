@@ -37,11 +37,9 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
   const client = await loggedInClient();
 
-  await page.goto(`/t/${tournament.id}`);
+  await page.goto(`/t/${tournament.id}/mission-control`);
   await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
-  await keyframe(page, testInfo, 'mission_control_closed');
 
-  await page.getByTestId('mission-control-toggle').click();
   await expect(page.getByRole('heading', { name: 'Timer' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Scores' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Teams' })).toBeVisible();
@@ -118,8 +116,8 @@ test('Mission Control shows read-only lockout for owner', async ({ context, page
   const updated = await client.patch(`/tournaments/${tournament.id}`, { read_only_mode: true });
   expectStatus(updated, 200, 'enable read-only mode');
 
-  await page.goto(`/t/${tournament.id}`);
-  await page.getByTestId('mission-control-toggle').click();
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('Follower-Modus aktiv. Live-Aktionen sind gesperrt.')).toBeVisible();
   await expect(page.getByTestId('mission-start-next-groups')).toBeDisabled();
   await expect(page.getByTestId('mission-timer-countup')).toBeDisabled();
