@@ -304,7 +304,7 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   await keyframe(page, testInfo, 'start_countdown_sound_synced');
 
   const midCue = await client.patch(`/tournaments/${tournament.id}/timer`, {
-    timestamp_seconds: 10 * 60 + 12,
+    timestamp_seconds: 10 * 60 + 4,
   });
   expectStatus(midCue, 200, 'start 10:10 cue timer');
   await waitForBeamerEffect(page, 'sound', 'mid-game-warning');
