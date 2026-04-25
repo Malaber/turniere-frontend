@@ -63,7 +63,11 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   });
   await keyframe(page, testInfo, 'mission_control_started_group_matches');
 
-  const activeCard = page.getByTestId('mission-match-card').filter({ hasText: 'in_progress' }).first();
+  const activeCard = page
+    .getByTestId('mission-match-card')
+    .filter({ hasText: 'G1-S1' })
+    .filter({ hasText: 'G1-S2' });
+  await expect(activeCard).toHaveCount(1);
   await activeCard.getByRole('spinbutton').nth(0).fill('7');
   await activeCard.getByRole('spinbutton').nth(1).fill('4');
   await activeCard.getByTestId('mission-match-save').click();
@@ -76,6 +80,8 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   });
   await keyframe(page, testInfo, 'mission_control_saved_live_score');
 
+  await expect(activeCard.getByLabel('Live')).toBeVisible({ timeout: 20_000 });
+  await expect(activeCard.getByLabel('Live')).toBeChecked();
   await activeCard.getByLabel('Live').uncheck();
   await activeCard.getByTestId('mission-match-save').click();
   await expectMatchStateCount(client, tournament.id, 'finished', 1);
