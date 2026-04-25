@@ -504,8 +504,16 @@ class MissionMatchCard extends React.Component {
                 <Label className='mt-2'>{match.team2.name}</Label>
                 <Input type='number' value={this.state.score2} onChange={this.setScore2} disabled={!editable}/>
                 <FormGroup check className='my-2'>
-                    <Input type='checkbox' checked={this.state.live} onChange={this.setLive} disabled={!editable}/>
-                    <Label check>Live</Label>
+                    <Input
+                        id={`mission-match-live-${match.id}`}
+                        type='checkbox'
+                        checked={this.state.live}
+                        onChange={this.setLive}
+                        disabled={!editable}
+                    />
+                    <Label check for={`mission-match-live-${match.id}`}>
+                        Live
+                    </Label>
                 </FormGroup>
                 <div className='d-flex gap-2'>
                     {canStart &&
