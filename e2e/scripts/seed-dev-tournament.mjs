@@ -195,7 +195,7 @@ async function main() {
   console.log('');
   console.log('URLs:');
   console.log(`  Tournament:        ${frontendUrl}/t/${tournamentId}`);
-  console.log(`  Edit:              ${frontendUrl}/t/${tournamentId}/edit`);
+  console.log(`  Mission Control:   ${frontendUrl}/t/${tournamentId}/mission-control`);
   console.log(`  Fullscreen:        ${frontendUrl}/t/${tournamentId}/fullscreen`);
   console.log(`  Between games:     ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=between`);
   console.log(`  During game:       ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=during`);
