@@ -90,6 +90,7 @@ export class MissionControl extends React.Component {
     render() {
         const {tournament, isOwner, isSignedIn} = this.props;
         const canControl = isOwner && isSignedIn && tournament.readOnlyMode !== true;
+        const canEditSettings = isOwner && isSignedIn;
 
         if (!isOwner || !isSignedIn) {
             return null;
@@ -231,7 +232,7 @@ export class MissionControl extends React.Component {
                             <TabPane tabId='settings'>
                                 <MissionTournamentSettings
                                     tournament={tournament}
-                                    disabled={!canControl}
+                                    disabled={!canEditSettings}
                                     onTournamentChange={this.props.onTournamentChange}
                                 />
                             </TabPane>

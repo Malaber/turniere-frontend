@@ -41,8 +41,9 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
 
   await expect(page.getByRole('heading', { name: 'Timer' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Scores' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Teams' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Turnier-Einstellungen' })).toBeVisible();
   await keyframe(page, testInfo, 'mission_control_open');
 
   await page.getByTestId('mission-timer-countup').click();
