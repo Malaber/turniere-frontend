@@ -54,7 +54,7 @@ test('Owner can configure read-only follower fields on create page', async ({ co
   await keyframe(page, testInfo, 'create_read_only_form');
 });
 
-test('Owner sees read-only tournament locked on main page and can take over in edit view', async ({ context, page }, testInfo) => {
+test('Owner sees read-only tournament locked on main page and can take over in Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedReadOnlyFollowerTournament();
   await injectTournamentSyncState(context, tournament.id, {
@@ -70,8 +70,8 @@ test('Owner sees read-only tournament locked on main page and can take over in e
   await expect(page.locator('[data-decider-match="true"]')).toHaveCount(0);
   await keyframe(page, testInfo, 'existing_read_only_tournament');
 
-  await page.goto(`/t/${tournament.id}/edit`);
-  await page.waitForLoadState('networkidle');
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await page.getByRole('link', { name: 'Turnier-Einstellungen' }).click();
 
   await expect(page.getByTestId('readonly-edit-alert')).toBeVisible();
   await expect(page.getByTestId('sync-last-pushed-at')).toContainText('Noch kein erfolgreicher Push');
@@ -80,12 +80,14 @@ test('Owner sees read-only tournament locked on main page and can take over in e
 
   await page.uncheck('#edittournament-checkbox-readOnlyMode');
   await page.locator('#edittournament-button').click();
-  await page.waitForURL(new RegExp(`/t/${tournament.id}$`), { timeout: 15000 });
+  await expect(page.getByText('Turnier-Einstellungen wurden gespeichert.')).toBeVisible();
+  
+  await page.goto(`/t/${tournament.id}`);
   await expect(page.getByTestId('readonly-tournament-banner')).toHaveCount(0);
   await keyframe(page, testInfo, 'read_only_takeover_after_save');
 });
 
-test('Owner can run sync test button and get real leader to follower roundtrip', async ({ context, page }, testInfo) => {
+test('Owner can run sync test button and get real leader to follower roundtrip in Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context, loadAuthState());
   const { leader, follower, syncToken } = await seedLeaderFollowerSyncPair();
   await injectTournamentSyncState(context, leader.id, {
@@ -104,8 +106,8 @@ test('Owner can run sync test button and get real leader to follower roundtrip',
   const followerBefore = await client.get(`/tournaments/${follower.id}`);
   expectStatus(followerBefore, 200, `fetch follower tournament ${follower.id} before sync test`);
 
-  await page.goto(`/t/${leader.id}/edit`);
-  await page.waitForLoadState('networkidle');
+  await page.goto(`/t/${leader.id}/mission-control`);
+  await page.getByRole('link', { name: 'Turnier-Einstellungen' }).click();
 
   await expect(page.locator('#edittournament-textfield-syncTargetUrl'))
     .toHaveValue(`${backendUrl}/tournaments/${follower.id}/sync_state`);
@@ -133,7 +135,7 @@ test('Owner can run sync test button and get real leader to follower roundtrip',
   });
 });
 
-test('Owner can edit leader sync target and token on normal tournament', async ({ context, page }, testInfo) => {
+test('Owner can edit leader sync target and token in Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedGroupStageTournament(1, 4, 2);
   const client = await makeClient();
@@ -149,8 +151,8 @@ test('Owner can edit leader sync target and token on normal tournament', async (
     syncAuthToken: 'leader-secret'
   });
 
-  await page.goto(`/t/${tournament.id}/edit`);
-  await page.waitForLoadState('networkidle');
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await page.getByRole('link', { name: 'Turnier-Einstellungen' }).click();
 
   await expect(page.locator('#edittournament-checkbox-readOnlyMode')).not.toBeChecked();
   await expect(page.locator('#edittournament-textfield-syncTargetUrl'))
@@ -162,9 +164,10 @@ test('Owner can edit leader sync target and token on normal tournament', async (
   await page.fill('#edittournament-textfield-syncAuthToken', 'leader-secret-2');
   await page.locator('#edittournament-button').click();
 
-  await page.waitForURL(new RegExp(`/t/${tournament.id}$`), { timeout: 15000 });
-  await page.goto(`/t/${tournament.id}/edit`);
-  await page.waitForLoadState('networkidle');
+  await expect(page.getByText('Turnier-Einstellungen wurden gespeichert.')).toBeVisible();
+  
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await page.getByRole('link', { name: 'Turnier-Einstellungen' }).click();
   await expect(page.locator('#edittournament-checkbox-readOnlyMode')).not.toBeChecked();
   await expect(page.locator('#edittournament-textfield-syncTargetUrl'))
     .toHaveValue('https://remote.example/tournaments/99/sync_state');

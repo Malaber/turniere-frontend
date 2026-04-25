@@ -28,9 +28,7 @@ app.prepare()
         });
 
         server.get('/t/:id(\\d+)/edit', (req, res) => {
-            const actualPage = '/tournament-edit';
-            const queryParam = {id: req.params.id};
-            app.render(req, res, actualPage, queryParam);
+            res.redirect(`/t/${req.params.id}/mission-control`);
         });
 
         server.get('/t/:id(\\d+)/mission-control', (req, res) => {
