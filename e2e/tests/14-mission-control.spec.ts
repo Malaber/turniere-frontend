@@ -68,7 +68,12 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await activeCard.getByRole('spinbutton').nth(1).fill('4');
   await activeCard.getByTestId('mission-match-save').click();
   await expectMatchStateCount(client, tournament.id, 'in_progress', 4);
-  await expect(activeCard).toContainText('7', { timeout: 20_000 });
+  await expect(activeCard.getByRole('spinbutton').nth(0)).toHaveValue('7', {
+    timeout: 20_000,
+  });
+  await expect(activeCard.getByRole('spinbutton').nth(1)).toHaveValue('4', {
+    timeout: 20_000,
+  });
   await keyframe(page, testInfo, 'mission_control_saved_live_score');
 
   await activeCard.getByLabel('Live').uncheck();
