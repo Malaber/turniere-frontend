@@ -36,15 +36,13 @@ export function putRequest(state, url, data) {
 }
 
 function generateHeaders(state) {
-    const userinfo = state?.userinfo;
-
-    if (userinfo?.accesstoken && userinfo?.client && userinfo?.uid) {
+    if (state.userinfo.isSignedIn) {
         return {
-            'access-token': userinfo.accesstoken,
-            'client': userinfo.client,
-            'uid': userinfo.uid
+            'access-token': state.userinfo.accesstoken,
+            'client': state.userinfo.client,
+            'uid': state.userinfo.uid
         };
+    } else {
+        return {};
     }
-
-    return {};
 }
