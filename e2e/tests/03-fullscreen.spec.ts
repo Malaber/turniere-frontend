@@ -121,7 +121,7 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
   await keyframe(page, testInfo, 'fullscreen_beamer_between_games');
 });
 
-test('Fullscreen beamer page updates live from backend ActionCable only', async ({ page }) => {
+test('Fullscreen beamer page updates live from backend ActionCable only', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
   const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
@@ -136,6 +136,7 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
 
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=live-projector`);
   await expect(page.getByText(/Anzeige: alle/i)).toBeVisible({ timeout: 20_000 });
+  await keyframe(page, testInfo, 'live_beamer_all');
 
   const firstUpdate = await client.patch(
     `/tournaments/${tournament.id}/beamers/${createBeamer.json.id}`,
@@ -143,6 +144,7 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
   );
   expectStatus(firstUpdate, 200, 'update beamer to in-progress');
   await expect(page.getByText(/Anzeige: laufend/i)).toBeVisible({ timeout: 10_000 });
+  await keyframe(page, testInfo, 'live_beamer_in_progress');
 
   const secondUpdate = await client.patch(
     `/tournaments/${tournament.id}/beamers/${createBeamer.json.id}`,
@@ -150,6 +152,49 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
   );
   expectStatus(secondUpdate, 200, 'update beamer to finished');
   await expect(page.getByText(/Anzeige: beendet/i)).toBeVisible({ timeout: 10_000 });
+  await keyframe(page, testInfo, 'live_beamer_finished');
+});
+
+test('Fullscreen match list receives live match snapshots', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const matchesRes = await client.get<Array<{
+    id: number;
+    state: string;
+    match_scores: Array<{ id: number; team: { name: string } | null }>;
+  }>>(`/tournaments/${tournament.id}/matches`);
+  expectStatus(matchesRes, 200, 'fetch live fullscreen matches');
+  const match = matchesRes.json.find((candidate) =>
+    candidate.state === 'not_started' && candidate.match_scores.length === 2
+  );
+  expect(match).toBeTruthy();
+
+  await page.goto(`/t/${tournament.id}/fullscreen?display=matches_in_progress`);
+  await expect(page.getByText(/keine Matches/i)).toBeVisible({ timeout: 20_000 });
+  await keyframe(page, testInfo, 'live_matches_empty');
+
+  const started = await client.patch(`/matches/${match!.id}`, { state: 'in_progress' });
+  expectStatus(started, 200, 'start live fullscreen match');
+  await expect(page.locator(`[data-match-id="${match!.id}"]`)).toBeVisible({ timeout: 10_000 });
+
+  const firstScore = await client.patch(`/match_scores/${match!.match_scores[0].id}`, { points: 5 });
+  expectStatus(firstScore, 200, 'update first live fullscreen score');
+  const secondScore = await client.patch(`/match_scores/${match!.match_scores[1].id}`, { points: 4 });
+  expectStatus(secondScore, 200, 'update second live fullscreen score');
+  const matchCard = page.locator(`[data-match-id="${match!.id}"]`);
+  await expect(matchCard.locator('th').first()).toHaveText('5', { timeout: 10_000 });
+  await expect(matchCard.locator('th').nth(1)).toHaveText('4', { timeout: 10_000 });
+  await keyframe(page, testInfo, 'live_matches_in_progress');
+
+  const finished = await client.patch(`/matches/${match!.id}`, { state: 'finished' });
+  expectStatus(finished, 200, 'finish live fullscreen match');
+  await expect(page.getByText(/keine Matches/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(`[data-match-id="${match!.id}"]`)).toHaveCount(0);
+  await keyframe(page, testInfo, 'live_matches_finished_removed');
 });
 
 test('Fullscreen timer updates live for countup mode', async ({ page }) => {

@@ -3,11 +3,13 @@ import React from 'react';
 import {Container, Spinner} from 'reactstrap';
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import {
+    convertMatchesSnapshot, convertTournamentSnapshot,
     getBeamerByName, getTournament, getTournamentMatches,
     getTournamentMeta, getTournamentTimerState
 } from '../js/redux/tournamentApi';
 import {connectToBeamerSocket, connectToTimerSocket} from '../js/utils/beamerSocket';
 import {normalizeTimerState} from '../js/utils/timerState';
+import {connectToTournamentMatchesSocket, connectToTournamentSocket} from '../js/utils/tournamentLiveSocket';
 import {MatchesView} from '../js/components/fullscreen/MatchesView';
 import {GroupsView} from '../js/components/fullscreen/GroupsView';
 import {DuringGameView} from '../js/components/fullscreen/DuringGameView';
@@ -58,7 +60,9 @@ class Main extends React.Component {
             metaStatus: null,
             matchesStatus: null,
             socket: null,
-            timerSocket: null
+            timerSocket: null,
+            tournamentSocket: null,
+            matchesSocket: null
         };
 
         this.updateMatches = this.updateMatches.bind(this);
@@ -66,9 +70,13 @@ class Main extends React.Component {
         this.updateTournament = this.updateTournament.bind(this);
         this.connectBeamerSocket = this.connectBeamerSocket.bind(this);
         this.connectTimerSocket = this.connectTimerSocket.bind(this);
+        this.connectTournamentSocket = this.connectTournamentSocket.bind(this);
+        this.connectMatchesSocket = this.connectMatchesSocket.bind(this);
         this.refreshBeamerConfig = this.refreshBeamerConfig.bind(this);
         this.onBeamerMessage = this.onBeamerMessage.bind(this);
         this.onTimerMessage = this.onTimerMessage.bind(this);
+        this.onTournamentMessage = this.onTournamentMessage.bind(this);
+        this.onMatchesMessage = this.onMatchesMessage.bind(this);
     }
 
     componentDidMount() {
@@ -90,7 +98,11 @@ class Main extends React.Component {
                     metaStatus: status,
                     tournamentMeta: meta,
                     loadedMeta: true
-                }, () => this.connectTimerSocket(meta.id));
+                }, () => {
+                    this.connectTimerSocket(meta.id);
+                    this.connectTournamentSocket(meta.id);
+                    this.connectMatchesSocket(meta.id);
+                });
             },
             error => {
                 const s = error.response ? error.response.status : -1;
@@ -98,25 +110,25 @@ class Main extends React.Component {
             }
         );
 
-        // Fetch full tournament data (for groups view)
+        // Fetch full tournament data and match list once. Live replacements arrive through ActionCable.
         this.updateTournament();
 
         // Initial timer snapshot. Live replacements arrive through ActionCable.
         this.updateTimerState();
-
-        // Set up polling intervals
-        this.matchesIntervalId = setInterval(this.updateMatches, 10000);
-        this.tournamentIntervalId = setInterval(this.updateTournament, 15000);
     }
 
     componentWillUnmount() {
-        clearInterval(this.matchesIntervalId);
-        clearInterval(this.tournamentIntervalId);
         if (this.state.socket) {
             this.state.socket.disconnect();
         }
         if (this.state.timerSocket) {
             this.state.timerSocket.disconnect();
+        }
+        if (this.state.tournamentSocket) {
+            this.state.tournamentSocket.disconnect();
+        }
+        if (this.state.matchesSocket) {
+            this.state.matchesSocket.disconnect();
         }
     }
 
@@ -126,7 +138,7 @@ class Main extends React.Component {
         }
 
         const socket = connectToBeamerSocket({
-            tournamentId: this.props.query.code,
+            tournamentId: this.state.tournamentMeta ? this.state.tournamentMeta.id : this.props.query.code,
             beamerName,
             onMessage: this.onBeamerMessage
         });
@@ -149,6 +161,42 @@ class Main extends React.Component {
         this.setState({timerSocket});
     }
 
+    connectTournamentSocket(tournamentId) {
+        if (!tournamentId || this.state.tournamentSocket) {
+            return;
+        }
+
+        const tournamentSocket = connectToTournamentSocket({
+            tournamentId,
+            onMessage: this.onTournamentMessage
+        });
+        this.setState({tournamentSocket});
+    }
+
+    connectMatchesSocket(tournamentId) {
+        if (!tournamentId) {
+            return;
+        }
+
+        const state = DISPLAY_STATE_TO_BACKEND_FILTER[this.state.displayState];
+        const key = tournamentId + ':' + (state || '');
+        if (this.matchesSocketKey === key) {
+            return;
+        }
+
+        if (this.state.matchesSocket) {
+            this.state.matchesSocket.disconnect();
+        }
+
+        const matchesSocket = connectToTournamentMatchesSocket({
+            tournamentId,
+            state,
+            onMessage: this.onMatchesMessage
+        });
+        this.matchesSocketKey = key;
+        this.setState({matchesSocket});
+    }
+
     refreshBeamerConfig(code, beamerName) {
         getBeamerByName(code, beamerName,
             (status, beamer) => {
@@ -161,6 +209,9 @@ class Main extends React.Component {
                 }, () => {
                     this.connectBeamerSocket(beamer.name);
                     this.updateMatches();
+                    if (this.state.tournamentMeta) {
+                        this.connectMatchesSocket(this.state.tournamentMeta.id);
+                    }
                 });
             },
             () => {
@@ -192,6 +243,9 @@ class Main extends React.Component {
                 this.connectBeamerSocket(beamer.name);
             }
             this.updateMatches();
+            if (this.state.tournamentMeta) {
+                this.connectMatchesSocket(this.state.tournamentMeta.id);
+            }
         });
     }
 
@@ -201,6 +255,48 @@ class Main extends React.Component {
         }
 
         this.setState({timerState: normalizeTimerState(message)});
+    }
+
+    onTournamentMessage(message) {
+        if (message.type && message.type !== 'tournament.updated') {
+            return;
+        }
+        if (!message.tournament) {
+            return;
+        }
+
+        this.setState(prev => {
+            const cachedMetadata = prev.tournament ? {
+                readOnlyMode: prev.tournament.readOnlyMode,
+                syncTargetUrl: prev.tournament.syncTargetUrl,
+                syncAuthToken: prev.tournament.syncAuthToken,
+                syncLastPushedAt: prev.tournament.syncLastPushedAt,
+                syncLastPushError: prev.tournament.syncLastPushError
+            } : null;
+
+            return {tournament: convertTournamentSnapshot(message.tournament, cachedMetadata)};
+        });
+    }
+
+    onMatchesMessage(message) {
+        if (message.type && message.type !== 'tournament_matches.updated') {
+            return;
+        }
+        if (!Array.isArray(message.matches)) {
+            return;
+        }
+
+        const currentFilter = DISPLAY_STATE_TO_BACKEND_FILTER[this.state.displayState] || null;
+        const messageFilter = message.state || null;
+        if (messageFilter !== currentFilter) {
+            return;
+        }
+
+        this.setState({
+            matchesStatus: 200,
+            matches: convertMatchesSnapshot(message.matches),
+            loadedMatches: true
+        });
     }
 
     updateMatches() {
@@ -231,6 +327,8 @@ class Main extends React.Component {
         getTournament(code,
             (status, tournament) => this.setState({tournament}, () => {
                 this.connectTimerSocket(tournament.id);
+                this.connectTournamentSocket(tournament.id);
+                this.connectMatchesSocket(tournament.id);
             }),
             error => console.error('Failed to fetch tournament:', error)
         );

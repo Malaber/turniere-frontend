@@ -1,13 +1,14 @@
 import Head from 'next/head';
 import React from 'react';
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
-import {getTournament} from '../js/redux/tournamentApi';
+import {convertTournamentSnapshot, getTournament} from '../js/redux/tournamentApi';
 import {
     Col,
     Container, Row, Spinner
 } from 'reactstrap';
 import {QRCodeSVG} from 'qrcode.react';
 import {Group} from '../js/components/GroupStage';
+import {connectToTournamentSocket} from '../js/utils/tournamentLiveSocket';
 
 
 function FullscreenPage(props) {
@@ -64,6 +65,7 @@ class Main extends React.Component {
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
         this.increasePage = this.increasePage.bind(this);
+        this.onTournamentMessage = this.onTournamentMessage.bind(this);
     }
 
     componentDidMount() {
@@ -79,11 +81,16 @@ class Main extends React.Component {
         } else {
             this.page = this.page + 1;
         }
-        this.updateTournament();
+        if (this.state.tournament) {
+            this.onTournamentRequestSuccess(200, this.state.tournament);
+        }
     }
 
     componentWillUnmount() {
         clearInterval(this.state.intervalIdPage);
+        if (this.tournamentSocket) {
+            this.tournamentSocket.disconnect();
+        }
     }
 
     updateTournament() {
@@ -102,6 +109,12 @@ class Main extends React.Component {
             page: this.page, showLogo: this.page == this.pages,
             backgroundColor: this.backgroundColors[this.page]
         });
+        if (!this.tournamentSocket && tournament.id) {
+            this.tournamentSocket = connectToTournamentSocket({
+                tournamentId: tournament.id,
+                onMessage: this.onTournamentMessage
+            });
+        }
     }
 
     onTournamentRequestError(error) {
@@ -110,6 +123,25 @@ class Main extends React.Component {
         } else {
             this.setState({loadingStatus: -1, loadedTournament: true});
         }
+    }
+
+    onTournamentMessage(message) {
+        if (message.type && message.type !== 'tournament.updated') {
+            return;
+        }
+        if (!message.tournament) {
+            return;
+        }
+
+        const cachedMetadata = this.state.tournament ? {
+            readOnlyMode: this.state.tournament.readOnlyMode,
+            syncTargetUrl: this.state.tournament.syncTargetUrl,
+            syncAuthToken: this.state.tournament.syncAuthToken,
+            syncLastPushedAt: this.state.tournament.syncLastPushedAt,
+            syncLastPushError: this.state.tournament.syncLastPushError
+        } : null;
+
+        this.onTournamentRequestSuccess(200, convertTournamentSnapshot(message.tournament, cachedMetadata));
     }
 
     render() {
