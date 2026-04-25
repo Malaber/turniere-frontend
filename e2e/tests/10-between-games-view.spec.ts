@@ -50,11 +50,19 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   expectStatus(created, 201, 'create long-name tournament');
   const tournamentId = created.json.id;
 
+  await expect.poll(async () => {
+    const matches = await client.get<Array<{ id: number; state: string }>>(
+      `/tournaments/${tournamentId}/matches`,
+    );
+    expectStatus(matches, 200, 'fetch long-name matches');
+    return matches.json.filter((m) => m.state === 'not_started').length;
+  }, { timeout: 20_000 }).toBeGreaterThanOrEqual(32);
+
   // Navigate to fullscreen
   await page.goto(`/t/${tournamentId}/fullscreen?display=between_games`);
 
   // Wait for match cards to render
-  const matchCards = page.locator('[class*="matchCard"]');
+  const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(page.getByText(/Nächste Spiele/)).toBeVisible({ timeout: 15_000 });
   await expect(matchCards.first()).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'between_games_loaded');
@@ -69,7 +77,7 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   await expect(matchCards).toHaveCount(32, { timeout: 20_000 });
 
   // Team names are rendered (CSS handles truncation via text-overflow)
-  const teamNames = page.getByTestId('team-name');
+  const teamNames = page.getByTestId('fullscreen-team-name');
   await expect(teamNames).toHaveCount(64); // 32 matches × 2 teams
   const singleWordName = teamNames.filter({ hasText: LONG_TEAM_NAME_SINGLE_WORD }).first();
   const sentenceName = teamNames.filter({ hasText: LONG_TEAM_NAME_SENTENCE }).first();
@@ -82,7 +90,7 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   expect(await sentenceName.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
 
   // Group number badges should be present
-  const badges = page.locator('[class*="matchBadge"]');
+  const badges = page.getByTestId('fullscreen-match-badge');
   const badgeTexts = await badges.allInnerTexts();
   expect(badgeTexts.length).toBe(32);
   // Badges show group numbers (1-6)

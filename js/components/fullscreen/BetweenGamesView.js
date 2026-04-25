@@ -21,16 +21,17 @@ function MatchCard({match, index}) {
         <div
             className={styles.matchCard}
             style={{animationDelay: delay}}
+            data-testid="fullscreen-match-card"
         >
             <div className={styles.matchContent}>
                 <div className={styles.matchTeamRow}>
-                    <TeamName name={team1.name} className={styles.teamName}/>
+                    <TeamName name={team1.name} className={styles.teamName} testId="fullscreen-team-name"/>
                 </div>
                 <div className={styles.matchTeamRow}>
-                    <TeamName name={team2.name} className={styles.teamName}/>
+                    <TeamName name={team2.name} className={styles.teamName} testId="fullscreen-team-name"/>
                 </div>
             </div>
-            <div className={styles.matchBadge}>
+            <div className={styles.matchBadge} data-testid="fullscreen-match-badge">
                 {badge}
             </div>
         </div>
@@ -48,6 +49,7 @@ function ChunkDots({total, active}) {
                     className={i === active ?
                         styles.dotActive :
                         styles.dot}
+                    data-testid="fullscreen-page-dot"
                 />
             )}
         </div>

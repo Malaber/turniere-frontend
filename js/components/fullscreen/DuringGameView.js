@@ -176,18 +176,19 @@ function FullscreenMatchCard({match, index}) {
         <div
             className={styles.matchCard}
             style={{animationDelay: delay}}
+            data-testid="fullscreen-match-card"
         >
             <div className={styles.matchContent}>
                 <div className={styles.matchTeamRow}>
-                    <TeamName name={team1.name} className={t1Cls}/>
+                    <TeamName name={team1.name} className={t1Cls} testId="fullscreen-team-name"/>
                     <span className={styles.teamScore}>{score1}</span>
                 </div>
                 <div className={styles.matchTeamRow}>
-                    <TeamName name={team2.name} className={t2Cls}/>
+                    <TeamName name={team2.name} className={t2Cls} testId="fullscreen-team-name"/>
                     <span className={styles.teamScore}>{score2}</span>
                 </div>
             </div>
-            <div className={styles.matchBadge}>
+            <div className={styles.matchBadge} data-testid="fullscreen-match-badge">
                 {badge}
             </div>
         </div>
@@ -347,6 +348,7 @@ export class DuringGameView extends React.Component {
                             <span
                                 key={i}
                                 className={i === pageIndex ? styles.pageDotActive : styles.pageDot}
+                                data-testid="fullscreen-page-dot"
                             />
                         )}
                     </div>

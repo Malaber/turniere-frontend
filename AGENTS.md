@@ -69,7 +69,7 @@ Next.js file-system routing directly.
 | `pages/list.js` | `/list` |
 | `pages/create.js` | `/create` |
 | `pages/tournament.js` | `/t/:code` |
-| `pages/tournament-edit.js` | `/t/:code/edit` |
+| `pages/tournament-mission-control.js` | `/t/:id/mission-control` |
 | `pages/tournament-fullscreen.js` | `/t/:code/fullscreen` |
 | `pages/tournament-fullscreen-groups.js` | `/t/:code/fullscreen-groups` |
 | `pages/tournament-statistics.js` | `/t/:code/statistics` |
