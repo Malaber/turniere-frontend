@@ -33,6 +33,12 @@ app.prepare()
             app.render(req, res, actualPage, queryParam);
         });
 
+        server.get('/t/:id(\\d+)/mission-control', (req, res) => {
+            const actualPage = '/tournament-mission-control';
+            const queryParam = {id: req.params.id};
+            app.render(req, res, actualPage, queryParam);
+        });
+
         server.get('/t/:code/statistics', (req, res) => {
             const actualPage = '/tournament-statistics';
             const queryParam = {code: req.params.code};

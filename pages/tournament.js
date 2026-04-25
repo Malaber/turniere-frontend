@@ -15,7 +15,6 @@ import {LoadingPage} from '../js/components/LoadingPage';
 import {getTournament} from '../js/redux/tournamentApi';
 import {FavoriteBar} from '../js/components/FavoriteBar';
 import {ScrollToTopButton} from '../js/components/ScrollToTopButton';
-import {MissionControl} from '../js/components/MissionControl';
 import {connectToTimerSocket} from '../js/utils/beamerSocket';
 import {normalizeTimerState} from '../js/utils/timerState';
 import {connectToTournamentSocket} from '../js/utils/tournamentLiveSocket';
@@ -42,12 +41,6 @@ class PrivateTournamentPage extends React.Component {
                         </Alert>
                     </div>}
                 <FavoriteBar teams={this.props.tournament.teams} tournamentId={this.props.tournament.id}/>
-                <MissionControl
-                    tournament={this.props.tournament}
-                    isSignedIn={isSignedIn}
-                    isOwner={isOwner}
-                    onTournamentChange={this.props.onTournamentChange}
-                />
                 <div className='stages'>
                     {groupStage != null &&
                     <div><GroupStage
