@@ -95,9 +95,11 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   const teamsPane = page.locator('.tab-pane.active');
   await teamsPane.getByTestId('mission-control-search').fill('G1-S1');
   const renamed = `G1-S1 Mission ${Date.now()}`;
-  await teamsPane.getByDisplayValue('G1-S1').fill(renamed);
+  const visibleTeamInput = teamsPane.locator('input.form-control').nth(1);
+  await expect(visibleTeamInput).toHaveValue('G1-S1');
+  await visibleTeamInput.fill(renamed);
   await teamsPane.getByTestId('mission-team-save').click();
-  await expect(page.getByDisplayValue(renamed)).toBeVisible({ timeout: 20_000 });
+  await expect(visibleTeamInput).toHaveValue(renamed, { timeout: 20_000 });
   await keyframe(page, testInfo, 'mission_control_renamed_team');
 
   const teams = await client.get<{ teams: Array<{ id: number; name: string }> }>(`/tournaments/${tournament.id}`);
