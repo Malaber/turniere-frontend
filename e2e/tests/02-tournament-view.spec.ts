@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
 import {
   seedGroupStageTournament,
@@ -12,6 +12,11 @@ const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(600_000);
+
+async function scrollToLocator(locator: Locator) {
+  await locator.scrollIntoViewIfNeeded();
+  await locator.page().waitForTimeout(250);
+}
 
 test('Public tournament view renders group-stage and playoff data', async ({ page }, testInfo) => {
   // --- Seed: create group-stage tournament (4 groups × 4 teams, 8 playoff spots) ---
@@ -57,9 +62,14 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
   await expect(statisticsAction).toBeVisible();
   await expect(fullscreenAction).toBeVisible();
 
-  await expect(page.getByRole('heading', { name: 'Finale' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Spiel um Platz 3' })).toBeVisible();
-  await keyframe(page, testInfo, 'tournament_final_and_third_place_matches');
+  const finalHeading = page.getByRole('heading', { name: 'Finale', exact: true });
+  const thirdPlaceHeading = page.getByRole('heading', { name: 'Spiel um Platz 3', exact: true });
+  await expect(finalHeading).toBeVisible();
+  await expect(thirdPlaceHeading).toBeVisible();
+  await scrollToLocator(finalHeading);
+  await keyframe(page, testInfo, 'tournament_final_match');
+  await scrollToLocator(thirdPlaceHeading);
+  await keyframe(page, testInfo, 'tournament_third_place_match');
 });
 
 test('Tournament match cards render all visible states as solid cards', async ({ page }, testInfo) => {
@@ -71,6 +81,7 @@ test('Tournament match cards render all visible states as solid cards', async ({
   await expect(page.locator('.stages').first()).toBeVisible({ timeout: 120000 });
   await expect(page.getByText('Spiel kann gestartet werden').first()).toBeVisible();
   await expect(page.getByText('Spiel kann noch nicht gestartet werden').first()).toBeVisible();
+  await scrollToLocator(page.locator('.match').first());
   await keyframe(page, testInfo, 'match_cards_not_started_and_not_ready');
 
   const matchesRes = await client.get<Array<{
@@ -92,6 +103,7 @@ test('Tournament match cards render all visible states as solid cards', async ({
 
   await page.reload();
   await expect(page.getByText('Spiel läuft').first()).toBeVisible({ timeout: 10000 });
+  await scrollToLocator(page.locator(`[data-match-id="${running.id}"]`));
   await keyframe(page, testInfo, 'match_cards_in_progress');
 
   for (const score of running.match_scores) {
@@ -103,7 +115,9 @@ test('Tournament match cards render all visible states as solid cards', async ({
   expectStatus(finished, 200, 'finish match for finished card screenshot');
 
   await page.reload();
-  await expect(page.getByText(/Gewinner:/).first()).toBeVisible({ timeout: 10000 });
+  const finishedMatchBlock = page.locator(`[data-match-id="${running.id}"]`).locator('xpath=..');
+  await expect(finishedMatchBlock).toContainText(/Gewinner:/, { timeout: 10000 });
+  await scrollToLocator(finishedMatchBlock);
   await keyframe(page, testInfo, 'match_cards_finished');
 
   const byeCreated = await client.post<{ id: number }>('/tournaments', {
@@ -120,6 +134,7 @@ test('Tournament match cards render all visible states as solid cards', async ({
 
   await page.goto(`/t/${byeCreated.json.id}`);
   await expect(page.getByText('kein Gegner, Team kommt weiter').first()).toBeVisible({ timeout: 120000 });
+  await scrollToLocator(page.locator('.match').first());
   await keyframe(page, testInfo, 'match_cards_single_team');
 });
 
@@ -152,9 +167,15 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
   expectStatus(started, 200, 'start match for live tournament view');
   await expect(page.getByText('Spiel läuft').first()).toBeVisible({ timeout: 10_000 });
 
-  const firstScore = await client.patch(`/match_scores/${match!.match_scores[0].id}`, { points: 7 });
+  const displayedTeamNames = await matchCard.locator('td').allInnerTexts();
+  const firstDisplayedScore = match!.match_scores.find((score) => score.team?.name === displayedTeamNames[0].trim());
+  const secondDisplayedScore = match!.match_scores.find((score) => score.team?.name === displayedTeamNames[1].trim());
+  expect(firstDisplayedScore).toBeTruthy();
+  expect(secondDisplayedScore).toBeTruthy();
+
+  const firstScore = await client.patch(`/match_scores/${firstDisplayedScore!.id}`, { points: 7 });
   expectStatus(firstScore, 200, 'update first score for live tournament view');
-  const secondScore = await client.patch(`/match_scores/${match!.match_scores[1].id}`, { points: 3 });
+  const secondScore = await client.patch(`/match_scores/${secondDisplayedScore!.id}`, { points: 3 });
   expectStatus(secondScore, 200, 'update second score for live tournament view');
   await expect(matchCard.locator('th').first()).toHaveText('7', { timeout: 10_000 });
   await expect(matchCard.locator('th').nth(1)).toHaveText('3', { timeout: 10_000 });
@@ -162,7 +183,7 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
 
   const finished = await client.patch(`/matches/${match!.id}`, { state: 'finished' });
   expectStatus(finished, 200, 'finish match for live tournament view');
-  await expect(page.getByText(new RegExp(`Gewinner: ${match!.match_scores[0].team!.name}`))).toBeVisible({
+  await expect(page.getByText(new RegExp(`Gewinner: ${firstDisplayedScore!.team!.name}`))).toBeVisible({
     timeout: 10_000,
   });
   await keyframe(page, testInfo, 'live_tournament_finished');

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { injectAuth, loadAuthState } from '../helpers/auth';
 import { keyframe, modalKeyframe } from '../helpers/screenshot';
 import {
@@ -20,6 +20,19 @@ async function expectNoHorizontalOverflow(page) {
 
 function visibleModal(page) {
   return page.getByRole('dialog').first();
+}
+
+async function closeVisibleModal(page: Page) {
+  const dialog = page.getByRole('dialog');
+  if (await dialog.count() === 0) return;
+
+  const closeButton = dialog.getByRole('button', { name: 'Close' });
+  if (await closeButton.count() > 0) {
+    await closeButton.first().click();
+  } else {
+    await page.keyboard.press('Escape');
+  }
+  await expect(dialog).toHaveCount(0);
 }
 
 async function expectNoLineThrough(locator) {
@@ -105,6 +118,7 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await modal.getByRole('button', { name: 'Spiel beenden' }).click({ force: true });
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20000 });
   await expectResolvedDecisionIconCount(page, 20000);
+  await closeVisibleModal(page);
   await page.getByLabel('Tie-Break erklärt').first().click();
   modal = page.getByRole('dialog');
   await expect(visibleModal(page)).toBeVisible();
