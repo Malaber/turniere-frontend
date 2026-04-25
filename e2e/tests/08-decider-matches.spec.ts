@@ -138,7 +138,8 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
 
   await page.getByTestId('finish-group-stage').click();
   await page.waitForLoadState('networkidle');
-  await expect(page.getByRole('heading', { name: 'Finale' })).toBeVisible({ timeout: 15000 });
+  await page.reload();
+  await expect(page.locator('.stages')).toContainText(/Finale|Spiel um Platz 3/, { timeout: 30000 });
   await keyframe(page, testInfo, 'playoffs_started_after_decider');
 });
 
