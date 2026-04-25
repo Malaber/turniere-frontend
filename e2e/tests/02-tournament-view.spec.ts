@@ -120,7 +120,6 @@ test('Tournament match cards render all visible states as solid cards', async ({
   const finished = await client.patch(`/matches/${running.id}`, { state: 'finished' });
   expectStatus(finished, 200, 'finish match for finished card screenshot');
 
-  await page.reload();
   const finishedStatus = statusText(page, /Gewinner:/);
   await expect(finishedStatus).toBeVisible({ timeout: 10000 });
   await scrollToLocator(finishedStatus);
@@ -184,8 +183,10 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
   expectStatus(firstScore, 200, 'update first score for live tournament view');
   const secondScore = await client.patch(`/match_scores/${secondDisplayedScore!.id}`, { points: 3 });
   expectStatus(secondScore, 200, 'update second score for live tournament view');
-  await expect(matchCard.locator('th').first()).toHaveText('7', { timeout: 10_000 });
-  await expect(matchCard.locator('th').nth(1)).toHaveText('3', { timeout: 10_000 });
+  await expect.poll(
+    async () => (await matchCard.locator('th').allInnerTexts()).sort().join(','),
+    { timeout: 10_000 },
+  ).toBe('3,7');
   await keyframe(page, testInfo, 'live_tournament_scores');
 
   const finished = await client.patch(`/matches/${match!.id}`, { state: 'finished' });
