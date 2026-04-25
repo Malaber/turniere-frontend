@@ -3,7 +3,7 @@ import {
     Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Nav, NavItem, NavLink, Row, Table,
     TabContent, TabPane
 } from 'reactstrap';
-import {FaLock, FaSearch, FaSlidersH, FaTrash, FaUsers} from 'react-icons/fa';
+import {FaLock, FaSearch, FaTrash, FaUsers} from 'react-icons/fa';
 import {notify} from 'react-notify-toast';
 import {
     createBeamer,
@@ -247,18 +247,10 @@ export class MissionControl extends React.Component {
                             </TabPane>
 
                             <TabPane tabId='scores'>
-                                <div className='mission-control-toolbar mb-3'>
-                                    <Input
-                                        type='search'
-                                        value={this.state.search}
-                                        onChange={this.setSearch}
-                                        placeholder='Teams suchen'
-                                        data-testid='mission-control-search'
-                                    />
-                                </div>
                                 <MissionMatches
                                     tournament={tournament}
                                     search={this.state.search}
+                                    onSearchChange={this.setSearch}
                                     disabled={!canControl}
                                     onTournamentChange={this.props.onTournamentChange}
                                 />
@@ -619,104 +611,54 @@ class MissionTimer extends React.Component {
 
 function MissionNextMatches(props) {
     const groupStage = props.tournament.groupStage;
-    const groups = groupStage && groupStage.state !== 'finished' ? groupStage.groups.map(group => ({
-        key: 'group-' + group.id,
-        title: 'Gruppe ' + group.number,
-        badge: group.matches.length + ' Matches',
-        matches: group.matches,
-        playoff: false
-    })) : [];
-    const stages = props.tournament.playoffStages.map(stage => ({
-        key: 'stage-' + stage.id,
-        title: stageName(stage.level),
-        badge: stage.matches.length + ' Matches',
-        stage: stage,
-        matches: stage.matches,
-        playoff: true
-    }));
-    const rows = groups.concat(stages);
+    const stagesWithReadyMatches = props.tournament.playoffStages
+        .map(stage => ({
+            stage: stage,
+            readyCount: stage.matches.filter(match => match.state === 'not_started').length
+        }))
+        .filter(stageInfo => stageInfo.readyCount > 0);
 
     return (
-        <section className='mission-control-section mission-pane-matches' data-testid='mission-match-control'>
-            <div className='mission-match-toolbar'>
-                <div className='mission-match-search'>
-                    <FaSearch aria-hidden='true' />
-                    <Input type='search' placeholder='Matches suchen...' aria-label='Matches suchen' />
-                </div>
-                <Button color='link' className='mission-filter-reset'>x Filter zuruecksetzen</Button>
-                <Button outline color='secondary' className='mission-view-button'>
-                    <FaSlidersH aria-hidden='true' /> Ansicht anpassen
-                </Button>
-            </div>
-
-            <div className='d-flex gap-2 flex-wrap mb-3'>
-                {groupStage && groupStage.state !== 'finished' &&
-                    <Button color='success'
-                        data-testid='mission-start-next-groups'
-                        disabled={props.disabled || props.actionRunning === 'group'}
-                        onClick={props.onStartGroupMatches}>
-                        Naechste Gruppenmatches starten
-                    </Button>}
-                {props.tournament.playoffStages.map(stage => (
-                    <Button key={stage.id} color='success' outline
-                        disabled={props.disabled || props.actionRunning === 'stage-' + stage.id}
-                        onClick={() => props.onStartStageMatches(stage)}>
-                        {stageName(stage.level)} starten
-                    </Button>
-                ))}
-            </div>
-
-            {rows.map(row => (
-                <div key={row.key} className='mission-match-stage'>
-                    <h3 className='h5 mission-pane-heading'>
-                        {row.title}
-                        <Badge color='light' className='mission-stage-badge'>{row.badge}</Badge>
-                    </h3>
-                    <div className='mission-match-grid'>
-                        {row.matches.sort(sortMatchesByPositionAscending()).map(match => (
-                            <MissionStartMatchCard key={match.id} match={match} playoff={row.playoff} />
-                        ))}
+        <section className='mission-control-section mission-pane-starts' data-testid='mission-match-control'>
+            <h3 className='h5 mission-pane-heading'>Bulk Match-Starts</h3>
+            <p className='text-muted'>
+                Startet jeweils die naechsten startbaren Matches gesammelt. Ergebnis- und Scorepflege liegt im
+                Ergebnisse-Tab.
+            </p>
+            <div className='mission-bulk-start-grid'>
+                {groupStage && groupStage.state !== 'finished' ?
+                    <div className='mission-control-panel'>
+                        <h4>Gruppenphase</h4>
+                        <p>Startet das naechste offene Match pro Gruppe.</p>
+                        <Button color='success'
+                            data-testid='mission-start-next-groups'
+                            disabled={props.disabled || props.actionRunning === 'group'}
+                            onClick={props.onStartGroupMatches}>
+                            Naechste Gruppenmatches starten
+                        </Button>
+                    </div> :
+                    <div className='mission-control-panel'>
+                        <h4>Gruppenphase</h4>
+                        <p>Gruppenphase ist abgeschlossen.</p>
+                    </div>}
+                {stagesWithReadyMatches.map(stageInfo => (
+                    <div key={stageInfo.stage.id} className='mission-control-panel'>
+                        <h4>{stageName(stageInfo.stage.level)}</h4>
+                        <p>{stageInfo.readyCount} startbare Matches.</p>
+                        <Button color='success' outline
+                            disabled={props.disabled || props.actionRunning === 'stage-' + stageInfo.stage.id}
+                            onClick={() => props.onStartStageMatches(stageInfo.stage)}>
+                            {stageName(stageInfo.stage.level)} starten
+                        </Button>
                     </div>
-                </div>
-            ))}
-
-            <div className='mission-status-legend'>
-                <span><i className='is-live'></i>Live</span>
-                <span><i className='is-progress'></i>In Progress</span>
-                <span><i className='is-not-started'></i>Not Started</span>
-                <span><i className='is-finished'></i>Finished</span>
+                ))}
+                {stagesWithReadyMatches.length === 0 && (!groupStage || groupStage.state === 'finished') &&
+                    <div className='mission-control-panel'>
+                        <h4>Playoffs</h4>
+                        <p>Keine startbaren Playoff-Matches vorhanden.</p>
+                    </div>}
             </div>
         </section>
-    );
-}
-
-function MissionStartMatchCard(props) {
-    const match = props.match;
-    const stateClass = matchStateClass(match.state);
-    const stateLabel = match.state === 'in_progress' ? 'Live' : matchStateLabel(match.state);
-    const tableLabel = 'G' + (match.group ? match.group.number : Math.max(1, match.position)) + '-S' + match.position;
-    return (
-        <div className={'mission-start-card ' + stateClass} data-testid='mission-start-match-card'>
-            <div className='mission-start-table'>{tableLabel}</div>
-            <div className='mission-start-row'>
-                <span><FaUsers aria-hidden='true' />{match.team1.name}</span>
-                <Input type='number' value={scoreFor(match, 'team1')} readOnly
-                    aria-label={match.team1.name + ' score'} />
-            </div>
-            <div className='mission-start-row'>
-                <span><FaUsers aria-hidden='true' />{match.team2.name}</span>
-                <Input type='number' value={scoreFor(match, 'team2')} readOnly
-                    aria-label={match.team2.name + ' score'} />
-            </div>
-            <div className='mission-start-meta'>
-                <span><i className={stateClass}></i>{stateLabel}</span>
-                <span><FaLock aria-hidden='true' />Locked</span>
-            </div>
-            {props.playoff &&
-                <div className='mission-next-table'>
-                    Tisch {match.position} <span>-&gt;</span> Tisch {nextPlayoffTable(match)}
-                </div>}
-        </div>
     );
 }
 
@@ -741,8 +683,24 @@ function MissionMatches(props) {
     });
 
     return (
-        <section className='mission-control-section'>
-            <h3 className='h5'>Scores</h3>
+        <section className='mission-control-section mission-pane-scores' data-testid='mission-score-control'>
+            <div className='mission-match-toolbar'>
+                <div className='mission-match-search'>
+                    <FaSearch aria-hidden='true' />
+                    <Input
+                        type='search'
+                        value={props.search}
+                        onChange={props.onSearchChange}
+                        placeholder='Gruppen, Teams, Matches suchen...'
+                        aria-label='Scores suchen'
+                        data-testid='mission-control-search'
+                    />
+                </div>
+                <Button color='link' className='mission-filter-reset'
+                    onClick={() => props.onSearchChange({target: {value: ''}})}>
+                    x Filter zuruecksetzen
+                </Button>
+            </div>
             {rows.map(row => (
                 <MissionStageBlock
                     key={row.key}
@@ -765,7 +723,20 @@ function MissionStageBlock(props) {
             if (!search) {
                 return true;
             }
-            return [match.team1.name, match.team2.name].join(' ').toLowerCase().indexOf(search) !== -1;
+            const haystack = [
+                props.title,
+                match.team1.name,
+                match.team2.name,
+                match.state,
+                matchStateLabel(match.state),
+                'spiel ' + match.position,
+                'sp. ' + match.position,
+                'tisch ' + match.position,
+                match.group ? 'gruppe ' + match.group.number : '',
+                match.group ? 'g' + match.group.number : '',
+                'g' + (match.group ? match.group.number : Math.max(1, match.position)) + '-s' + match.position
+            ].join(' ').toLowerCase();
+            return haystack.indexOf(search) !== -1;
         })
         .sort(sortMatchesByPositionAscending());
 
@@ -774,23 +745,23 @@ function MissionStageBlock(props) {
     }
 
     return (
-        <div className='mb-3'>
-            <h4 className='h6 d-flex align-items-center gap-2'>
+        <div className='mission-match-stage'>
+            <h3 className='h5 mission-pane-heading'>
                 {props.title}
-                <Badge color='secondary'>{matches.length}</Badge>
-            </h4>
+                <Badge color='light' className='mission-stage-badge'>{matches.length} Matches</Badge>
+            </h3>
             {props.group && <MissionGroupTable group={props.group}/>}
-            <Row className='g-2'>
+            <div className='mission-match-grid mission-score-grid'>
                 {matches.map(match => (
-                    <Col lg='4' md='6' key={match.id}>
-                        <MissionMatchCard
-                            match={match}
-                            disabled={props.disabled}
-                            onTournamentChange={props.onTournamentChange}
-                        />
-                    </Col>
+                    <MissionMatchCard
+                        key={match.id}
+                        match={match}
+                        playoff={!props.group}
+                        disabled={props.disabled}
+                        onTournamentChange={props.onTournamentChange}
+                    />
                 ))}
-            </Row>
+            </div>
         </div>
     );
 }
@@ -923,37 +894,53 @@ class MissionMatchCard extends React.Component {
         const match = this.props.match;
         const editable = match.state === 'in_progress' && !this.props.disabled;
         const canStart = match.state === 'not_started' && !this.props.disabled;
+        const stateClass = matchStateClass(match.state);
+        const stateLabel = match.state === 'in_progress' ? 'Live' : matchStateLabel(match.state);
+        const groupNumber = match.group ? match.group.number : Math.max(1, match.position);
+        const tableLabel = 'G' + groupNumber + '-S' + match.position;
         return (
-            <form onSubmit={this.submit} className='mission-control-match border rounded p-2'
+            <form onSubmit={this.submit} className={'mission-control-match mission-start-card ' + stateClass}
                 data-testid='mission-match-card'>
-                <div className='d-flex justify-content-between align-items-center mb-2'>
-                    <strong>Sp. {match.position}</strong>
-                    <Badge color={match.state === 'in_progress' ? 'warning' : 'secondary'}>
-                        {match.state}
-                    </Badge>
+                <div className='mission-start-table'>
+                    {tableLabel}
+                    {match.decider && <Badge color='warning' className='ms-2'>Entscheidung</Badge>}
                 </div>
-                {match.decider && <div className='text-muted mb-2'>Entscheidungsmatch</div>}
-                <Label className='w-100'>
-                    <TeamName name={match.team1.name}/>
-                </Label>
-                <Input type='number' value={this.state.score1} onChange={this.setScore1} disabled={!editable}/>
-                <Label className='mt-2 w-100'>
-                    <TeamName name={match.team2.name}/>
-                </Label>
-                <Input type='number' value={this.state.score2} onChange={this.setScore2} disabled={!editable}/>
-                <FormGroup check className='my-2'>
-                    <Input
-                        id={`mission-match-live-${match.id}`}
-                        type='checkbox'
-                        checked={this.state.live}
-                        onChange={this.setLive}
-                        disabled={!editable}
-                    />
-                    <Label check for={`mission-match-live-${match.id}`}>
-                        Live
+                <div className='mission-start-row'>
+                    <Label className='mb-0'>
+                        <FaUsers aria-hidden='true' />
+                        <TeamName name={match.team1.name}/>
                     </Label>
-                </FormGroup>
-                <div className='d-flex gap-2'>
+                    <Input type='number' value={this.state.score1} onChange={this.setScore1}
+                        disabled={!editable} aria-label={match.team1.name + ' score'} />
+                </div>
+                <div className='mission-start-row'>
+                    <Label className='mb-0'>
+                        <FaUsers aria-hidden='true' />
+                        <TeamName name={match.team2.name}/>
+                    </Label>
+                    <Input type='number' value={this.state.score2} onChange={this.setScore2}
+                        disabled={!editable} aria-label={match.team2.name + ' score'} />
+                </div>
+                <div className='mission-start-meta'>
+                    <FormGroup check className='mb-0'>
+                        <Input
+                            id={`mission-match-live-${match.id}`}
+                            type='checkbox'
+                            checked={this.state.live}
+                            onChange={this.setLive}
+                            disabled={!editable}
+                        />
+                        <Label check for={`mission-match-live-${match.id}`}>
+                            <i className={stateClass}></i>{stateLabel}
+                        </Label>
+                    </FormGroup>
+                    <span><FaLock aria-hidden='true' />Locked</span>
+                </div>
+                {this.props.playoff &&
+                    <div className='mission-next-table'>
+                        Tisch {match.position} <span>-&gt;</span> Tisch {nextPlayoffTable(match)}
+                    </div>}
+                <div className='mission-score-actions'>
                     {canStart &&
                         <Button color='outline-primary' size='sm' type='button'
                             data-testid='mission-match-start'
