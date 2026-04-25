@@ -18,6 +18,8 @@ import {ScrollToTopButton} from '../js/components/ScrollToTopButton';
 import {MissionControl} from '../js/components/MissionControl';
 import {connectToTimerSocket} from '../js/utils/beamerSocket';
 import {normalizeTimerState} from '../js/utils/timerState';
+import {connectToTournamentSocket} from '../js/utils/tournamentLiveSocket';
+import {convertTournamentSnapshot} from '../js/redux/tournamentApi';
 
 class PrivateTournamentPage extends React.Component {
     render() {
@@ -119,6 +121,7 @@ class Main extends React.Component {
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
         this.reloadTournament = this.reloadTournament.bind(this);
         this.onTimerMessage = this.onTimerMessage.bind(this);
+        this.onTournamentMessage = this.onTournamentMessage.bind(this);
     }
 
     componentDidMount() {
@@ -128,6 +131,9 @@ class Main extends React.Component {
     componentWillUnmount() {
         if (this.timerSocket) {
             this.timerSocket.disconnect();
+        }
+        if (this.tournamentSocket) {
+            this.tournamentSocket.disconnect();
         }
     }
 
@@ -141,6 +147,12 @@ class Main extends React.Component {
             this.timerSocket = connectToTimerSocket({
                 tournamentId: tournament.id,
                 onMessage: this.onTimerMessage
+            });
+        }
+        if (!this.tournamentSocket && tournament.id) {
+            this.tournamentSocket = connectToTournamentSocket({
+                tournamentId: tournament.id,
+                onMessage: this.onTournamentMessage
             });
         }
     }
@@ -167,6 +179,31 @@ class Main extends React.Component {
                 tournament: Object.assign({}, prev.tournament, {
                     timerState: normalizeTimerState(message)
                 })
+            };
+        });
+    }
+
+    onTournamentMessage(message) {
+        if (message.type && message.type !== 'tournament.updated') {
+            return;
+        }
+        if (!message.tournament) {
+            return;
+        }
+
+        this.setState(prev => {
+            const cachedMetadata = prev.tournament ? {
+                readOnlyMode: prev.tournament.readOnlyMode,
+                syncTargetUrl: prev.tournament.syncTargetUrl,
+                syncAuthToken: prev.tournament.syncAuthToken,
+                syncLastPushedAt: prev.tournament.syncLastPushedAt,
+                syncLastPushError: prev.tournament.syncLastPushError
+            } : null;
+
+            return {
+                status: 200,
+                tournament: convertTournamentSnapshot(message.tournament, cachedMetadata),
+                loaded: true
             };
         });
     }
