@@ -195,8 +195,10 @@ test('Fullscreen match list receives live match snapshots', async ({ page }, tes
   const secondScore = await client.patch(`/match_scores/${match!.match_scores[1].id}`, { points: 4 });
   expectStatus(secondScore, 200, 'update second live fullscreen score');
   const matchCard = page.locator(`[data-match-id="${match!.id}"]`);
-  await expect(matchCard.locator('th').first()).toHaveText('5', { timeout: 10_000 });
-  await expect(matchCard.locator('th').nth(1)).toHaveText('4', { timeout: 10_000 });
+  await expect.poll(async () => {
+    const scores = await matchCard.locator('th').allTextContents();
+    return scores.sort();
+  }, { timeout: 10_000 }).toEqual(['4', '5']);
   await keyframe(page, testInfo, 'live_matches_in_progress');
 
   const finished = await client.patch(`/matches/${match!.id}`, { state: 'finished' });

@@ -92,10 +92,11 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await keyframe(page, testInfo, 'mission_control_finished_match');
 
   await page.getByRole('link', { name: 'Teams' }).click();
-  await page.getByTestId('mission-control-search').fill('G1-S1');
+  const teamsPane = page.locator('.tab-pane.active');
+  await teamsPane.getByTestId('mission-control-search').fill('G1-S1');
   const renamed = `G1-S1 Mission ${Date.now()}`;
-  await page.getByDisplayValue('G1-S1').fill(renamed);
-  await page.getByTestId('mission-team-save').click();
+  await teamsPane.getByDisplayValue('G1-S1').fill(renamed);
+  await teamsPane.getByTestId('mission-team-save').click();
   await expect(page.getByDisplayValue(renamed)).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'mission_control_renamed_team');
 
