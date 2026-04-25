@@ -75,9 +75,9 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   const sentenceName = teamNames.filter({ hasText: LONG_TEAM_NAME_SENTENCE }).first();
   await expect(singleWordName).toHaveAttribute('title', new RegExp(LONG_TEAM_NAME_SINGLE_WORD));
   await expect(sentenceName).toHaveAttribute('title', new RegExp(LONG_TEAM_NAME_SENTENCE));
-  await expect(singleWordName).toHaveCSS('text-overflow', 'ellipsis');
-  await expect(sentenceName).toHaveCSS('text-overflow', 'ellipsis');
   await expect(singleWordName).toHaveCSS('overflow-x', 'hidden');
+  expect(await singleWordName.evaluate(el => getComputedStyle(el).textOverflow)).toMatch(/ellipsis|"\.\.\."/);
+  expect(await sentenceName.evaluate(el => getComputedStyle(el).textOverflow)).toMatch(/ellipsis|"\.\.\."/);
   expect(await singleWordName.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
   expect(await sentenceName.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
 

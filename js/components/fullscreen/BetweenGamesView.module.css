@@ -93,9 +93,7 @@
     color: #1a1a1a;
     font-size: 1.3rem;
     font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.25;
 }
 
 .matchBadge {

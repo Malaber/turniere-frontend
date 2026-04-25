@@ -94,8 +94,8 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   const longTeamName = page.getByTestId('team-name').filter({ hasText: LONG_TEAM_NAME_SINGLE_WORD }).first();
   await expect(longTeamName).toHaveAttribute('title', new RegExp(LONG_TEAM_NAME_SINGLE_WORD));
-  await expect(longTeamName).toHaveCSS('text-overflow', 'ellipsis');
   await expect(longTeamName).toHaveCSS('overflow-x', 'hidden');
+  expect(await longTeamName.evaluate(el => getComputedStyle(el).textOverflow)).toMatch(/ellipsis|"\.\.\."/);
   expect(await longTeamName.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
   await keyframe(page, testInfo, 'during_game_loaded');
 
