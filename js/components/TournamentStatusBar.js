@@ -15,8 +15,8 @@ export function EditButton(props) {
     const {tournamentId, isOwner, isSignedIn} = props;
 
     if (isSignedIn && isOwner) {
-        return (<LinkButton href={'/t/' + tournamentId + '/edit'}>
-            Turnier bearbeiten
+        return (<LinkButton href={'/t/' + tournamentId + '/mission-control'}>
+            Mission Control
         </LinkButton>);
     } else {
         return null;

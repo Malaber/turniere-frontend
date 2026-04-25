@@ -14,6 +14,7 @@ export const actionTypesTournamentinfo = {
     'SWAP_MATCH_POSITIONS': 'SWAP_MATCH_POSITIONS',
     'CREATE_DECIDER_MATCH': 'CREATE_DECIDER_MATCH',
     'FINISH_GROUP_STAGE': 'FINISH_GROUP_STAGE',
+    'SET_TOURNAMENT_TIMER': 'SET_TOURNAMENT_TIMER',
 
     'REHYDRATE': 'TOURNAMENTINFO_REHYDRATE',
     'CLEAR': 'TOURNAMENTINFO_CLEAR'
@@ -32,6 +33,7 @@ export const defaultStateTournamentinfo = {
     syncLastPushedAt: null,
     syncLastPushError: '',
     stages: [],
-    teams: []
+    teams: [],
+    timerState: null
     // date: null
 };

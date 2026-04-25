@@ -36,6 +36,27 @@ async function startMatches(
   return ids;
 }
 
+async function waitForMatchStateCount(
+  client: ApiClient,
+  tournamentId: number,
+  state: string,
+  expected: number,
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const res = await client.get<Array<{ state: string }>>(
+          `/tournaments/${tournamentId}/matches`,
+          { state },
+        );
+        expectStatus(res, 200, `fetch ${state} matches`);
+        return res.json.length;
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(expected);
+}
+
 async function setupBeamerAndMatches(
   matchCount: number,
   opts: { timerSeconds?: number; beamerName?: string } = {},
@@ -64,10 +85,12 @@ async function setupBeamerAndMatches(
   const hasBeamer = beamerRes.status === 201;
 
   await startMatches(client, tournament.id, matchCount);
+  await waitForMatchStateCount(client, tournament.id, 'in_progress', matchCount);
 
   const fullscreenQuery = hasBeamer
     ? `beamer=${beamerName}`
     : 'display=during_game';
+
   return { tournament, client, fullscreenQuery };
 }
 
@@ -86,7 +109,7 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   // Wait for match cards to confirm the page loaded
-  const matchCards = page.locator('[class*="matchCard"]');
+  const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'during_game_loaded');
 
@@ -106,16 +129,21 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   const readTimer = () =>
     page.evaluate(() => {
       const strips = document.querySelectorAll('[class*="digitStrip"]');
-      return Array.from(strips).map(el => {
-        const style = (el as HTMLElement).style.transform;
-        const match = style.match(/translateY\((-?\d+)/);
-        return match ? String(Math.abs(parseInt(match[1], 10)) / 10) : '?';
-      }).join('');
+
+      return Array.from(strips)
+        .map((el) => {
+          const style = (el as HTMLElement).style.transform;
+          const match = style.match(/translateY\((-?\d+)/);
+
+          return match ? String(Math.abs(parseInt(match[1], 10)) / 10) : '?';
+        })
+        .join('');
     });
 
   const textBefore = await readTimer();
   await page.waitForTimeout(2500);
   const textAfter = await readTimer();
+
   expect(textBefore).not.toEqual(textAfter);
 
   await keyframe(page, testInfo, 'during_game_timer_updated');
@@ -134,7 +162,7 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   // Wait for match cards to confirm initial render
-  const matchCards = page.locator('[class*="matchCard"]');
+  const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'before_countdown');
 
@@ -142,14 +170,19 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
   const cardsVisibleBefore = await matchCards.count();
   expect(cardsVisibleBefore).toBeGreaterThan(0);
 
-  const timerRes = await client.patch(`/tournaments/${tournament.id}/timer`, { timestamp_seconds: 15 });
+  const timerRes = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 15,
+  });
   expectStatus(timerRes, 200, 'start countdown timer');
 
   // Wait for countdown phase (timer <= 10s triggers takeover)
   const timerTakeover = page.locator('[class*="timerTakeover"]');
   await expect(timerTakeover).toBeVisible({ timeout: 15_000 });
+
   // Use direct screenshot — bump animation repeats each second
-  await page.screenshot({ path: `screenshots/fullscreen_timer_takeover_during_countdown_and_finished/countdown_takeover.png` });
+  await page.screenshot({
+    path: 'screenshots/fullscreen_timer_takeover_during_countdown_and_finished/countdown_takeover.png',
+  });
 
   // During takeover, match cards should not be visible
   await expect(matchCards).toHaveCount(0);
@@ -157,19 +190,26 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
   // Timer digits should still be visible inside the takeover
   const timerUrgent = page.locator('[class*="timerUrgent"]');
   await expect(timerUrgent).toBeVisible({ timeout: 5_000 });
-  await page.screenshot({ path: `screenshots/fullscreen_timer_takeover_during_countdown_and_finished/countdown_urgent.png` });
+  await page.screenshot({
+    path: 'screenshots/fullscreen_timer_takeover_during_countdown_and_finished/countdown_urgent.png',
+  });
 
   // Wait for "Spiel vorbei!" finished state
   const finishedText = page.locator('[class*="timerFinished"]');
   await expect(finishedText).toBeVisible({ timeout: 15_000 });
   await expect(finishedText).toContainText('Spiel vorbei!');
+
   // Use direct screenshot — finishedPulse animation is infinite
-  await page.screenshot({ path: `screenshots/fullscreen_timer_takeover_during_countdown_and_finished/finished_takeover.png` });
+  await page.screenshot({
+    path: 'screenshots/fullscreen_timer_takeover_during_countdown_and_finished/finished_takeover.png',
+  });
 
   // After ~10s the finished display should disappear and matches return
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(500);
-  await page.screenshot({ path: `screenshots/fullscreen_timer_takeover_during_countdown_and_finished/back_to_normal.png` });
+  await page.screenshot({
+    path: 'screenshots/fullscreen_timer_takeover_during_countdown_and_finished/back_to_normal.png',
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -186,7 +226,7 @@ test('Match grid with 4 matches (1 row)', async ({ page }, testInfo) => {
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
-  const matchCards = page.locator('[class*="matchCard"]');
+  const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards).toHaveCount(4);
   await keyframe(page, testInfo, 'grid_1_row_4_matches');
 
@@ -195,11 +235,12 @@ test('Match grid with 4 matches (1 row)', async ({ page }, testInfo) => {
   const timerContainer = page.locator('[class*="timerContainer"]');
   const timerBox = await timerContainer.boundingBox();
   expect(timerBox).not.toBeNull();
+
   // Timer should be significantly taller than minimum (> 30% of viewport)
   expect(timerBox!.height).toBeGreaterThan(1080 * 0.3);
 
   // No page indicator dots for single page
-  const pageDots = page.locator('[class*="pageDot"]');
+  const pageDots = page.getByTestId('fullscreen-page-dot');
   await expect(pageDots).toHaveCount(0);
 });
 
@@ -213,12 +254,12 @@ test('Match grid with 8 matches (2 rows)', async ({ page }, testInfo) => {
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
-  const matchCards = page.locator('[class*="matchCard"]');
+  const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards).toHaveCount(8);
   await keyframe(page, testInfo, 'grid_2_rows_8_matches');
 
   // No page indicator dots for single page
-  const pageDots = page.locator('[class*="pageDot"]');
+  const pageDots = page.getByTestId('fullscreen-page-dot');
   await expect(pageDots).toHaveCount(0);
 });
 
@@ -232,7 +273,7 @@ test('Match grid with 12 matches (3 rows)', async ({ page }, testInfo) => {
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
-  const matchCards = page.locator('[class*="matchCard"]');
+  const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards).toHaveCount(12);
   await keyframe(page, testInfo, 'grid_3_rows_12_matches');
 });
@@ -247,7 +288,7 @@ test('Match grid with 16 matches (4 rows, full page)', async ({ page }, testInfo
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
-  const matchCards = page.locator('[class*="matchCard"]');
+  const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards).toHaveCount(16);
   await keyframe(page, testInfo, 'grid_4_rows_16_matches');
 
@@ -258,7 +299,7 @@ test('Match grid with 16 matches (4 rows, full page)', async ({ page }, testInfo
   expect(timerBox!.height).toBeGreaterThan(1080 * 0.15);
 
   // No page dots — exactly 16 fits one page
-  const pageDots = page.locator('[class*="pageDot"]');
+  const pageDots = page.getByTestId('fullscreen-page-dot');
   await expect(pageDots).toHaveCount(0);
 });
 
@@ -276,7 +317,7 @@ test('During-game view rotates match pages', async ({ page }, testInfo) => {
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
-  const matchCards = page.locator('[class*="matchCard"]');
+  const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards.first()).toBeVisible();
   await keyframe(page, testInfo, 'rotation_page1');
 
@@ -285,8 +326,9 @@ test('During-game view rotates match pages', async ({ page }, testInfo) => {
   expect(firstPageCount).toBe(16);
 
   // Page indicator dots should be visible since we have overflow (30 > 16)
-  const pageDots = page.locator('[class*="pageDot"]');
+  const pageDots = page.getByTestId('fullscreen-page-dot');
   await expect(pageDots.first()).toBeVisible();
+
   const dotCount = await pageDots.count();
   expect(dotCount).toBe(2); // ceil(30/16) = 2
 
@@ -321,11 +363,13 @@ test('Cards maintain consistent aspect ratio across row counts', async ({ page }
   });
 
   await page.goto(`/t/${setup4.tournament.id}/fullscreen?${setup4.fullscreenQuery}`);
-  const matchCards = page.locator('[class*="matchCard"]');
+
+  const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards).toHaveCount(4);
 
   const card4 = await matchCards.first().boundingBox();
   expect(card4).not.toBeNull();
+
   const ratio4 = card4!.width / card4!.height;
 
   await keyframe(page, testInfo, 'aspect_ratio_1_row');
@@ -341,6 +385,7 @@ test('Cards maintain consistent aspect ratio across row counts', async ({ page }
 
   const card16 = await matchCards.first().boundingBox();
   expect(card16).not.toBeNull();
+
   const ratio16 = card16!.width / card16!.height;
 
   await keyframe(page, testInfo, 'aspect_ratio_4_rows');

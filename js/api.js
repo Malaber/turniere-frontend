@@ -113,6 +113,8 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
             email: action.parameters.email,
             password: action.parameters.password
         }).then(resp => {
+            storeOptionalToken(resp);
+
             __store.dispatch({
                 type: actionTypesUserinfo.LOGIN_RESULT_SUCCESS,
                 parameters: {
@@ -120,7 +122,6 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
                     successCallback: action.parameters.successCallback
                 }
             });
-            storeOptionalToken(resp);
         }).catch(error => {
             if (error.response) {
                 __store.dispatch({
@@ -171,8 +172,12 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
     case actionTypesUserinfo.VERIFY_CREDENTIALS:
         getRequest(action.state, '/users/validate_token').then(resp => {
             storeOptionalToken(resp);
-        }).catch(() => {
-            __store.dispatch({type: actionTypesUserinfo.CLEAR});
+        }).catch(error => {
+            if (error.response && error.response.status === 401) {
+                __store.dispatch({type: actionTypesUserinfo.CLEAR});
+            } else {
+                console.warn('validate_token failed, not clearing auth', error);
+            }
         });
         return Object.assign({}, state, {});
     case actionTypesUserinfo.CHANGE_MAIL:
@@ -357,6 +362,21 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
         patchRequest(action.state, '/matches/' + action.parameters.matchId + '/swap', {
             other_match_id: action.parameters.otherMatchId
         }).then(resp => {
+            storeOptionalToken(resp);
+            action.parameters.successCallback(resp.data);
+        }).catch(error => {
+            if (error.response) {
+                storeOptionalToken(error.response);
+                action.parameters.errorCallback(error.response.data, error.response.status);
+            } else {
+                action.parameters.errorCallback(null, -1);
+            }
+        });
+        return Object.assign({}, state, {});
+    case actionTypesTournamentinfo.SET_TOURNAMENT_TIMER:
+        patchRequest(action.state, '/tournaments/' + action.parameters.tournamentId + '/timer',
+            action.parameters.payload
+        ).then(resp => {
             storeOptionalToken(resp);
             action.parameters.successCallback(resp.data);
         }).catch(error => {
@@ -741,6 +761,52 @@ export function finishGroupStage(stageId, successCallback, errorCallback) {
             errorCallback: errorCallback
         },
         state: getState()
+    });
+}
+
+export function setTournamentTimer(tournamentId, payload, successCallback, errorCallback) {
+    __store.dispatch({
+        type: actionTypesTournamentinfo.SET_TOURNAMENT_TIMER,
+        parameters: {
+            tournamentId: tournamentId,
+            payload: payload,
+            successCallback: successCallback,
+            errorCallback: errorCallback
+        },
+        state: getState()
+    });
+}
+
+export function startNextGroupMatches(groups, successCallback, errorCallback) {
+    const matches = groups.map(group => group.matches
+        .filter(match => match.state === 'not_started')
+        .sort((a, b) => a.position - b.position)[0])
+        .filter(match => match !== undefined);
+    startMatchesInSequence(matches, successCallback, errorCallback);
+}
+
+export function startNextStageMatches(stage, successCallback, errorCallback) {
+    const matches = stage.matches.filter(match => match.state === 'not_started');
+    startMatchesInSequence(matches, successCallback, errorCallback);
+}
+
+function startMatchesInSequence(matches, successCallback, errorCallback) {
+    const currentState = getState();
+    let chain = Promise.resolve();
+
+    matches.forEach(match => {
+        chain = chain.then(() => patchRequest(currentState, '/matches/' + match.id, {
+            state: 'in_progress'
+        }).then(resp => storeOptionalToken(resp)));
+    });
+
+    chain.then(() => successCallback(matches)).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
     });
 }
 

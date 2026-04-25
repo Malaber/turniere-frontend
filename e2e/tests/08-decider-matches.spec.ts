@@ -99,9 +99,12 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await expect(visibleModal(page)).toBeVisible();
   await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch kann gestartet werden' })).toBeVisible();
   await modal.getByRole('button', { name: 'Spiel starten' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15000 });
+  await expect(page.getByText('Entscheidungsmatch läuft')).toBeVisible({ timeout: 15000 });
+  await keyframe(page, testInfo, 'decider_match_started');
   await deciderCard.click({ force: true });
   modal = page.getByRole('dialog');
-  await expect(visibleModal(page)).toBeVisible();
+  await expect(visibleModal(page)).toBeVisible({ timeout: 15000 });
   await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible();
 
   await modal.getByRole('spinbutton').nth(0).fill('5');
@@ -112,9 +115,12 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await modalKeyframe(page, testInfo, 'decider_match_modal');
 
   await modal.getByRole('button', { name: 'Tie-Breaker Punkte ändern' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15000 });
+  await expect(deciderCard).toContainText('5');
+  await expect(deciderCard).toContainText('3');
   await deciderCard.click({ force: true });
   modal = page.getByRole('dialog');
-  await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible();
+  await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible({ timeout: 15000 });
   await modal.getByRole('button', { name: 'Spiel beenden' }).click({ force: true });
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20000 });
   await expectResolvedDecisionIconCount(page, 20000);
@@ -132,7 +138,7 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
 
   await page.getByTestId('finish-group-stage').click();
   await page.waitForLoadState('networkidle');
-  await expect(page.getByText('Finale')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('heading', { name: 'Finale' })).toBeVisible({ timeout: 15000 });
   await keyframe(page, testInfo, 'playoffs_started_after_decider');
 });
 

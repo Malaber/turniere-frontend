@@ -96,6 +96,29 @@
     text-align: left;
 }
 
+.mission-control-card {
+    border-radius: 0.5rem;
+}
+
+.mission-control-toolbar {
+    max-width: 32rem;
+}
+
+.mission-control-section {
+    border-top: 1px solid #dee2e6;
+    margin-top: 1rem;
+    padding-top: 1rem;
+}
+
+.mission-control-group-table {
+    max-width: 42rem;
+}
+
+.mission-control-match {
+    background-color: #fff;
+    min-height: 100%;
+}
+
 @media (max-width: 400px) {
     .hide-below-400-w {
         display: none;
