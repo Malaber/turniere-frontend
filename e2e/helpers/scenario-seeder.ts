@@ -237,10 +237,34 @@ async function runPlayoffsToCompletion(client: ApiClient, tournamentId: number):
 // Payload builders
 // ---------------------------------------------------------------------------
 
-function groupStagePayload(groupCount: number, teamsPerGroup: number, playoffTeamsAmount: number) {
+export const LONG_TEAM_NAME_SINGLE_WORD =
+  'rindfleischetikettierungsüberwachungsaufgabenübertragungsgesetz';
+export const LONG_TEAM_NAME_SENTENCE =
+  'Fuchs du hast die Gans gestohlen gib sie wieder her';
+
+type TeamNameFactory = (groupIndex: number, seedIndex: number) => string;
+
+function defaultGroupStageTeamName(groupIndex: number, seedIndex: number): string {
+  return `G${groupIndex + 1}-S${seedIndex + 1}`;
+}
+
+export function longGroupStageTeamName(groupIndex: number, seedIndex: number): string {
+  const baseNames = [
+    LONG_TEAM_NAME_SINGLE_WORD,
+    LONG_TEAM_NAME_SENTENCE,
+  ];
+  return `${baseNames[seedIndex % baseNames.length]} G${groupIndex + 1}-S${seedIndex + 1}`;
+}
+
+function groupStagePayload(
+  groupCount: number,
+  teamsPerGroup: number,
+  playoffTeamsAmount: number,
+  teamNameFor: TeamNameFactory = defaultGroupStageTeamName,
+) {
   const teams = Array.from({ length: groupCount }, (_, gi) =>
     Array.from({ length: teamsPerGroup }, (__, si) => ({
-      name: `G${gi + 1}-S${si + 1}`,
+      name: teamNameFor(gi, si),
       group: gi,
     })),
   ).flat();
@@ -287,9 +311,10 @@ export async function seedGroupStageTournament(
   groupCount = 4,
   teamsPerGroup = 4,
   playoffTeamsAmount = 8,
+  teamNameFor: TeamNameFactory = defaultGroupStageTeamName,
 ): Promise<SeededTournament> {
   const client = await makeClient();
-  const payload = groupStagePayload(groupCount, teamsPerGroup, playoffTeamsAmount);
+  const payload = groupStagePayload(groupCount, teamsPerGroup, playoffTeamsAmount, teamNameFor);
 
   const created = await client.post<Tournament>('/tournaments', payload);
   expectStatus(created, 201, 'create group stage tournament');

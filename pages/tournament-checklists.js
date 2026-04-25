@@ -10,6 +10,7 @@ import {TournamentBigImage} from '../js/components/TournamentBigImage';
 import {EditButton, TournamentStatusBar} from '../js/components/TournamentStatusBar';
 import {LinkButton} from '../js/components/LinkButton';
 import {LoadingPage} from '../js/components/LoadingPage';
+import {TeamName} from '../js/components/TeamName';
 import {
     convertTeamActionListsSnapshot,
     createTeamActionList as createTeamActionListRequest,
@@ -141,7 +142,7 @@ class TeamActionListsSection extends React.Component {
                                             onChange={event => this.onChange(list, item, event)}
                                         />
                                         <label className='form-check-label' htmlFor={'team-action-item-' + pendingKey}>
-                                            {item.team ? item.team.name : 'Unbekanntes Team'}
+                                            {item.team ? <TeamName name={item.team.name} inline/> : 'Unbekanntes Team'}
                                             {item.completedAt &&
                                                 <span className='text-muted ms-2'>
                                                     ({formatTeamActionCompletedAt(item.completedAt)})

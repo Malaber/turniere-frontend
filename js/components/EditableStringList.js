@@ -4,6 +4,7 @@ import {
 } from 'reactstrap';
 
 import styles from './EditableStringList.module.css';
+import {TeamName} from './TeamName';
 
 export default class EditableStringList extends React.Component {
     constructor(props) {
@@ -263,7 +264,7 @@ class Item extends React.Component {
         return (<Alert
             className={styles.team_item} color="info" isOpen={this.state.visible} toggle={this.onDismiss}
         >
-            {this.props.text}
+            <TeamName name={this.props.text}/>
         </Alert>);
     }
 }

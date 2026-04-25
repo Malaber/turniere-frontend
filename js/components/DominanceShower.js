@@ -5,6 +5,7 @@ import {
     CardTitle,
     Table
 } from 'reactstrap';
+import {TeamName} from './TeamName';
 
 export class DominanceShower extends React.Component {
     render() {
@@ -12,10 +13,12 @@ export class DominanceShower extends React.Component {
             <Card className="shadow-sm">
                 <CardBody>
                     <CardTitle>{this.props.title}</CardTitle>
-                    <Table borderless className="m-0">
+                    <Table borderless className="m-0" style={{tableLayout: 'fixed', width: '100%'}}>
                         <tbody>
                             <tr>
-                                <th colSpan="2" className="h3 text-center">{this.props.stats.team_name}</th>
+                                <th colSpan="2" className="h3 text-center">
+                                    <TeamName name={this.props.stats.team_name}/>
+                                </th>
                             </tr>
                             <tr>
                                 <td className="h4 text-success pb-0">{this.props.stats.points_made}</td>

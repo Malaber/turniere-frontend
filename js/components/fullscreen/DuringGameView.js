@@ -3,6 +3,7 @@ import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
 import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
 import styles from './DuringGameView.module.css';
+import {TeamName} from '../TeamName';
 
 
 const MATCHES_PER_PAGE = 16;
@@ -178,11 +179,11 @@ function FullscreenMatchCard({match, index}) {
         >
             <div className={styles.matchContent}>
                 <div className={styles.matchTeamRow}>
-                    <span className={t1Cls}>{team1.name}</span>
+                    <TeamName name={team1.name} className={t1Cls}/>
                     <span className={styles.teamScore}>{score1}</span>
                 </div>
                 <div className={styles.matchTeamRow}>
-                    <span className={t2Cls}>{team2.name}</span>
+                    <TeamName name={team2.name} className={t2Cls}/>
                     <span className={styles.teamScore}>{score2}</span>
                 </div>
             </div>

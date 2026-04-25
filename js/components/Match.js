@@ -4,6 +4,7 @@ import {endMatch, startMatch} from '../api';
 import {notify} from 'react-notify-toast';
 import {MatchModal} from './MatchModal';
 import {MatchTable} from './MatchTable';
+import {TeamName} from './TeamName';
 
 import styles from './Match.module.css';
 
@@ -24,12 +25,6 @@ export class Match extends React.Component {
         this.onEndMatchError = this.onEndMatchError.bind(this);
         this.getMatchFinishedMessage = this.getMatchFinishedMessage.bind(this);
         this.changeScores = this.changeScores.bind(this);
-    }
-
-    componentDidUpdate(prevProps) {
-        if (prevProps.match !== this.props.match) {
-            this.setState({match: this.props.match});
-        }
     }
 
     toggleModal() {
@@ -99,10 +94,16 @@ export class Match extends React.Component {
             return match.decider ? 'Entscheidungsmatch beendet, weiterhin Gleichstand' : 'Spiel beendet, unentschieden';
         }
         if (match.winnerTeamId === match.team1.id) {
-            return (match.decider ? 'Entscheidung für: ' : 'Gewinner: ') + match.team1.name;
+            return (<>
+                {match.decider ? 'Entscheidung für: ' : 'Gewinner: '}
+                <TeamName name={match.team1.name} inline/>
+            </>);
         }
         if (match.winnerTeamId === match.team2.id) {
-            return (match.decider ? 'Entscheidung für: ' : 'Gewinner: ') + match.team2.name;
+            return (<>
+                {match.decider ? 'Entscheidung für: ' : 'Gewinner: '}
+                <TeamName name={match.team2.name} inline/>
+            </>);
         }
         return match.decider ? 'Entscheidungsmatch beendet' : 'Spiel beendet';
     }

@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
-import { seedGroupStageTournament } from '../helpers/scenario-seeder';
+import {
+  LONG_TEAM_NAME_SINGLE_WORD,
+  longGroupStageTeamName,
+  seedGroupStageTournament,
+} from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
@@ -43,7 +47,7 @@ async function setupBeamerAndMatches(
   const { timerSeconds, beamerName = 'e2e-during' } = opts;
 
   // Use more groups/teams to have enough matches available
-  const { tournament } = await seedGroupStageTournament(8, 4, 8);
+  const { tournament } = await seedGroupStageTournament(8, 4, 8, longGroupStageTeamName);
 
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
@@ -88,6 +92,11 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   // Wait for match cards to confirm the page loaded
   const matchCards = page.locator('[class*="matchCard"]');
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
+  const longTeamName = page.getByTestId('team-name').filter({ hasText: LONG_TEAM_NAME_SINGLE_WORD }).first();
+  await expect(longTeamName).toHaveAttribute('title', new RegExp(LONG_TEAM_NAME_SINGLE_WORD));
+  await expect(longTeamName).toHaveCSS('text-overflow', 'ellipsis');
+  await expect(longTeamName).toHaveCSS('overflow-x', 'hidden');
+  expect(await longTeamName.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
   await keyframe(page, testInfo, 'during_game_loaded');
 
   // White body background for bright-room projector

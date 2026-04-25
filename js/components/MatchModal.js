@@ -2,6 +2,7 @@ import {Button, Input, Modal, ModalBody, ModalFooter, ModalHeader} from 'reactst
 import React, {Component} from 'react';
 import {EditableMatchTable} from './EditableMatchTable';
 import {MatchTable} from './MatchTable';
+import {TeamName} from './TeamName';
 import {submitDeciderMatchScores, submitMatchScores} from '../api';
 import {notify} from 'react-notify-toast';
 
@@ -114,6 +115,9 @@ export class MatchModal extends Component {
         let scoreHint = null;
         const canSwapMatchPosition = this.props.canSwapMatchPosition &&
             Array.isArray(this.props.swapTargets) && this.props.swapTargets.length > 0;
+        const selectedSwapTarget = canSwapMatchPosition ?
+            this.props.swapTargets.find(target => String(target.id) === this.state.swapTargetId) :
+            null;
         let swapControls = null;
         // possible states: single_team not_ready not_started in_progress finished
         switch (this.props.match.state) {
@@ -173,10 +177,15 @@ export class MatchModal extends Component {
                                 disabled={this.props.swapInProgress} data-testid='swap-match-position-select'>
                                 {this.props.swapTargets.map(target => (
                                     <option key={target.id} value={target.id}>
-                                        Sp. {target.position}: {target.team1.name} vs. {target.team2.name}
+                                        Sp. {target.position}
                                     </option>
                                 ))}
                             </Input>
+                            {selectedSwapTarget &&
+                                <div className='text-muted small' style={{minWidth: 0, maxWidth: '16rem'}}>
+                                    <TeamName name={selectedSwapTarget.team1.name}/>
+                                    <TeamName name={selectedSwapTarget.team2.name}/>
+                                </div>}
                             <Button color='secondary' onClick={this.swapMatchPosition}
                                 disabled={this.props.swapInProgress}
                                 data-testid='swap-match-position-button'>

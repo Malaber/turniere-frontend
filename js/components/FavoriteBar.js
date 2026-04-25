@@ -1,6 +1,7 @@
 import React, {useState, useEffect, useRef} from 'react';
 import {Button, ButtonGroup, Input} from 'reactstrap';
 import {FaHeartCirclePlus, FaRegHeart, FaHeart, FaArrowTurnDown} from 'react-icons/fa6';
+import {TeamName} from './TeamName';
 
 export function FavoriteBar({teams, tournamentId}) {
     const [favorite, setFavorite] = useState(null);
@@ -139,7 +140,9 @@ export function FavoriteBar({teams, tournamentId}) {
         <div className="favorites border-bottom py-2 px-1">
             <div className="d-flex align-items-center">
                 <h1 className="custom-font m-2" ref={headingRef}>Favorit:</h1>
-                <p className="m-2">{favorite ? favorite.name : ''}</p>
+                <p className="m-2 flex-grow-1" style={{minWidth: 0}}>
+                    <TeamName name={favorite ? favorite.name : ''}/>
+                </p>
                 <ButtonGroup className="m-2">
                     <Button
                         title="{isVisible ? 'Favoriten schließen' : 'Favoriten öffnen'}"
@@ -185,7 +188,7 @@ export function FavoriteBar({teams, tournamentId}) {
                             >
                                 {favorite && favorite.id === team.id ? <FaHeart/> : <FaRegHeart/>}
                             </Button>
-                            <span>{team.name}</span>
+                            <TeamName name={team.name} className="flex-grow-1"/>
                         </div>
                     ))}
                 </div>
