@@ -6,16 +6,16 @@ import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
 const TIMER_EFFECT_CUES = [
     {
         key: 'start-countdown',
-        secondsRemaining: 20 * 60 + 10,
-        startOffsetSeconds: 0,
+        secondsRemaining: 20 * 60,
+        startOffsetSeconds: 8.5,
         durationSeconds: 27.214,
         volume: 1,
         src: '/static/sounds/start_countdown.mp3'
     },
     {
         key: 'mid-game-warning',
-        secondsRemaining: 10 * 60 + 10,
-        startOffsetSeconds: 0,
+        secondsRemaining: 10 * 60,
+        startOffsetSeconds: 2,
         durationSeconds: 7.601,
         volume: 1,
         src: '/static/sounds/10_minute_warning.mp3'
@@ -23,7 +23,7 @@ const TIMER_EFFECT_CUES = [
     {
         key: 'end-countdown',
         secondsRemaining: 10,
-        startOffsetSeconds: 0,
+        startOffsetSeconds: 6,
         durationSeconds: 18.107,
         volume: 1,
         src: '/static/sounds/end_countdown.mp3'
