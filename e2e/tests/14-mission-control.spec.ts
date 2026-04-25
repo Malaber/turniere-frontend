@@ -54,6 +54,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.getByText(/countdown/)).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'mission_control_countdown_timer');
 
+  await page.getByRole('link', { name: 'Match-Starts' }).click();
   await page.getByTestId('mission-start-next-groups').click();
   await expectMatchStateCount(client, tournament.id, 'in_progress', 4);
   await expect(page.getByTestId('mission-match-card').filter({ hasText: 'in_progress' })).toHaveCount(4, {
@@ -61,6 +62,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   });
   await keyframe(page, testInfo, 'mission_control_started_group_matches');
 
+  await page.getByRole('link', { name: 'Ergebnisse' }).click();
   const activeCard = page
     .getByTestId('mission-match-card')
     .filter({ hasText: 'G1-S1' })
@@ -88,6 +90,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   });
   await keyframe(page, testInfo, 'mission_control_finished_match');
 
+  await page.getByRole('link', { name: 'Teams' }).click();
   await page.getByTestId('mission-control-search').fill('G1-S1');
   const renamed = `G1-S1 Mission ${Date.now()}`;
   await page.getByDisplayValue('G1-S1').fill(renamed);

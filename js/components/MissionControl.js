@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    Alert, Badge, Button, Card, CardBody, Col, Collapse, FormGroup, Input, Label, Row, Table
+    Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
 } from 'reactstrap';
 import {notify} from 'react-notify-toast';
 import {
@@ -15,6 +15,7 @@ import {
 } from '../api';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
 import {TIMER_MODE_COUNTDOWN, TIMER_MODE_COUNTUP} from '../utils/timerState';
+import {TournamentSettingsForm} from './TournamentSettingsForm';
 
 function stageName(level) {
     const names = ['Finale', 'Halbfinale', 'Viertelfinale', 'Achtelfinale'];
@@ -40,11 +41,11 @@ export class MissionControl extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
-            open: props.defaultOpen === true,
+            activeTab: 'timer',
             search: '',
             actionRunning: null
         };
-        this.toggleOpen = this.toggleOpen.bind(this);
+        this.setActiveTab = this.setActiveTab.bind(this);
         this.setSearch = this.setSearch.bind(this);
         this.startGroupMatches = this.startGroupMatches.bind(this);
         this.startStageMatches = this.startStageMatches.bind(this);
@@ -52,8 +53,8 @@ export class MissionControl extends React.Component {
         this.onActionError = this.onActionError.bind(this);
     }
 
-    toggleOpen() {
-        this.setState(prev => ({open: !prev.open}));
+    setActiveTab(tab) {
+        this.setState({activeTab: tab});
     }
 
     setSearch(event) {
@@ -98,60 +99,177 @@ export class MissionControl extends React.Component {
             <div className='container mb-4' data-testid='mission-control'>
                 <Card className='mission-control-card'>
                     <CardBody>
-                        <div className='d-flex align-items-center justify-content-between flex-wrap gap-2'>
+                        <div className='d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3'>
                             <div>
                                 <h2 className='h4 mb-1'>Mission Control</h2>
                                 <div className='text-muted'>Live-Steuerung fuer Turnierleitung</div>
                             </div>
-                            <Button color='dark' outline onClick={this.toggleOpen} data-testid='mission-control-toggle'>
-                                {this.state.open ? 'Ausblenden' : 'Oeffnen'}
-                            </Button>
                         </div>
+
                         {!canControl &&
-                            <Alert color='warning' className='mt-3 mb-0'>
+                            <Alert color='warning' className='mt-3 mb-3'>
                                 Follower-Modus aktiv. Live-Aktionen sind gesperrt.
                             </Alert>}
-                        <Collapse isOpen={this.state.open}>
-                            <div className='mission-control-toolbar mt-3'>
-                                <Input
-                                    type='search'
-                                    value={this.state.search}
-                                    onChange={this.setSearch}
-                                    placeholder='Teams suchen'
-                                    data-testid='mission-control-search'
+
+                        <Nav tabs className='mb-3'>
+                            <NavItem>
+                                <NavLink href='#' active={this.state.activeTab === 'timer'}
+                                    onClick={event => {
+                                        event.preventDefault();
+                                        this.setActiveTab('timer');
+                                    }}>
+                                    Timer
+                                </NavLink>
+                            </NavItem>
+                            <NavItem>
+                                <NavLink href='#' active={this.state.activeTab === 'beamer'}
+                                    onClick={event => {
+                                        event.preventDefault();
+                                        this.setActiveTab('beamer');
+                                    }}>
+                                    Beamer
+                                </NavLink>
+                            </NavItem>
+                            <NavItem>
+                                <NavLink href='#' active={this.state.activeTab === 'starts'}
+                                    onClick={event => {
+                                        event.preventDefault();
+                                        this.setActiveTab('starts');
+                                    }}>
+                                    Match-Starts
+                                </NavLink>
+                            </NavItem>
+                            <NavItem>
+                                <NavLink href='#' active={this.state.activeTab === 'scores'}
+                                    onClick={event => {
+                                        event.preventDefault();
+                                        this.setActiveTab('scores');
+                                    }}>
+                                    Ergebnisse
+                                </NavLink>
+                            </NavItem>
+                            <NavItem>
+                                <NavLink href='#' active={this.state.activeTab === 'teams'}
+                                    onClick={event => {
+                                        event.preventDefault();
+                                        this.setActiveTab('teams');
+                                    }}>
+                                    Teams
+                                </NavLink>
+                            </NavItem>
+                            <NavItem>
+                                <NavLink href='#' active={this.state.activeTab === 'settings'}
+                                    onClick={event => {
+                                        event.preventDefault();
+                                        this.setActiveTab('settings');
+                                    }}>
+                                    Turnier-Einstellungen
+                                </NavLink>
+                            </NavItem>
+                        </Nav>
+
+                        <TabContent activeTab={this.state.activeTab}>
+                            <TabPane tabId='timer'>
+                                <MissionTimer
+                                    tournamentId={tournament.id}
+                                    timerState={tournament.timerState}
+                                    disabled={!canControl}
+                                    onTournamentChange={this.props.onTournamentChange}
                                 />
-                            </div>
-                            <MissionTimer
-                                tournamentId={tournament.id}
-                                timerState={tournament.timerState}
-                                disabled={!canControl}
-                                onTournamentChange={this.props.onTournamentChange}
-                            />
-                            <MissionNextMatches
-                                tournament={tournament}
-                                disabled={!canControl}
-                                actionRunning={this.state.actionRunning}
-                                onStartGroupMatches={this.startGroupMatches}
-                                onStartStageMatches={this.startStageMatches}
-                            />
-                            <MissionMatches
-                                tournament={tournament}
-                                search={this.state.search}
-                                disabled={!canControl}
-                                onTournamentChange={this.props.onTournamentChange}
-                            />
-                            <MissionTeams
-                                teams={tournament.teams}
-                                search={this.state.search}
-                                disabled={!canControl}
-                                onTournamentChange={this.props.onTournamentChange}
-                            />
-                        </Collapse>
+                            </TabPane>
+
+                            <TabPane tabId='beamer'>
+                                <MissionBeamer tournament={tournament} />
+                            </TabPane>
+
+                            <TabPane tabId='starts'>
+                                <MissionNextMatches
+                                    tournament={tournament}
+                                    disabled={!canControl}
+                                    actionRunning={this.state.actionRunning}
+                                    onStartGroupMatches={this.startGroupMatches}
+                                    onStartStageMatches={this.startStageMatches}
+                                />
+                            </TabPane>
+
+                            <TabPane tabId='scores'>
+                                <div className='mission-control-toolbar mb-3'>
+                                    <Input
+                                        type='search'
+                                        value={this.state.search}
+                                        onChange={this.setSearch}
+                                        placeholder='Teams suchen'
+                                        data-testid='mission-control-search'
+                                    />
+                                </div>
+                                <MissionMatches
+                                    tournament={tournament}
+                                    search={this.state.search}
+                                    disabled={!canControl}
+                                    onTournamentChange={this.props.onTournamentChange}
+                                />
+                            </TabPane>
+
+                            <TabPane tabId='teams'>
+                                <div className='mission-control-toolbar mb-3'>
+                                    <Input
+                                        type='search'
+                                        value={this.state.search}
+                                        onChange={this.setSearch}
+                                        placeholder='Teams suchen'
+                                        data-testid='mission-control-search'
+                                    />
+                                </div>
+                                <MissionTeams
+                                    teams={tournament.teams}
+                                    search={this.state.search}
+                                    disabled={!canControl}
+                                    onTournamentChange={this.props.onTournamentChange}
+                                />
+                            </TabPane>
+
+                            <TabPane tabId='settings'>
+                                <MissionTournamentSettings
+                                    tournament={tournament}
+                                    disabled={!canControl}
+                                    onTournamentChange={this.props.onTournamentChange}
+                                />
+                            </TabPane>
+                        </TabContent>
                     </CardBody>
                 </Card>
             </div>
         );
     }
+}
+
+function MissionBeamer(props) {
+    return (
+        <section className='mission-control-section'>
+            <h3 className='h5'>Beamer</h3>
+            <div className='d-flex gap-2 flex-wrap'>
+                <Button color='primary' href={'/t/' + props.tournament.id + '/fullscreen'}>
+                    Vollbild-Ansicht oeffnen
+                </Button>
+                <Button color='secondary' outline href={'/t/' + props.tournament.id + '/fullscreen?beamer=default'}>
+                    Standard-Beamer
+                </Button>
+            </div>
+        </section>
+    );
+}
+
+function MissionTournamentSettings(props) {
+    return (
+        <section className='mission-control-section'>
+            <h3 className='h5'>Turnier-Einstellungen</h3>
+            <TournamentSettingsForm
+                tournament={props.tournament}
+                disabled={props.disabled}
+                onTournamentChange={props.onTournamentChange}
+            />
+        </section>
+    );
 }
 
 class MissionTimer extends React.Component {
