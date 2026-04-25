@@ -40,12 +40,6 @@ export class Match extends React.Component {
         }
     }
 
-    componentDidUpdate(prevProps) {
-        if (prevProps.match !== this.props.match) {
-            this.setState({match: this.props.match});
-        }
-    }
-
     startMatch() {
         startMatch(this.state.match.id, this.onStartMatchSuccess, this.onStartMatchError);
     }
@@ -156,21 +150,24 @@ export class Match extends React.Component {
         }
         return (<div className='mb-3'>
             <Card
-                className={'shadow-sm match'}
+                className={'shadow-sm match ' + styles.matchCard}
                 onClick={this.toggleModal}
                 data-team-level-ids={`${team1Id},${team2Id}`}
                 data-match-id={this.state.match.id}
                 data-decider-match={this.state.match.decider ? 'true' : 'false'}
             >
-                <div className="d-flex flex-row">
-                    <CardBody className={borderClass + ' border py-2 ' + cardClass + ' ' + styles.match_bg}>
+                <div className={styles.matchCardRow}>
+                    <CardBody
+                        className={borderClass + ' border py-2 ' + cardClass + ' ' +
+                            styles.match_bg + ' ' + styles.matchCardBody}
+                    >
                         <MatchTable
                             match={this.state.match}
                             stageLevel={this.props.stageLevel}
                             borderColor={borderClass}
                         />
                     </CardBody>
-                    <span className="badge bg-secondary align-items-center">
+                    <span className={'badge bg-secondary ' + styles.matchCardBadge}>
                         {groupInformation}
                         {deciderInformation}
                         <div className="mb-2 mt-2">Sp. {this.state.match.position}</div>

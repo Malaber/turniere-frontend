@@ -48,13 +48,39 @@ export class PlayoffStages extends Component {
 
     render() {
         return (<div>
-            {this.props.playoffStages.map(stage => <Stage isSignedIn={this.props.isSignedIn}
-                isOwner={this.props.isOwner} updateNextStage={() => this.updateNextStage(stage.id)}
-                readOnlyMode={this.props.readOnlyMode}
-                level={getLevelName(stage.level)} matches={stage.matches} stageLevel={stage.level}
-                key={stage.level}/>)}
+            {this.state.stages.flatMap(stage => getStageSections(stage)).map(section =>
+                <Stage isSignedIn={this.props.isSignedIn}
+                    isOwner={this.props.isOwner} updateNextStage={() => this.updateNextStage(section.stage.id)}
+                    readOnlyMode={this.props.readOnlyMode}
+                    level={section.name} matches={section.matches} stageLevel={section.stage.level}
+                    key={section.key}/>)}
         </div>);
     }
+}
+
+function getStageSections(stage) {
+    if (stage.level !== 0 || stage.matches.length <= 1) {
+        return [{
+            stage: stage,
+            key: stage.level,
+            name: getLevelName(stage.level),
+            matches: stage.matches
+        }];
+    }
+
+    return stage.matches.map(match => ({
+        stage: stage,
+        key: `${stage.level}-${match.position}`,
+        name: getFinalMatchName(match),
+        matches: [match]
+    }));
+}
+
+function getFinalMatchName(match) {
+    if (match.position === 2) {
+        return 'Spiel um Platz 3';
+    }
+    return 'Finale';
 }
 
 function getLevelName(levelNumber) {

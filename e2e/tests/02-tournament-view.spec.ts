@@ -56,6 +56,71 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
 
   await expect(statisticsAction).toBeVisible();
   await expect(fullscreenAction).toBeVisible();
+
+  await expect(page.getByRole('heading', { name: 'Finale' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Spiel um Platz 3' })).toBeVisible();
+  await keyframe(page, testInfo, 'tournament_final_and_third_place_matches');
+});
+
+test('Tournament match cards render all visible states as solid cards', async ({ page }, testInfo) => {
+  const { tournament } = await seedAndPlayGroupStage(2, 4, 4);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  await page.goto(`/t/${tournament.id}`);
+  await expect(page.locator('.stages').first()).toBeVisible({ timeout: 120000 });
+  await expect(page.getByText('Spiel kann gestartet werden').first()).toBeVisible();
+  await expect(page.getByText('Spiel kann noch nicht gestartet werden').first()).toBeVisible();
+  await keyframe(page, testInfo, 'match_cards_not_started_and_not_ready');
+
+  const matchesRes = await client.get<Array<{
+    id: number;
+    state: string;
+    position: number;
+    match_scores: Array<{ id: number; team: { id: number; name: string } | null }>;
+  }>>(`/tournaments/${tournament.id}/matches`);
+  expectStatus(matchesRes, 200, 'fetch tournament matches for state screenshots');
+
+  const playable = matchesRes.json
+    .filter((match) => match.state === 'not_started' && match.match_scores.length === 2)
+    .sort((a, b) => a.position - b.position);
+  expect(playable.length).toBeGreaterThanOrEqual(2);
+
+  const running = playable[0];
+  const started = await client.patch(`/matches/${running.id}`, { state: 'in_progress' });
+  expectStatus(started, 200, 'start match for running card screenshot');
+
+  await page.reload();
+  await expect(page.getByText('Spiel läuft').first()).toBeVisible({ timeout: 10000 });
+  await keyframe(page, testInfo, 'match_cards_in_progress');
+
+  for (const score of running.match_scores) {
+    const points = score.id === running.match_scores[0].id ? 10 : 1;
+    const updated = await client.patch(`/match_scores/${score.id}`, { points });
+    expectStatus(updated, 200, `update score ${score.id} for finished card screenshot`);
+  }
+  const finished = await client.patch(`/matches/${running.id}`, { state: 'finished' });
+  expectStatus(finished, 200, 'finish match for finished card screenshot');
+
+  await page.reload();
+  await expect(page.getByText(/Gewinner:/).first()).toBeVisible({ timeout: 10000 });
+  await keyframe(page, testInfo, 'match_cards_finished');
+
+  const byeCreated = await client.post<{ id: number }>('/tournaments', {
+    name: `E2E Playoff Bye ${Math.random().toString(36).slice(2, 8)}`,
+    description: 'Playwright E2E tournament',
+    public: true,
+    teams: [
+      { name: 'Bye Seed 1' },
+      { name: 'Bye Seed 2' },
+      { name: 'Bye Seed 3' },
+    ],
+  });
+  expectStatus(byeCreated, 201, 'create public playoff tournament with bye');
+
+  await page.goto(`/t/${byeCreated.json.id}`);
+  await expect(page.getByText('kein Gegner, Team kommt weiter').first()).toBeVisible({ timeout: 120000 });
+  await keyframe(page, testInfo, 'match_cards_single_team');
 });
 
 test('Tournament view receives live tournament snapshots', async ({ page }, testInfo) => {
