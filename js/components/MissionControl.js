@@ -63,7 +63,7 @@ function matchStateLabel(state) {
     if (state === 'in_progress') {
         return 'In Progress';
     }
-    if (state === 'not_started') {
+    if (state === 'not_started' || state === 'not_ready') {
         return 'Not Started';
     }
     if (state === 'finished') {
@@ -79,7 +79,7 @@ function matchStateClass(state) {
     if (state === 'finished') {
         return 'is-finished';
     }
-    if (state === 'not_started') {
+    if (state === 'not_started' || state === 'not_ready') {
         return 'is-not-started';
     }
     return 'is-live';
@@ -618,7 +618,7 @@ class MissionTimer extends React.Component {
 
 function MissionNextMatches(props) {
     const groupStage = props.tournament.groupStage;
-    const groups = groupStage ? groupStage.groups.map(group => ({
+    const groups = groupStage && groupStage.state !== 'finished' ? groupStage.groups.map(group => ({
         key: 'group-' + group.id,
         title: 'Gruppe ' + group.number,
         badge: group.matches.length + ' Matches',
