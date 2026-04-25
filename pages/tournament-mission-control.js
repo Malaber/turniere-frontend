@@ -19,7 +19,7 @@ class MissionControlContent extends React.Component {
         const isOwner = username === ownerUsername;
 
         return (
-            <div className='container py-4'>
+            <div className='container-fluid py-4 mission-control-page'>
                 <MissionControl
                     tournament={this.props.tournament}
                     isSignedIn={isSignedIn}

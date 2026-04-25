@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { injectAuth } from '../helpers/auth';
 import { keyframe } from '../helpers/screenshot';
-import { seedGroupStageTournament } from '../helpers/scenario-seeder';
+import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
@@ -58,7 +58,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await page.getByRole('link', { name: 'Match-Starts' }).click();
   await page.getByTestId('mission-start-next-groups').click();
   await expectMatchStateCount(client, tournament.id, 'in_progress', 4);
-  await expect(page.getByTestId('mission-match-card').filter({ hasText: 'in_progress' })).toHaveCount(4, {
+  await expect(page.getByTestId('mission-start-match-card').filter({ hasText: 'Live' })).toHaveCount(4, {
     timeout: 20_000,
   });
   await keyframe(page, testInfo, 'mission_control_started_group_matches');
@@ -105,6 +105,70 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   const teams = await client.get<{ teams: Array<{ id: number; name: string }> }>(`/tournaments/${tournament.id}`);
   expectStatus(teams, 200, 'fetch tournament after team rename');
   expect(teams.json.teams.some((team) => team.name === renamed)).toBe(true);
+});
+
+test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({
+  context,
+  page,
+}, testInfo) => {
+  await injectAuth(context);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
+  const client = await loggedInClient();
+
+  const leftStage = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'Left stage',
+    display_state: 'matches_upcoming',
+  });
+  expectStatus(leftStage, 201, 'create left stage beamer');
+  const backside = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'Backside',
+    display_state: 'matches_finished',
+  });
+  expectStatus(backside, 201, 'create backside beamer');
+
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await expect(page.getByTestId('mission-timer-control')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Countdown starten' })).toBeVisible();
+  await expect(page.getByTestId('mission-timer-quick-20')).toContainText('20:00');
+  await expect(page.getByTestId('mission-timer-quick-15s')).toContainText('00:15');
+  await expect(page.getByRole('heading', { name: 'Countup starten' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Timer verwalten' })).toBeVisible();
+  await keyframe(page, testInfo, 'timer_control_mockup');
+
+  await page.getByRole('link', { name: 'Beamer' }).click();
+  await expect(page.getByTestId('mission-beamer-control')).toBeVisible();
+  await expect(page.getByText('Left stage')).toBeVisible();
+  await expect(page.getByText('Backside')).toBeVisible();
+  await keyframe(page, testInfo, 'beamer_control_mockup');
+
+  await page.getByTestId('mission-beamer-name').fill('Main hall');
+  await page.getByTestId('mission-beamer-create').click();
+  await expect(page.getByText('Main hall')).toBeVisible({ timeout: 20_000 });
+  const beamers = await client.get<Array<{ id: number; name: string; display_state: string }>>(
+    `/tournaments/${tournament.id}/beamers`,
+  );
+  expectStatus(beamers, 200, 'fetch beamers after create');
+  const created = beamers.json.find((beamer) => beamer.name === 'Main hall');
+  expect(created).toBeTruthy();
+
+  await page.getByTestId(`mission-beamer-display-${created!.id}`).selectOption('during_game');
+  await expect.poll(async () => {
+    const updated = await client.get<Array<{ id: number; name: string; display_state: string }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(updated, 200, 'fetch beamers after update');
+    return updated.json.find((beamer) => beamer.id === created!.id)?.display_state;
+  }, { timeout: 20_000 }).toBe('during_game');
+
+  await page.getByRole('link', { name: 'Match-Starts' }).click();
+  await expect(page.getByTestId('mission-match-control')).toBeVisible();
+  await expect(page.getByPlaceholder('Matches suchen...')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Viertelfinale 4 Matches' })).toBeVisible();
+  await expect(page.getByText('Tisch 3 -> Tisch 2')).toBeVisible();
+  await expect(page.getByText('Tisch 4 -> Tisch 2')).toBeVisible();
+  await expect(page.getByText('Tisch 1 -> Tisch 1').first()).toBeVisible();
+  await keyframe(page, testInfo, 'match_control_mockup');
 });
 
 test('Mission Control hidden for anonymous viewers', async ({ page }, testInfo) => {

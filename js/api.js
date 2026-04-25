@@ -777,6 +777,66 @@ export function setTournamentTimer(tournamentId, payload, successCallback, error
     });
 }
 
+export function getBeamers(tournamentId, successCallback, errorCallback) {
+    const currentState = getState();
+    getRequest(currentState, '/tournaments/' + tournamentId + '/beamers').then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
+}
+
+export function createBeamer(tournamentId, payload, successCallback, errorCallback) {
+    const currentState = getState();
+    postRequest(currentState, '/tournaments/' + tournamentId + '/beamers', payload).then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
+}
+
+export function updateBeamer(tournamentId, beamerId, payload, successCallback, errorCallback) {
+    const currentState = getState();
+    patchRequest(currentState, '/tournaments/' + tournamentId + '/beamers/' + beamerId, payload).then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
+}
+
+export function deleteBeamer(tournamentId, beamerId, successCallback, errorCallback) {
+    const currentState = getState();
+    deleteRequest(currentState, '/tournaments/' + tournamentId + '/beamers/' + beamerId).then(resp => {
+        storeOptionalToken(resp);
+        successCallback();
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
+}
+
 export function startNextGroupMatches(groups, successCallback, errorCallback) {
     const matches = groups.map(group => group.matches
         .filter(match => match.state === 'not_started')
