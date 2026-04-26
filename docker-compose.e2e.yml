@@ -48,6 +48,8 @@ services:
     build:
       context: .
       dockerfile: docker/production/Dockerfile
+      args:
+        TURNIERE_FRONTEND_VERSION: e2e
     depends_on:
       backend:
         condition: service_healthy
@@ -66,6 +68,7 @@ services:
       TURNIERE_E2E_EMAIL: e2e@example.com
       TURNIERE_E2E_PASSWORD: password123
       TURNIERE_E2E_USERNAME: e2e-user
+      TURNIERE_EXPECTED_FRONTEND_VERSION: e2e
     volumes:
       - ./e2e/screenshots:/app/screenshots
       - ./e2e/test-results:/app/test-results

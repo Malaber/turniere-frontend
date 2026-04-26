@@ -24,6 +24,7 @@ test('Landing page renders correctly without backend data', async ({ page }, tes
 
   // Footer
   await expect(page.locator('footer')).toBeVisible();
+  await expect(page.locator('footer').getByRole('link', { name: 'Version' })).toHaveAttribute('href', '/version');
 
   await keyframe(page, testInfo, 'landing_full');
 });
