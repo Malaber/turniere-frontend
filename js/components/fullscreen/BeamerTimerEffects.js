@@ -43,13 +43,6 @@ function emitDebugEvent(type, payload) {
     }
     window.__beamerTimerEffects.events.push(event);
     window.dispatchEvent(new CustomEvent('beamer-timer-effect', {detail: event}));
-
-    if (window.__beamerTimerAudioLogging !== false && window.console) {
-        const logFn = type === 'sound-unavailable' || type === 'sound-seek-error' ?
-            'warn' :
-            'info';
-        window.console[logFn]('[beamer-audio]', type, event);
-    }
 }
 
 
@@ -85,16 +78,16 @@ export class BeamerTimerEffects extends React.Component {
         this.previousSecondsRemaining = null;
         this.timerSessionKey = null;
         this.finishedTriggered = false;
+        this.unlockInProgress = false;
+        this.lastUnlockAt = 0;
 
         this.checkAudioPermission = this.checkAudioPermission.bind(this);
         this.tick = this.tick.bind(this);
         this.manualUnlock = this.manualUnlock.bind(this);
         this.retryPendingCue = this.retryPendingCue.bind(this);
-        this.testCue = this.testCue.bind(this);
     }
 
     componentDidMount() {
-        this.installDebugApi();
         this.checkAudioPermission('page-load').catch(() => {});
         this.tick();
         this.intervalId = setInterval(this.tick, TICK_MS);
@@ -108,75 +101,7 @@ export class BeamerTimerEffects extends React.Component {
 
     componentWillUnmount() {
         clearInterval(this.intervalId);
-        this.uninstallDebugApi();
         this.stopActiveSounds('unmount');
-    }
-
-    installDebugApi() {
-        if (typeof window === 'undefined') return;
-
-        window.__beamerTimerAudio = {
-            clear: () => {
-                if (window.__beamerTimerEffects) {
-                    window.__beamerTimerEffects.events = [];
-                }
-            },
-            cues: TIMER_EFFECT_CUES,
-            events: () => (window.__beamerTimerEffects && window.__beamerTimerEffects.events) || [],
-            help: () => ({
-                clear: '__beamerTimerAudio.clear()',
-                disableLogs: 'window.__beamerTimerAudioLogging = false',
-                enableLogs: 'window.__beamerTimerAudioLogging = true',
-                events: '__beamerTimerAudio.events().slice(-20)',
-                policy: '__beamerTimerAudio.policy()',
-                retry: '__beamerTimerAudio.retry()',
-                state: '__beamerTimerAudio.state()',
-                testCue: '__beamerTimerAudio.testCue("start-countdown", 5)'
-            }),
-            policy: () => {
-                if (!navigator.getAutoplayPolicy) {
-                    return {
-                        audioContext: 'unsupported',
-                        mediaElement: 'unsupported'
-                    };
-                }
-                try {
-                    return {
-                        audioContext: navigator.getAutoplayPolicy('audiocontext'),
-                        mediaElement: navigator.getAutoplayPolicy('mediaelement')
-                    };
-                } catch (error) {
-                    return {error: error.message};
-                }
-            },
-            retry: () => this.retryPendingCue('manual-debug'),
-            state: () => ({
-                activeSounds: this.activeSounds.map(audio => ({
-                    currentTime: audio.currentTime,
-                    muted: audio.muted,
-                    paused: audio.paused,
-                    readyState: audio.readyState,
-                    src: audio.currentSrc || audio.src,
-                    volume: audio.volume
-                })),
-                audioPermissionStatus: this.state.audioPermissionStatus,
-                pendingCue: this.pendingCue && this.pendingCue.key,
-                policy: window.__beamerTimerAudio.policy(),
-                timerSessionKey: this.timerSessionKey,
-                userActivation: navigator.userActivation ? {
-                    hasBeenActive: navigator.userActivation.hasBeenActive,
-                    isActive: navigator.userActivation.isActive
-                } : 'unsupported'
-            }),
-            testCue: this.testCue
-        };
-    }
-
-    uninstallDebugApi() {
-        if (typeof window === 'undefined') return;
-        if (window.__beamerTimerAudio && window.__beamerTimerAudio.testCue === this.testCue) {
-            delete window.__beamerTimerAudio;
-        }
     }
 
     resetSessionIfNeeded(timerState) {
@@ -282,16 +207,22 @@ export class BeamerTimerEffects extends React.Component {
         this.playCue(cue, elapsedSeconds);
     }
 
-    manualUnlock() {
+    manualUnlock(event) {
+        if (event) {
+            event.preventDefault();
+        }
+
+        const now = Date.now();
+        if (this.unlockInProgress || now - this.lastUnlockAt < 750) return;
+
+        this.lastUnlockAt = now;
+        this.unlockInProgress = true;
         this.checkAudioPermission('manual-unlock')
             .then(() => this.retryPendingCue('manual-unlock'))
-            .catch(() => {});
-    }
-
-    testCue(key, elapsedSeconds) {
-        const cue = TIMER_EFFECT_CUES.find(candidate => candidate.key === key) || TIMER_EFFECT_CUES[0];
-        const elapsed = Number.isFinite(elapsedSeconds) ? elapsedSeconds : 0;
-        this.playCue(cue, elapsed);
+            .catch(() => {})
+            .then(() => {
+                this.unlockInProgress = false;
+            });
     }
 
     checkAudioPermission(reason) {
@@ -490,7 +421,10 @@ export class BeamerTimerEffects extends React.Component {
             <button
                 type="button"
                 data-testid="beamer-sound-unlock"
+                aria-label="Audio aktivieren"
                 onClick={this.manualUnlock}
+                onPointerUp={this.manualUnlock}
+                onTouchEnd={this.manualUnlock}
                 style={{
                     position: 'fixed',
                     right: '1rem',
@@ -500,8 +434,10 @@ export class BeamerTimerEffects extends React.Component {
                     borderRadius: '6px',
                     background: '#111827',
                     color: '#ffffff',
+                    cursor: 'pointer',
                     fontSize: '1rem',
                     fontWeight: 700,
+                    minHeight: '44px',
                     padding: '0.75rem 1rem'
                 }}
             >

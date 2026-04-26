@@ -354,7 +354,6 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   const syncedStart = audioPlayEvents.find(
     (event) => event.src.includes('start_countdown.mp3'),
   );
-  const debugState = await page.evaluate(() => (window as any).__beamerTimerAudio.state());
 
   expect(soundCues).toEqual(expect.arrayContaining([
     'start-countdown',
@@ -368,8 +367,7 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   ]));
   expect(syncedStart).toBeTruthy();
   expect(syncedStart.currentTime).toBeGreaterThan(0);
-  expect(debugState.activeSounds.length).toBeGreaterThan(0);
-  expect(debugState.audioPermissionStatus).toBe('allowed');
+  expect(effectEvents.some((event) => event.type === 'audio-permission-allowed')).toBeTruthy();
   expect(audioEvents.some((event) => event.type === 'audio-pause')).toBeTruthy();
 
   const finishStop = effectEvents.find(

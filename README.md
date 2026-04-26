@@ -49,17 +49,6 @@ venue beamer, use a dedicated Chrome/Chromium profile with autoplay enabled:
   "https://turnie.re/t/TOURNAMENT/fullscreen?beamer=default"
 ```
 
-The fullscreen page logs audio state to the browser console with the
-`[beamer-audio]` prefix. Useful debug commands:
-
-```
-__beamerTimerAudio.help()
-__beamerTimerAudio.state()
-__beamerTimerAudio.policy()
-__beamerTimerAudio.events().slice(-20)
-__beamerTimerAudio.testCue("start-countdown", 5)
-```
-
 On load, the beamer page probes audible autoplay. If the browser blocks it, a
 small warning button appears in the lower right corner before the timer sound is
 needed. Clicking it grants activation for the current page load and retries any
