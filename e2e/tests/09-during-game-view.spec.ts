@@ -107,6 +107,7 @@ async function installBeamerEffectSpies(page: Page) {
       preload = '';
       volume = 1;
       currentTime = 0;
+      muted = false;
       readyState = 1;
 
       constructor(src: string) {
@@ -115,10 +116,21 @@ async function installBeamerEffectSpies(page: Page) {
       }
 
       play() {
+        if ((window as any).__blockBeamerAudioOnce && !this.muted) {
+          (window as any).__blockBeamerAudioOnce = false;
+          (window as any).__beamerAudioEvents.push({
+            type: 'audio-blocked',
+            src: this.src,
+            currentTime: this.currentTime,
+          });
+          return Promise.reject(new Error('NotAllowedError'));
+        }
+
         (window as any).__beamerAudioEvents.push({
           type: 'audio-play',
           src: this.src,
           currentTime: this.currentTime,
+          muted: this.muted,
           volume: this.volume,
         });
         return Promise.resolve();
@@ -290,6 +302,9 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1920, height: 1080 });
   await installBeamerEffectSpies(page);
+  await page.addInitScript(() => {
+    (window as any).__blockBeamerAudioOnce = true;
+  });
 
   const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(12, {
     timerSeconds: 20 * 60 + 5,
@@ -300,7 +315,12 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'effects_loaded');
+  await waitForBeamerEffect(page, 'audio-permission-blocked');
+  await expect(page.getByTestId('beamer-sound-unlock')).toBeVisible();
+  await page.getByTestId('beamer-sound-unlock').click();
+  await waitForBeamerEffect(page, 'audio-permission-allowed');
   await waitForBeamerEffect(page, 'sound', 'start-countdown');
+  await waitForBeamerEffect(page, 'sound-started', 'start-countdown');
   await keyframe(page, testInfo, 'start_countdown_sound_synced');
 
   const midCue = await client.patch(`/tournaments/${tournament.id}/timer`, {
@@ -347,6 +367,7 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   ]));
   expect(syncedStart).toBeTruthy();
   expect(syncedStart.currentTime).toBeGreaterThan(0);
+  expect(effectEvents.some((event) => event.type === 'audio-permission-allowed')).toBeTruthy();
   expect(audioEvents.some((event) => event.type === 'audio-pause')).toBeTruthy();
 
   const finishStop = effectEvents.find(
