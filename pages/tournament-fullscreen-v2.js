@@ -24,8 +24,10 @@ const DISPLAY_STATE_LABELS = {
     'matches_not_started': 'bereit zum Starten',
     'matches_finished': 'beendet',
     'groups': 'Gruppenstand',
+    'group_tables': 'Gruppenstand',
     'between_games': 'Zwischen den Spielen',
-    'during_game': 'Während dem Spiel'
+    'during_game': 'Während dem Spiel',
+    'static_image': 'Statisches Bild'
 };
 
 const DISPLAY_STATE_TO_BACKEND_FILTER = {
@@ -35,8 +37,24 @@ const DISPLAY_STATE_TO_BACKEND_FILTER = {
     'matches_not_started': 'not_started',
     'matches_finished': 'finished',
     'between_games': null,
-    'during_game': 'in_progress'
+    'during_game': 'in_progress',
+    'groups': null,
+    'group_tables': null,
+    'static_image': null
 };
+
+function matchStateFromConfig(config) {
+    if (!config || typeof config.match_filter !== 'string') {
+        return null;
+    }
+
+    const match = config.match_filter.match(/^state:([^,\s]+)$/);
+    return match ? match[1] : null;
+}
+
+function backendFilterForDisplayState(displayState, config = null) {
+    return matchStateFromConfig(config) || DISPLAY_STATE_TO_BACKEND_FILTER[displayState] || null;
+}
 
 
 class Main extends React.Component {
@@ -52,7 +70,8 @@ class Main extends React.Component {
             tournament: null,
             matches: [],
             timerState: {mode: null, timestampIso: null},
-            displayState: props.query.display || 'matches_all',
+            displayState: props.query.display || 'during_game',
+            beamerConfig: null,
             beamerName: props.query.beamer || 'default',
             qrCodeUrl: null,
             logoUrl: null,
@@ -179,7 +198,7 @@ class Main extends React.Component {
             return;
         }
 
-        const state = DISPLAY_STATE_TO_BACKEND_FILTER[this.state.displayState];
+        const state = backendFilterForDisplayState(this.state.displayState, this.state.beamerConfig);
         const key = tournamentId + ':' + (state || '');
         if (this.matchesSocketKey === key) {
             return;
@@ -203,6 +222,7 @@ class Main extends React.Component {
             (status, beamer) => {
                 this.setState({
                     displayState: beamer.display_state,
+                    beamerConfig: beamer.config || null,
                     beamerName: beamer.name,
                     qrCodeUrl: beamer.qr_code_url,
                     logoUrl: beamer.logo_url,
@@ -216,7 +236,15 @@ class Main extends React.Component {
                 });
             },
             () => {
-                this.updateMatches();
+                if (beamerName !== 'default') {
+                    this.refreshBeamerConfig(code, 'default');
+                    return;
+                }
+                this.setState({
+                    displayState: 'during_game',
+                    beamerConfig: null,
+                    loadedMatches: false
+                }, this.updateMatches);
             }
         );
     }
@@ -235,6 +263,7 @@ class Main extends React.Component {
         const reconnectNeeded = this.state.beamerName !== beamer.name;
         this.setState({
             displayState: beamer.display_state,
+            beamerConfig: beamer.config || null,
             beamerName: beamer.name,
             qrCodeUrl: beamer.qr_code_url,
             logoUrl: beamer.logo_url,
@@ -287,7 +316,7 @@ class Main extends React.Component {
             return;
         }
 
-        const currentFilter = DISPLAY_STATE_TO_BACKEND_FILTER[this.state.displayState] || null;
+        const currentFilter = backendFilterForDisplayState(this.state.displayState, this.state.beamerConfig);
         const messageFilter = message.state || null;
         if (messageFilter !== currentFilter) {
             return;
@@ -302,7 +331,7 @@ class Main extends React.Component {
 
     updateMatches() {
         const code = this.props.query.code;
-        const backendFilter = DISPLAY_STATE_TO_BACKEND_FILTER[this.state.displayState];
+        const backendFilter = backendFilterForDisplayState(this.state.displayState, this.state.beamerConfig);
         getTournamentMatches(code,
             (status, matches) => {
                 this.setState({matchesStatus: status, matches: matches, loadedMatches: true});
@@ -341,6 +370,7 @@ class Main extends React.Component {
 
         switch (displayState) {
         case 'groups':
+        case 'group_tables':
             return <GroupsView
                 tournament={tournament}
                 qrCodeUrl={qrCodeUrl}
