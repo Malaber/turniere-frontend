@@ -45,7 +45,10 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Turnier-Einstellungen' })).toBeVisible();
-  await expect(page.getByTestId('mission-tournament-link')).toHaveAttribute('href', `/t/${tournament.code}`);
+  await expect(page.getByTestId('mission-tournament-link')).toHaveAttribute('href', `/t/${tournament.id}`);
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
+  const initialScoresPane = page.locator('.tab-pane.active');
+  await expect(initialScoresPane.getByTestId('mission-control-search')).toBeFocused();
   await keyframe(page, testInfo, 'mission_control_open');
 
   await page.getByRole('link', { name: 'Match-Starts' }).click();
@@ -71,16 +74,19 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
     .filter({ hasText: 'G1-S1' })
     .filter({ hasText: 'G1-S2' });
   await expect(activeCard).toHaveCount(1);
-  await activeCard.getByRole('spinbutton').nth(0).fill('7');
-  await activeCard.getByRole('spinbutton').nth(1).fill('4');
-  await expect(activeCard.getByRole('spinbutton').nth(0)).toHaveValue('7');
-  await expect(activeCard.getByRole('spinbutton').nth(1)).toHaveValue('4');
-  await activeCard.getByRole('spinbutton').nth(1).press(submitShortcut);
+  await expect(activeCard.locator('.mission-start-table')).toHaveCount(0);
+  const g1s1Score = activeCard.getByLabel('G1-S1 score');
+  const g1s2Score = activeCard.getByLabel('G1-S2 score');
+  await g1s1Score.fill('7');
+  await g1s2Score.fill('4');
+  await expect(g1s1Score).toHaveValue('7');
+  await expect(g1s2Score).toHaveValue('4');
+  await g1s2Score.press(submitShortcut);
   await expectMatchStateCount(client, tournament.id, 'in_progress', 4);
-  await expect(activeCard.getByRole('spinbutton').nth(0)).toHaveValue('7', {
+  await expect(g1s1Score).toHaveValue('7', {
     timeout: 20_000,
   });
-  await expect(activeCard.getByRole('spinbutton').nth(1)).toHaveValue('4', {
+  await expect(g1s2Score).toHaveValue('4', {
     timeout: 20_000,
   });
   await keyframe(page, testInfo, 'mission_control_saved_live_score');
@@ -95,6 +101,20 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
     timeout: 20_000,
   });
   await keyframe(page, testInfo, 'mission_control_finished_match');
+
+  await expect(g1s1Score).toBeDisabled();
+  await activeCard.getByTestId('mission-match-lock').hover();
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  await expect(g1s1Score).toBeEnabled();
+  await g1s1Score.fill('8');
+  await g1s2Score.fill('5');
+  await g1s2Score.press(submitShortcut);
+  await expectMatchStateCount(client, tournament.id, 'finished', 1);
+  await expect(g1s1Score).toHaveValue('8', { timeout: 20_000 });
+  await expect(g1s2Score).toHaveValue('5', { timeout: 20_000 });
+  await keyframe(page, testInfo, 'mission_control_unlocked_finished_score');
 
   await page.getByRole('link', { name: 'Teams' }).click();
   await expect(page).toHaveURL(/#teams$/);
@@ -120,6 +140,8 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.locator('.tab-pane.active').getByRole('heading', { name: 'Teams' })).toBeVisible({
     timeout: 20_000,
   });
+  await page.goto(`/t/${tournament.code}`);
+  await expect(page).toHaveURL(new RegExp(`/t/${tournament.id}$`), { timeout: 20_000 });
 });
 
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({
@@ -133,17 +155,18 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
 
   const leftStage = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'Left stage',
-    display_state: 'matches_upcoming',
+    display_state: 'during_game',
   });
   expectStatus(leftStage, 201, 'create left stage beamer');
   const backside = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'Backside',
-    display_state: 'matches_finished',
+    display_state: 'between_games',
   });
   expectStatus(backside, 201, 'create backside beamer');
 
   await page.goto(`/t/${tournament.id}/mission-control`);
   await expect(page.getByTestId('mission-timer-control')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('mission-tournament-link')).toHaveText(/Turnier öffnen/);
   await expect(page.getByRole('heading', { name: 'Countdown starten' })).toBeVisible();
   await expect(page.getByTestId('mission-current-timer-display')).toBeVisible();
   await expect(page.getByTestId('mission-timer-quick-20s')).toContainText('00:20');

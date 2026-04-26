@@ -346,7 +346,6 @@
     color: #0f7a2a;
     font-weight: 700;
     margin-bottom: 0.75rem;
-    min-height: 1.5rem;
 }
 
 .mission-start-row,
@@ -428,6 +427,22 @@ i.is-finished {
 .mission-next-table {
     gap: 0.35rem;
     margin-top: 0.85rem;
+}
+
+.mission-lock-button {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: #25313f;
+    cursor: pointer;
+    display: inline-flex;
+    gap: 0.45rem;
+    padding: 0;
+}
+
+.mission-lock-button:focus-visible {
+    outline: 2px solid #006fff;
+    outline-offset: 2px;
 }
 
 @media (max-width: 400px) {

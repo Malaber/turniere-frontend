@@ -19,6 +19,7 @@ import {connectToTimerSocket} from '../js/utils/beamerSocket';
 import {normalizeTimerState} from '../js/utils/timerState';
 import {connectToTournamentSocket} from '../js/utils/tournamentLiveSocket';
 import {convertTournamentSnapshot} from '../js/redux/tournamentApi';
+import {requestTournamentList} from '../js/api';
 
 class PrivateTournamentPage extends React.Component {
     render() {
@@ -113,6 +114,8 @@ class Main extends React.Component {
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
         this.reloadTournament = this.reloadTournament.bind(this);
+        this.redirectCodeToId = this.redirectCodeToId.bind(this);
+        this.redirectCodeFromTournamentLists = this.redirectCodeFromTournamentLists.bind(this);
         this.onTimerMessage = this.onTimerMessage.bind(this);
         this.onTournamentMessage = this.onTournamentMessage.bind(this);
     }
@@ -136,6 +139,7 @@ class Main extends React.Component {
 
     onTournamentRequestSuccess(requestStatus, tournament) {
         this.setState({status: requestStatus, tournament: tournament, loaded: true});
+        this.redirectCodeToId(tournament);
         if (!this.timerSocket && tournament.id) {
             this.timerSocket = connectToTimerSocket({
                 tournamentId: tournament.id,
@@ -150,12 +154,58 @@ class Main extends React.Component {
         }
     }
 
+    redirectCodeToId(tournament) {
+        if (!tournament || !tournament.id) {
+            return;
+        }
+        if (String(this.props.query.code) === String(tournament.id)) {
+            if (String(tournament.code) !== String(this.props.query.code)) {
+                this.redirectCodeFromTournamentLists(false);
+            }
+            return;
+        }
+        window.location.replace('/t/' + tournament.id);
+    }
+
     onTournamentRequestError(error) {
+        if (error.response && error.response.status === 404 && !/^\d+$/.test(String(this.props.query.code))) {
+            this.redirectCodeFromTournamentLists(true);
+            return;
+        }
         if (error.response) {
             this.setState({status: error.response.status, loaded: true});
         } else {
             this.setState({status: -1, loaded: true});
         }
+    }
+
+    redirectCodeFromTournamentLists(showNotFound = true) {
+        const redirectMatch = tournaments => {
+            const tournament = tournaments.find(item => String(item.code) === String(this.props.query.code));
+            if (tournament && tournament.id) {
+                window.location.replace('/t/' + tournament.id);
+                return true;
+            }
+            return false;
+        };
+        const setNotFound = () => this.setState({status: 404, loaded: true});
+        const tryPublic = () => requestTournamentList('public', tournaments => {
+            if (!redirectMatch(tournaments)) {
+                if (showNotFound) {
+                    setNotFound();
+                }
+            }
+        }, () => {
+            if (showNotFound) {
+                setNotFound();
+            }
+        });
+
+        requestTournamentList('private', tournaments => {
+            if (!redirectMatch(tournaments)) {
+                tryPublic();
+            }
+        }, tryPublic);
     }
 
     onTimerMessage(message) {

@@ -53,7 +53,7 @@ const DISPLAY_STATES = [
     {value: 'matches_finished', label: 'Beendete Matches'},
     {value: 'groups', label: 'Gruppenstand'},
     {value: 'between_games', label: 'Zwischen den Spielen'},
-    {value: 'during_game', label: 'Waehrend dem Spiel'}
+    {value: 'during_game', label: 'Während dem Spiel'}
 ];
 
 const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'teams', 'settings'];
@@ -141,12 +141,12 @@ export class MissionControl extends React.Component {
         window.removeEventListener('keydown', this.handleGlobalKeyDown);
     }
 
-    setActiveTab(tab, updateUrl = true) {
+    setActiveTab(tab, updateUrl = true, callback = null) {
         if (TAB_IDS.indexOf(tab) === -1) {
             return;
         }
 
-        this.setState({activeTab: tab});
+        this.setState({activeTab: tab}, callback);
         if (updateUrl && typeof window !== 'undefined') {
             window.history.pushState(null, '', '#' + tab);
         }
@@ -172,15 +172,16 @@ export class MissionControl extends React.Component {
 
     focusSearch() {
         const focus = () => {
-            if (this.searchInput.current) {
-                this.searchInput.current.focus();
-                this.searchInput.current.select();
+            const activeSearch = document.querySelector('.tab-pane.active [data-testid="mission-control-search"]');
+            const input = activeSearch || this.searchInput.current;
+            if (input) {
+                input.focus();
+                input.select();
             }
         };
 
         if (SEARCH_TAB_IDS.indexOf(this.state.activeTab) === -1) {
-            this.setActiveTab('scores');
-            window.setTimeout(focus, 0);
+            this.setActiveTab('scores', true, focus);
             return;
         }
 
@@ -229,12 +230,12 @@ export class MissionControl extends React.Component {
                         <div className='d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3'>
                             <div>
                                 <h2 className='h4 mb-1'>Mission Control</h2>
-                                <div className='text-muted'>Live-Steuerung fuer Turnierleitung</div>
+                                <div className='text-muted'>Live-Steuerung für Turnierleitung</div>
                             </div>
                             <Button color='outline-primary'
-                                href={'/t/' + tournament.code}
+                                href={'/t/' + tournament.id}
                                 data-testid='mission-tournament-link'>
-                                Turnier oeffnen <FaExternalLinkAlt aria-hidden='true' />
+                                Turnier öffnen <FaExternalLinkAlt aria-hidden='true' />
                             </Button>
                         </div>
 
@@ -406,7 +407,7 @@ class MissionBeamer extends React.Component {
         this.setState({running: true});
         createBeamer(this.props.tournament.id, {
             name: this.state.name.trim(),
-            display_state: 'matches_all'
+            display_state: 'during_game'
         }, () => {
             notify.show('Beamer wurde erstellt.', 'success', 2000);
             this.setState({name: ''});
@@ -427,7 +428,7 @@ class MissionBeamer extends React.Component {
     remove(beamer) {
         this.setState({running: true});
         deleteBeamer(this.props.tournament.id, beamer.id, () => {
-            notify.show('Beamer wurde geloescht.', 'success', 2000);
+            notify.show('Beamer wurde gelöscht.', 'success', 2000);
             this.reload();
         }, this.onError);
     }
@@ -482,7 +483,7 @@ class MissionBeamer extends React.Component {
                                         disabled={this.state.running || this.props.disabled}
                                         data-testid={'mission-beamer-delete-' + beamer.id}
                                         onClick={() => this.remove(beamer)}>
-                                        <FaTrash aria-hidden='true' /> Loeschen
+                                        <FaTrash aria-hidden='true' /> Löschen
                                     </Button>
                                 </td>
                             </tr>
@@ -503,7 +504,7 @@ class MissionBeamer extends React.Component {
                         value={this.state.name}
                         onChange={this.setName}
                         disabled={this.state.running || this.props.disabled}
-                        placeholder='z.B. Hauptbeamer'
+                        placeholder='z. B. Hauptbeamer'
                         data-testid='mission-beamer-name' />
                     <Button type='submit' color='primary' className='mt-3'
                         disabled={this.state.running || this.props.disabled || !this.state.name.trim()}
@@ -690,7 +691,7 @@ class MissionTimer extends React.Component {
 
                 <div className='mission-control-panel mt-3'>
                     <h3 className='h5 mission-pane-heading'>Countup starten</h3>
-                    <p>Starte einen aufwaertszaehlenden Timer.</p>
+                    <p>Starte einen aufwärtszählenden Timer.</p>
                     <Button color='info' className='mission-countup-button'
                         disabled={this.props.disabled || this.state.running}
                         data-testid='mission-timer-countup'
@@ -701,12 +702,12 @@ class MissionTimer extends React.Component {
 
                 <div className='mission-control-panel mt-3'>
                     <h3 className='h5 mission-pane-heading'>Timer verwalten</h3>
-                    <p>Alle aktiven Timer stoppen und zuruecksetzen.</p>
+                    <p>Alle aktiven Timer stoppen und zurücksetzen.</p>
                     <Button outline color='danger' className='w-100'
                         disabled={this.props.disabled || this.state.running}
                         data-testid='mission-timer-clear'
                         onClick={this.clearTimer}>
-                        Timer loeschen
+                        Timer löschen
                     </Button>
                 </div>
             </section>
@@ -727,19 +728,19 @@ function MissionNextMatches(props) {
         <section className='mission-control-section mission-pane-starts' data-testid='mission-match-control'>
             <h3 className='h5 mission-pane-heading'>Bulk Match-Starts</h3>
             <p className='text-muted'>
-                Startet jeweils die naechsten startbaren Matches gesammelt. Ergebnis- und Scorepflege liegt im
+                Startet jeweils die nächsten startbaren Matches gesammelt. Ergebnis- und Scorepflege liegt im
                 Ergebnisse-Tab.
             </p>
             <div className='mission-bulk-start-grid'>
                 {groupStage && groupStage.state !== 'finished' ?
                     <div className='mission-control-panel'>
                         <h4>Gruppenphase</h4>
-                        <p>Startet das naechste offene Match pro Gruppe.</p>
+                        <p>Startet das nächste offene Match pro Gruppe.</p>
                         <Button color='success'
                             data-testid='mission-start-next-groups'
                             disabled={props.disabled || props.actionRunning === 'group'}
                             onClick={props.onStartGroupMatches}>
-                            Naechste Gruppenmatches starten
+                            Nächste Gruppenmatches starten
                         </Button>
                     </div> :
                     <div className='mission-control-panel'>
@@ -808,7 +809,7 @@ function MissionMatches(props) {
                 </div>
                 <Button color='link' className='mission-filter-reset'
                     onClick={() => props.onSearchChange({target: {value: ''}})}>
-                    x Filter zuruecksetzen
+                    x Filter zurücksetzen
                 </Button>
             </div>
             {rows.map(row => (
@@ -912,6 +913,9 @@ class MissionMatchCard extends React.Component {
         this.startMatch = this.startMatch.bind(this);
         this.submit = this.submit.bind(this);
         this.onFormKeyDown = this.onFormKeyDown.bind(this);
+        this.startUnlockHold = this.startUnlockHold.bind(this);
+        this.cancelUnlockHold = this.cancelUnlockHold.bind(this);
+        this.unlockTemporarily = this.unlockTemporarily.bind(this);
         this.onStartSuccess = this.onStartSuccess.bind(this);
         this.onStartError = this.onStartError.bind(this);
         this.onScoresSuccess = this.onScoresSuccess.bind(this);
@@ -924,16 +928,28 @@ class MissionMatchCard extends React.Component {
             score1: scoreFor(props.match, 'team1'),
             score2: scoreFor(props.match, 'team2'),
             live: props.match.state === 'in_progress',
+            temporaryUnlocked: false,
             running: false
         };
+    }
+
+    componentWillUnmount() {
+        this.cancelUnlockHold();
+        if (this.unlockResetTimer) {
+            window.clearTimeout(this.unlockResetTimer);
+        }
     }
 
     componentDidUpdate(prevProps) {
         const scoreChanged = scoreFor(prevProps.match, 'team1') !== scoreFor(this.props.match, 'team1') ||
             scoreFor(prevProps.match, 'team2') !== scoreFor(this.props.match, 'team2');
-        if (prevProps.match.id !== this.props.match.id || prevProps.match.state !== this.props.match.state ||
-            scoreChanged) {
+        if (prevProps.match.id !== this.props.match.id || prevProps.match.state !== this.props.match.state) {
             this.setState(this.scoreStateFromProps(this.props));
+        } else if (scoreChanged) {
+            this.setState({
+                score1: scoreFor(this.props.match, 'team1'),
+                score2: scoreFor(this.props.match, 'team2')
+            });
         }
     }
 
@@ -993,6 +1009,35 @@ class MissionMatchCard extends React.Component {
         event.currentTarget.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
     }
 
+    startUnlockHold(event) {
+        if (this.props.disabled || this.props.match.state !== 'finished') {
+            return;
+        }
+
+        event.preventDefault();
+        this.cancelUnlockHold();
+        this.unlockHoldTimer = window.setTimeout(this.unlockTemporarily, 600);
+    }
+
+    cancelUnlockHold() {
+        if (this.unlockHoldTimer) {
+            window.clearTimeout(this.unlockHoldTimer);
+            this.unlockHoldTimer = null;
+        }
+    }
+
+    unlockTemporarily() {
+        this.unlockHoldTimer = null;
+        this.setState({temporaryUnlocked: true});
+        if (this.unlockResetTimer) {
+            window.clearTimeout(this.unlockResetTimer);
+        }
+        this.unlockResetTimer = window.setTimeout(() => {
+            this.unlockResetTimer = null;
+            this.setState({temporaryUnlocked: false});
+        }, 6000);
+    }
+
     onStartSuccess() {
         notify.show('Match wurde gestartet.', 'success', 2000);
         this.setState({running: false, live: true});
@@ -1005,9 +1050,9 @@ class MissionMatchCard extends React.Component {
     }
 
     onScoresSuccess() {
-        if (this.submittedLive) {
+        if (this.submittedLive || this.state.temporaryUnlocked) {
             notify.show('Score wurde gespeichert.', 'success', 2000);
-            this.setState({running: false});
+            this.setState({temporaryUnlocked: false, running: false});
             this.props.onTournamentChange();
             return;
         }
@@ -1028,20 +1073,18 @@ class MissionMatchCard extends React.Component {
 
     render() {
         const match = this.props.match;
-        const editable = match.state === 'in_progress' && !this.props.disabled;
+        const editable = (match.state === 'in_progress' || this.state.temporaryUnlocked) && !this.props.disabled;
         const canStart = match.state === 'not_started' && !this.props.disabled;
         const stateClass = matchStateClass(match.state);
         const stateLabel = match.state === 'in_progress' ? 'Live' : matchStateLabel(match.state);
-        const groupNumber = match.group ? match.group.number : Math.max(1, match.position);
-        const tableLabel = 'G' + groupNumber + '-S' + match.position;
         return (
             <form onSubmit={this.submit} className={'mission-control-match mission-start-card ' + stateClass}
                 onKeyDown={this.onFormKeyDown}
                 data-testid='mission-match-card'>
-                <div className='mission-start-table'>
-                    {tableLabel}
-                    {match.decider && <Badge color='warning' className='ms-2'>Entscheidung</Badge>}
-                </div>
+                {match.decider &&
+                    <div className='mission-start-table'>
+                        <Badge color='warning'>Entscheidung</Badge>
+                    </div>}
                 <div className='mission-start-row'>
                     <Label className='mb-0'>
                         <FaUsers aria-hidden='true' />
@@ -1075,7 +1118,19 @@ class MissionMatchCard extends React.Component {
                             <i className={stateClass}></i>{stateLabel}
                         </Label>
                     </FormGroup>
-                    <span><FaLock aria-hidden='true' />Locked</span>
+                    <button type='button'
+                        className='mission-lock-button'
+                        data-testid='mission-match-lock'
+                        onMouseDown={this.startUnlockHold}
+                        onMouseUp={this.cancelUnlockHold}
+                        onMouseLeave={this.cancelUnlockHold}
+                        onTouchStart={this.startUnlockHold}
+                        onTouchEnd={this.cancelUnlockHold}
+                        onTouchCancel={this.cancelUnlockHold}
+                        title='Gedrückt halten, um Ergebnis kurz zu entsperren'>
+                        <FaLock aria-hidden='true' />
+                        {this.state.temporaryUnlocked ? 'Kurz entsperrt' : 'Locked'}
+                    </button>
                 </div>
                 {this.props.playoff &&
                     <div className='mission-next-table'>
