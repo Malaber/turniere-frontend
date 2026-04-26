@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
 import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
@@ -8,6 +9,11 @@ const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
+
+async function expectDuringGameEmpty(page: Page): Promise<void> {
+  await expect(page.getByText(/Kein Timer gesetzt/i)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/keine laufenden Matches/i)).toBeVisible({ timeout: 20_000 });
+}
 
 async function startMatches(
   client: ApiClient,
@@ -51,7 +57,7 @@ test('Fullscreen beamer page renders with default fallback', async ({ page }, te
 
   // --- Fullscreen without beamer param (should fallback to default) ---
   await page.goto(`/t/${tournament.id}/fullscreen`);
-  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 20_000 });
+  await expectDuringGameEmpty(page);
   await keyframe(page, testInfo, 'fullscreen_loaded');
 
   // Cursor is hidden
@@ -91,7 +97,7 @@ test('Fullscreen beamer page falls back when beamer name not found', async ({ pa
 
   // --- Fullscreen with nonexistent beamer name ---
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=nonexistent`);
-  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 20_000 });
+  await expectDuringGameEmpty(page);
   await keyframe(page, testInfo, 'fullscreen_fallback');
 
   // Should still render (falls back to default beamer)
@@ -139,7 +145,7 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
   expectStatus(createBeamer, 201, 'create live beamer');
 
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=live-projector`);
-  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 20_000 });
+  await expectDuringGameEmpty(page);
   await keyframe(page, testInfo, 'live_beamer_during_game');
 
   const firstUpdate = await client.patch(
