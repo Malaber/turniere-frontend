@@ -6,32 +6,27 @@ import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
 const TIMER_EFFECT_CUES = [
     {
         key: 'start-countdown',
-        secondsRemaining: 20 * 60 + 10,
-        pattern: [
-            {frequency: 440, durationMs: 260},
-            {frequency: 660, durationMs: 260},
-            {frequency: 880, durationMs: 420}
-        ]
+        secondsRemaining: 20 * 60,
+        startOffsetSeconds: 8.5,
+        durationSeconds: 27.214,
+        volume: 1,
+        src: '/static/sounds/start_countdown.mp3'
     },
     {
         key: 'mid-game-warning',
-        secondsRemaining: 10 * 60 + 10,
-        pattern: [
-            {frequency: 660, durationMs: 220},
-            {frequency: 660, durationMs: 220},
-            {frequency: 520, durationMs: 480}
-        ]
+        secondsRemaining: 10 * 60,
+        startOffsetSeconds: 2,
+        durationSeconds: 7.601,
+        volume: 1,
+        src: '/static/sounds/10_minute_warning.mp3'
     },
     {
         key: 'end-countdown',
         secondsRemaining: 10,
-        pattern: [
-            {frequency: 880, durationMs: 180},
-            {frequency: 740, durationMs: 180},
-            {frequency: 880, durationMs: 180},
-            {frequency: 740, durationMs: 180},
-            {frequency: 988, durationMs: 700}
-        ]
+        startOffsetSeconds: 6,
+        durationSeconds: 18.107,
+        volume: 1,
+        src: '/static/sounds/end_countdown.mp3'
     }
 ];
 
@@ -71,8 +66,7 @@ function triggerConfetti() {
 export class BeamerTimerEffects extends React.Component {
     constructor(props) {
         super(props);
-        this.audioContext = null;
-        this.activeNodes = [];
+        this.activeSounds = [];
         this.firedCueKeys = {};
         this.previousSecondsRemaining = null;
         this.timerSessionKey = null;
@@ -125,7 +119,6 @@ export class BeamerTimerEffects extends React.Component {
 
         const secondsRemaining = Math.floor(display.ms / 1000);
         if (secondsRemaining <= 0) {
-            this.stopActiveSounds('timer-finished');
             if (!this.finishedTriggered) {
                 this.finishedTriggered = true;
                 triggerConfetti();
@@ -137,86 +130,131 @@ export class BeamerTimerEffects extends React.Component {
         TIMER_EFFECT_CUES.forEach(cue => {
             if (this.firedCueKeys[cue.key]) return;
 
+            const cueStartSeconds = this.getCueStartSeconds(cue);
+            const elapsedSeconds = Math.max(0, cueStartSeconds - secondsRemaining);
+            const canSyncFromElapsed = elapsedSeconds < cue.durationSeconds;
             const crossedCue = this.previousSecondsRemaining !== null &&
-                this.previousSecondsRemaining > cue.secondsRemaining &&
-                secondsRemaining <= cue.secondsRemaining;
+                this.previousSecondsRemaining > cueStartSeconds &&
+                secondsRemaining <= cueStartSeconds;
+            const loadedDuringCue = this.previousSecondsRemaining === null &&
+                secondsRemaining <= cueStartSeconds &&
+                canSyncFromElapsed;
 
-            if (crossedCue || secondsRemaining === cue.secondsRemaining) {
+            if (crossedCue || loadedDuringCue || secondsRemaining === cueStartSeconds) {
                 this.firedCueKeys[cue.key] = true;
-                this.playCue(cue);
+                if (canSyncFromElapsed) {
+                    this.playCue(cue, elapsedSeconds);
+                } else {
+                    emitDebugEvent('sound-skip', {
+                        cue: cue.key,
+                        elapsedSeconds,
+                        src: cue.src
+                    });
+                }
             }
         });
 
         this.previousSecondsRemaining = secondsRemaining;
     }
 
-    getAudioContext() {
-        if (typeof window === 'undefined') return null;
-
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) {
-            emitDebugEvent('sound-unavailable', {reason: 'no-audio-context'});
-            return null;
-        }
-
-        if (!this.audioContext) {
-            this.audioContext = new AudioContextClass();
-        }
-
-        if (this.audioContext.state === 'suspended' && this.audioContext.resume) {
-            this.audioContext.resume().catch(() => {
-                emitDebugEvent('sound-unavailable', {reason: 'resume-blocked'});
-            });
-        }
-
-        return this.audioContext;
+    getCueStartSeconds(cue) {
+        return cue.secondsRemaining + cue.startOffsetSeconds;
     }
 
-    playCue(cue) {
+    playCue(cue, elapsedSeconds) {
+        if (typeof window === 'undefined' || typeof Audio === 'undefined') {
+            emitDebugEvent('sound-unavailable', {reason: 'no-audio-element'});
+            return;
+        }
+
         this.stopActiveSounds('next-cue');
-        emitDebugEvent('sound', {cue: cue.key});
-
-        const audioContext = this.getAudioContext();
-        if (!audioContext) return;
-
-        let offsetMs = 0;
-        cue.pattern.forEach(note => {
-            const oscillator = audioContext.createOscillator();
-            const gain = audioContext.createGain();
-            const startAt = audioContext.currentTime + (offsetMs / 1000);
-            const endAt = startAt + (note.durationMs / 1000);
-
-            oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(note.frequency, startAt);
-            gain.gain.setValueAtTime(0.0001, startAt);
-            gain.gain.exponentialRampToValueAtTime(0.2, startAt + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, endAt);
-
-            oscillator.connect(gain);
-            gain.connect(audioContext.destination);
-            oscillator.start(startAt);
-            oscillator.stop(endAt + 0.05);
-
-            this.activeNodes.push({oscillator, gain});
-            offsetMs += note.durationMs + 70;
+        emitDebugEvent('sound', {
+            cue: cue.key,
+            elapsedSeconds,
+            src: cue.src,
+            startOffsetSeconds: cue.startOffsetSeconds
         });
+
+        const audio = new Audio(cue.src);
+        audio.preload = 'auto';
+        audio.volume = cue.volume;
+        this.activeSounds.push(audio);
+
+        const removeAudio = () => {
+            this.activeSounds = this.activeSounds.filter(activeAudio => activeAudio !== audio);
+            emitDebugEvent('sound-ended', {cue: cue.key, src: cue.src});
+        };
+
+        audio.addEventListener('ended', removeAudio, {once: true});
+
+        const startPlayback = () => {
+            try {
+                const playResult = audio.play();
+                if (playResult && playResult.catch) {
+                    playResult.catch(error => {
+                        emitDebugEvent('sound-unavailable', {
+                            reason: 'play-blocked',
+                            message: error.message
+                        });
+                    });
+                }
+            } catch (error) {
+                emitDebugEvent('sound-unavailable', {
+                    reason: 'play-error',
+                    message: error.message
+                });
+            }
+        };
+
+        const seekThenPlay = () => {
+            let fallbackId = null;
+            let didStart = false;
+            const playOnce = () => {
+                if (didStart) return;
+                didStart = true;
+                if (fallbackId) {
+                    clearTimeout(fallbackId);
+                    fallbackId = null;
+                }
+                startPlayback();
+            };
+
+            try {
+                audio.currentTime = elapsedSeconds;
+            } catch (error) {
+                emitDebugEvent('sound-seek-error', {
+                    cue: cue.key,
+                    message: error.message
+                });
+                startPlayback();
+                return;
+            }
+
+            audio.addEventListener('seeked', playOnce, {once: true});
+            audio.addEventListener('canplay', playOnce, {once: true});
+            fallbackId = setTimeout(playOnce, 500);
+        };
+
+        if (audio.readyState >= 1) {
+            seekThenPlay();
+        } else {
+            audio.addEventListener('loadedmetadata', seekThenPlay, {once: true});
+            audio.load();
+        }
     }
 
     stopActiveSounds(reason) {
-        if (this.activeNodes.length === 0) return;
+        if (this.activeSounds.length === 0) return;
 
-        this.activeNodes.forEach(({oscillator, gain}) => {
+        this.activeSounds.forEach(audio => {
             try {
-                if (gain && gain.gain && this.audioContext) {
-                    gain.gain.cancelScheduledValues(this.audioContext.currentTime);
-                    gain.gain.setValueAtTime(0.0001, this.audioContext.currentTime);
-                }
-                oscillator.stop();
+                audio.pause();
+                audio.currentTime = 0;
             } catch (error) {
-                // Already stopped nodes throw in WebAudio. Safe to ignore.
+                // Stopping detached media can throw. Safe to ignore.
             }
         });
-        this.activeNodes = [];
+        this.activeSounds = [];
         emitDebugEvent('sound-stop', {reason});
     }
 

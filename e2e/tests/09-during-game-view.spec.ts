@@ -102,71 +102,48 @@ async function installBeamerEffectSpies(page: Page) {
   await page.addInitScript(() => {
     (window as any).__beamerAudioEvents = [];
 
-    class FakeAudioParam {
-      setValueAtTime(value: number, when: number) {
-        (window as any).__beamerAudioEvents.push({ type: 'param-set', value, when });
+    class FakeAudio {
+      src: string;
+      preload = '';
+      volume = 1;
+      currentTime = 0;
+      readyState = 1;
+
+      constructor(src: string) {
+        this.src = src;
+        (window as any).__beamerAudioEvents.push({ type: 'audio-created', src });
       }
 
-      exponentialRampToValueAtTime(value: number, when: number) {
-        (window as any).__beamerAudioEvents.push({ type: 'param-ramp', value, when });
-      }
-
-      cancelScheduledValues(when: number) {
-        (window as any).__beamerAudioEvents.push({ type: 'param-cancel', when });
-      }
-    }
-
-    class FakeAudioNode {
-      connect() {
-        return new FakeAudioNode();
-      }
-    }
-
-    class FakeOscillator extends FakeAudioNode {
-      constructor() {
-        super();
-        this.frequency = new FakeAudioParam();
-        this.type = 'sine';
-      }
-
-      start(when: number) {
-        (window as any).__beamerAudioEvents.push({ type: 'oscillator-start', when });
-      }
-
-      stop(when?: number) {
-        (window as any).__beamerAudioEvents.push({ type: 'oscillator-stop', when });
-      }
-    }
-
-    class FakeGain extends FakeAudioNode {
-      constructor() {
-        super();
-        this.gain = new FakeAudioParam();
-      }
-    }
-
-    class FakeAudioContext {
-      constructor() {
-        this.currentTime = 0;
-        this.destination = new FakeAudioNode();
-        this.state = 'running';
-      }
-
-      createOscillator() {
-        return new FakeOscillator();
-      }
-
-      createGain() {
-        return new FakeGain();
-      }
-
-      resume() {
+      play() {
+        (window as any).__beamerAudioEvents.push({
+          type: 'audio-play',
+          src: this.src,
+          currentTime: this.currentTime,
+          volume: this.volume,
+        });
         return Promise.resolve();
       }
+
+      pause() {
+        (window as any).__beamerAudioEvents.push({
+          type: 'audio-pause',
+          src: this.src,
+          currentTime: this.currentTime,
+        });
+      }
+
+      load() {
+        (window as any).__beamerAudioEvents.push({ type: 'audio-load', src: this.src });
+      }
+
+      addEventListener(eventName: string, callback: () => void) {
+        if (['loadedmetadata', 'seeked', 'canplay'].includes(eventName)) {
+          callback();
+        }
+      }
     }
 
-    (window as any).AudioContext = FakeAudioContext;
-    (window as any).webkitAudioContext = FakeAudioContext;
+    (window as any).Audio = FakeAudio;
   });
 }
 
@@ -309,13 +286,13 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
   });
 });
 
-test('Beamer timer plays hardcoded cues and fires confetti on finish', async ({ page }, testInfo) => {
+test('Beamer timer syncs sound files and fires confetti on finish', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1920, height: 1080 });
   await installBeamerEffectSpies(page);
 
   const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(12, {
-    timerSeconds: 25 * 60,
+    timerSeconds: 20 * 60 + 5,
   });
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
@@ -323,16 +300,11 @@ test('Beamer timer plays hardcoded cues and fires confetti on finish', async ({ 
   const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'effects_loaded');
-
-  const startCue = await client.patch(`/tournaments/${tournament.id}/timer`, {
-    timestamp_seconds: 20 * 60 + 12,
-  });
-  expectStatus(startCue, 200, 'start 20:10 cue timer');
   await waitForBeamerEffect(page, 'sound', 'start-countdown');
-  await keyframe(page, testInfo, 'start_countdown_sound');
+  await keyframe(page, testInfo, 'start_countdown_sound_synced');
 
   const midCue = await client.patch(`/tournaments/${tournament.id}/timer`, {
-    timestamp_seconds: 10 * 60 + 12,
+    timestamp_seconds: 10 * 60 + 4,
   });
   expectStatus(midCue, 200, 'start 10:10 cue timer');
   await waitForBeamerEffect(page, 'sound', 'mid-game-warning');
@@ -358,22 +330,31 @@ test('Beamer timer plays hardcoded cues and fires confetti on finish', async ({ 
   const soundCues = effectEvents
     .filter((event) => event.type === 'sound')
     .map((event) => event.cue);
+  const audioPlayEvents = audioEvents.filter((event) => event.type === 'audio-play');
+  const syncedStart = audioPlayEvents.find(
+    (event) => event.src.includes('start_countdown.mp3'),
+  );
 
   expect(soundCues).toEqual(expect.arrayContaining([
     'start-countdown',
     'mid-game-warning',
     'end-countdown',
   ]));
-  expect(audioEvents.some((event) => event.type === 'oscillator-start')).toBeTruthy();
-  expect(audioEvents.some((event) => event.type === 'oscillator-stop')).toBeTruthy();
+  expect(audioPlayEvents.map((event) => event.src)).toEqual(expect.arrayContaining([
+    '/static/sounds/start_countdown.mp3',
+    '/static/sounds/10_minute_warning.mp3',
+    '/static/sounds/end_countdown.mp3',
+  ]));
+  expect(syncedStart).toBeTruthy();
+  expect(syncedStart.currentTime).toBeGreaterThan(0);
+  expect(audioEvents.some((event) => event.type === 'audio-pause')).toBeTruthy();
 
   const finishStop = effectEvents.find(
     (event) => event.type === 'sound-stop' && event.reason === 'timer-finished',
   );
   const confetti = effectEvents.find((event) => event.type === 'confetti');
-  expect(finishStop).toBeTruthy();
+  expect(finishStop).toBeFalsy();
   expect(confetti).toBeTruthy();
-  expect(Math.abs(confetti.at - finishStop.at)).toBeLessThanOrEqual(3000);
 });
 
 // ---------------------------------------------------------------------------
