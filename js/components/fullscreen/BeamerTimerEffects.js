@@ -74,15 +74,20 @@ function triggerConfetti() {
 export class BeamerTimerEffects extends React.Component {
     constructor(props) {
         super(props);
+        this.state = {
+            soundBlocked: false
+        };
         this.activeSounds = [];
         this.firedCueKeys = {};
         this.pendingCue = null;
+        this.playbackAttemptId = 0;
         this.playbackRetryTimeout = null;
         this.previousSecondsRemaining = null;
         this.timerSessionKey = null;
         this.finishedTriggered = false;
 
         this.tick = this.tick.bind(this);
+        this.manualUnlock = this.manualUnlock.bind(this);
         this.retryPendingCue = this.retryPendingCue.bind(this);
         this.testCue = this.testCue.bind(this);
     }
@@ -183,6 +188,7 @@ export class BeamerTimerEffects extends React.Component {
         this.pendingCue = null;
         this.previousSecondsRemaining = null;
         this.finishedTriggered = false;
+        this.setState({soundBlocked: false});
         this.stopActiveSounds('timer-changed');
     }
 
@@ -261,6 +267,7 @@ export class BeamerTimerEffects extends React.Component {
         const elapsedSeconds = this.getElapsedSeconds(cue);
         if (elapsedSeconds === null) {
             this.pendingCue = null;
+            this.setState({soundBlocked: false});
             return;
         }
 
@@ -271,6 +278,10 @@ export class BeamerTimerEffects extends React.Component {
             src: cue.src
         });
         this.playCue(cue, elapsedSeconds);
+    }
+
+    manualUnlock() {
+        this.retryPendingCue('manual-unlock');
     }
 
     testCue(key, elapsedSeconds) {
@@ -295,6 +306,7 @@ export class BeamerTimerEffects extends React.Component {
         }
 
         this.stopActiveSounds('next-cue');
+        const attemptId = ++this.playbackAttemptId;
         this.pendingCue = cue;
         emitDebugEvent('sound', {
             cue: cue.key,
@@ -318,11 +330,14 @@ export class BeamerTimerEffects extends React.Component {
 
         const startPlayback = () => {
             const markStarted = source => {
+                if (attemptId !== this.playbackAttemptId) return;
                 this.pendingCue = null;
                 clearTimeout(this.playbackRetryTimeout);
+                this.setState({soundBlocked: false});
                 emitDebugEvent('sound-started', {cue: cue.key, source, src: cue.src});
             };
             const markBlocked = (error, source) => {
+                if (attemptId !== this.playbackAttemptId) return;
                 emitDebugEvent('sound-unavailable', {
                     reason: 'play-blocked',
                     message: error.message,
@@ -330,6 +345,7 @@ export class BeamerTimerEffects extends React.Component {
                     source,
                     src: cue.src
                 });
+                this.setState({soundBlocked: true});
                 this.schedulePlaybackRetry(cue, 'play-blocked');
             };
 
@@ -345,12 +361,14 @@ export class BeamerTimerEffects extends React.Component {
                     markStarted('normal');
                 }
             } catch (error) {
+                if (attemptId !== this.playbackAttemptId) return;
                 emitDebugEvent('sound-unavailable', {
                     reason: 'play-error',
                     message: error.message,
                     cue: cue.key,
                     src: cue.src
                 });
+                this.setState({soundBlocked: true});
                 this.schedulePlaybackRetry(cue, 'play-error');
             }
         };
@@ -423,6 +441,7 @@ export class BeamerTimerEffects extends React.Component {
     stopActiveSounds(reason) {
         clearTimeout(this.playbackRetryTimeout);
         this.playbackRetryTimeout = null;
+        this.playbackAttemptId++;
         if (this.activeSounds.length === 0) return;
 
         this.activeSounds.forEach(audio => {
@@ -438,6 +457,29 @@ export class BeamerTimerEffects extends React.Component {
     }
 
     render() {
-        return null;
+        if (!this.state.soundBlocked) return null;
+
+        return (
+            <button
+                type="button"
+                data-testid="beamer-sound-unlock"
+                onClick={this.manualUnlock}
+                style={{
+                    position: 'fixed',
+                    right: '1rem',
+                    bottom: '1rem',
+                    zIndex: 2147483647,
+                    border: '2px solid #f59e0b',
+                    borderRadius: '6px',
+                    background: '#111827',
+                    color: '#ffffff',
+                    fontSize: '1rem',
+                    fontWeight: 700,
+                    padding: '0.75rem 1rem'
+                }}
+            >
+                Audio blockiert - klicken zum Aktivieren
+            </button>
+        );
     }
 }

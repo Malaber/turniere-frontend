@@ -36,6 +36,34 @@ No separate `TURNIERE_MATCH_URL` is required.
  
 In production environment the server runs on port 80, otherwise on port 3001.
 
+## Beamer Audio
+
+Browsers can block audible autoplay until the page has user activation. For the
+venue beamer, use a dedicated Chrome/Chromium profile with autoplay enabled:
+
+```
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --user-data-dir="$HOME/.turniere-beamer-chrome" \
+  --autoplay-policy=no-user-gesture-required \
+  --kiosk \
+  "https://turnie.re/t/TOURNAMENT/fullscreen?beamer=default"
+```
+
+The fullscreen page logs audio state to the browser console with the
+`[beamer-audio]` prefix. Useful debug commands:
+
+```
+__beamerTimerAudio.help()
+__beamerTimerAudio.state()
+__beamerTimerAudio.policy()
+__beamerTimerAudio.events().slice(-20)
+__beamerTimerAudio.testCue("start-countdown", 5)
+```
+
+If the browser blocks autoplay, a small warning button appears in the lower
+right corner. Clicking it grants activation for the current page load and
+retries the pending sound at the current timer offset.
+
 ## Production Setup: Build the Docker Container
 
 ```
