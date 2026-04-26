@@ -23,6 +23,7 @@ const DISPLAY_STATE_LABELS = {
     'matches_upcoming': 'kommend',
     'matches_not_started': 'bereit zum Starten',
     'matches_finished': 'beendet',
+    'groups': 'Gruppenstand',
     'group_tables': 'Gruppenstand',
     'between_games': 'Zwischen den Spielen',
     'during_game': 'Während dem Spiel',
@@ -37,6 +38,7 @@ const DISPLAY_STATE_TO_BACKEND_FILTER = {
     'matches_finished': 'finished',
     'between_games': null,
     'during_game': 'in_progress',
+    'groups': null,
     'group_tables': null,
     'static_image': null
 };
@@ -367,6 +369,7 @@ class Main extends React.Component {
         const {qrCodeUrl, logoUrl} = this.state;
 
         switch (displayState) {
+        case 'groups':
         case 'group_tables':
             return <GroupsView
                 tournament={tournament}

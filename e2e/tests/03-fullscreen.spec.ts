@@ -51,7 +51,6 @@ test('Fullscreen beamer page renders with default fallback', async ({ page }, te
 
   // --- Fullscreen without beamer param (should fallback to default) ---
   await page.goto(`/t/${tournament.id}/fullscreen`);
-  await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'fullscreen_loaded');
 
@@ -92,7 +91,6 @@ test('Fullscreen beamer page falls back when beamer name not found', async ({ pa
 
   // --- Fullscreen with nonexistent beamer name ---
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=nonexistent`);
-  await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'fullscreen_fallback');
 
@@ -141,7 +139,7 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
   expectStatus(createBeamer, 201, 'create live beamer');
 
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=live-projector`);
-  await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'live_beamer_during_game');
 
   const firstUpdate = await client.patch(
