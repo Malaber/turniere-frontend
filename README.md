@@ -60,9 +60,10 @@ __beamerTimerAudio.events().slice(-20)
 __beamerTimerAudio.testCue("start-countdown", 5)
 ```
 
-If the browser blocks autoplay, a small warning button appears in the lower
-right corner. Clicking it grants activation for the current page load and
-retries the pending sound at the current timer offset.
+On load, the beamer page probes audible autoplay. If the browser blocks it, a
+small warning button appears in the lower right corner before the timer sound is
+needed. Clicking it grants activation for the current page load and retries any
+pending sound at the current timer offset.
 
 ## Production Setup: Build the Docker Container
 

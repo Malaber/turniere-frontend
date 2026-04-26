@@ -31,7 +31,7 @@ const TIMER_EFFECT_CUES = [
 ];
 
 const TICK_MS = 250;
-const PLAYBACK_RETRY_MS = 750;
+const AUDIO_PERMISSION_PROBE_SRC = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
 
 
 function emitDebugEvent(type, payload) {
@@ -75,17 +75,18 @@ export class BeamerTimerEffects extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
+            audioPermissionStatus: 'unknown',
             soundBlocked: false
         };
         this.activeSounds = [];
         this.firedCueKeys = {};
         this.pendingCue = null;
         this.playbackAttemptId = 0;
-        this.playbackRetryTimeout = null;
         this.previousSecondsRemaining = null;
         this.timerSessionKey = null;
         this.finishedTriggered = false;
 
+        this.checkAudioPermission = this.checkAudioPermission.bind(this);
         this.tick = this.tick.bind(this);
         this.manualUnlock = this.manualUnlock.bind(this);
         this.retryPendingCue = this.retryPendingCue.bind(this);
@@ -94,6 +95,7 @@ export class BeamerTimerEffects extends React.Component {
 
     componentDidMount() {
         this.installDebugApi();
+        this.checkAudioPermission('page-load').catch(() => {});
         this.tick();
         this.intervalId = setInterval(this.tick, TICK_MS);
     }
@@ -157,6 +159,7 @@ export class BeamerTimerEffects extends React.Component {
                     src: audio.currentSrc || audio.src,
                     volume: audio.volume
                 })),
+                audioPermissionStatus: this.state.audioPermissionStatus,
                 pendingCue: this.pendingCue && this.pendingCue.key,
                 policy: window.__beamerTimerAudio.policy(),
                 timerSessionKey: this.timerSessionKey,
@@ -188,7 +191,6 @@ export class BeamerTimerEffects extends React.Component {
         this.pendingCue = null;
         this.previousSecondsRemaining = null;
         this.finishedTriggered = false;
-        this.setState({soundBlocked: false});
         this.stopActiveSounds('timer-changed');
     }
 
@@ -281,7 +283,9 @@ export class BeamerTimerEffects extends React.Component {
     }
 
     manualUnlock() {
-        this.retryPendingCue('manual-unlock');
+        this.checkAudioPermission('manual-unlock')
+            .then(() => this.retryPendingCue('manual-unlock'))
+            .catch(() => {});
     }
 
     testCue(key, elapsedSeconds) {
@@ -290,13 +294,65 @@ export class BeamerTimerEffects extends React.Component {
         this.playCue(cue, elapsed);
     }
 
-    schedulePlaybackRetry(cue, reason) {
-        this.pendingCue = cue;
-        clearTimeout(this.playbackRetryTimeout);
-        this.playbackRetryTimeout = setTimeout(() => {
-            this.playbackRetryTimeout = null;
-            this.retryPendingCue(reason);
-        }, PLAYBACK_RETRY_MS);
+    checkAudioPermission(reason) {
+        if (typeof window === 'undefined' || typeof Audio === 'undefined') {
+            return Promise.resolve();
+        }
+
+        const audio = new Audio(AUDIO_PERMISSION_PROBE_SRC);
+        audio.preload = 'auto';
+        audio.muted = false;
+        audio.volume = 1;
+
+        emitDebugEvent('audio-permission-check', {reason});
+
+        try {
+            const playResult = audio.play();
+            if (!playResult || !playResult.catch) {
+                audio.pause();
+                audio.currentTime = 0;
+                this.setState({
+                    audioPermissionStatus: 'allowed',
+                    soundBlocked: false
+                });
+                emitDebugEvent('audio-permission-allowed', {reason, sync: true});
+                return Promise.resolve();
+            }
+
+            return playResult
+                .then(() => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    this.setState({
+                        audioPermissionStatus: 'allowed',
+                        soundBlocked: false
+                    });
+                    emitDebugEvent('audio-permission-allowed', {reason});
+                })
+                .catch(error => {
+                    this.setState({
+                        audioPermissionStatus: 'blocked',
+                        soundBlocked: true
+                    });
+                    emitDebugEvent('audio-permission-blocked', {
+                        message: error.message,
+                        name: error.name,
+                        reason
+                    });
+                    throw error;
+                });
+        } catch (error) {
+            this.setState({
+                audioPermissionStatus: 'blocked',
+                soundBlocked: true
+            });
+            emitDebugEvent('audio-permission-blocked', {
+                message: error.message,
+                name: error.name,
+                reason
+            });
+            return Promise.reject(error);
+        }
     }
 
     playCue(cue, elapsedSeconds) {
@@ -332,7 +388,6 @@ export class BeamerTimerEffects extends React.Component {
             const markStarted = source => {
                 if (attemptId !== this.playbackAttemptId) return;
                 this.pendingCue = null;
-                clearTimeout(this.playbackRetryTimeout);
                 this.setState({soundBlocked: false});
                 emitDebugEvent('sound-started', {cue: cue.key, source, src: cue.src});
             };
@@ -345,8 +400,10 @@ export class BeamerTimerEffects extends React.Component {
                     source,
                     src: cue.src
                 });
-                this.setState({soundBlocked: true});
-                this.schedulePlaybackRetry(cue, 'play-blocked');
+                this.setState({
+                    audioPermissionStatus: 'blocked',
+                    soundBlocked: true
+                });
             };
 
             try {
@@ -354,9 +411,7 @@ export class BeamerTimerEffects extends React.Component {
                 if (playResult && playResult.catch) {
                     playResult
                         .then(() => markStarted('normal'))
-                        .catch(error => {
-                            this.tryMutedBootstrap(audio, cue, markStarted, markBlocked, error);
-                        });
+                        .catch(error => markBlocked(error, 'normal'));
                 } else {
                     markStarted('normal');
                 }
@@ -368,8 +423,10 @@ export class BeamerTimerEffects extends React.Component {
                     cue: cue.key,
                     src: cue.src
                 });
-                this.setState({soundBlocked: true});
-                this.schedulePlaybackRetry(cue, 'play-error');
+                this.setState({
+                    audioPermissionStatus: 'blocked',
+                    soundBlocked: true
+                });
             }
         };
 
@@ -410,37 +467,7 @@ export class BeamerTimerEffects extends React.Component {
         }
     }
 
-    tryMutedBootstrap(audio, cue, markStarted, markBlocked, originalError) {
-        try {
-            audio.muted = true;
-            const mutedPlayResult = audio.play();
-            if (!mutedPlayResult || !mutedPlayResult.catch) {
-                audio.muted = false;
-                markStarted('muted-bootstrap');
-                return;
-            }
-
-            mutedPlayResult
-                .then(() => {
-                    setTimeout(() => {
-                        audio.muted = false;
-                        emitDebugEvent('sound-unmuted', {cue: cue.key, src: cue.src});
-                    }, 50);
-                    markStarted('muted-bootstrap');
-                })
-                .catch(error => {
-                    audio.muted = false;
-                    markBlocked(error || originalError, 'muted-bootstrap');
-                });
-        } catch (error) {
-            audio.muted = false;
-            markBlocked(error || originalError, 'muted-bootstrap');
-        }
-    }
-
     stopActiveSounds(reason) {
-        clearTimeout(this.playbackRetryTimeout);
-        this.playbackRetryTimeout = null;
         this.playbackAttemptId++;
         if (this.activeSounds.length === 0) return;
 
