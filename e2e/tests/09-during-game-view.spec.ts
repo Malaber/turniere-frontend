@@ -107,6 +107,7 @@ async function installBeamerEffectSpies(page: Page) {
       preload = '';
       volume = 1;
       currentTime = 0;
+      muted = false;
       readyState = 1;
 
       constructor(src: string) {
@@ -115,7 +116,7 @@ async function installBeamerEffectSpies(page: Page) {
       }
 
       play() {
-        if ((window as any).__blockBeamerAudioOnce) {
+        if ((window as any).__blockBeamerAudioOnce && !this.muted) {
           (window as any).__blockBeamerAudioOnce = false;
           (window as any).__beamerAudioEvents.push({
             type: 'audio-blocked',
@@ -129,6 +130,7 @@ async function installBeamerEffectSpies(page: Page) {
           type: 'audio-play',
           src: this.src,
           currentTime: this.currentTime,
+          muted: this.muted,
           volume: this.volume,
         });
         return Promise.resolve();
@@ -314,7 +316,6 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'effects_loaded');
   await waitForBeamerEffect(page, 'sound', 'start-countdown');
-  await waitForBeamerEffect(page, 'sound-retry', 'start-countdown');
   await waitForBeamerEffect(page, 'sound-started', 'start-countdown');
   await keyframe(page, testInfo, 'start_countdown_sound_synced');
 
@@ -349,6 +350,7 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   const syncedStart = audioPlayEvents.find(
     (event) => event.src.includes('start_countdown.mp3'),
   );
+  const debugState = await page.evaluate(() => (window as any).__beamerTimerAudio.state());
 
   expect(soundCues).toEqual(expect.arrayContaining([
     'start-countdown',
@@ -362,6 +364,8 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   ]));
   expect(syncedStart).toBeTruthy();
   expect(syncedStart.currentTime).toBeGreaterThan(0);
+  expect(audioPlayEvents.some((event) => event.muted)).toBeTruthy();
+  expect(debugState.activeSounds.length).toBeGreaterThan(0);
   expect(audioEvents.some((event) => event.type === 'audio-pause')).toBeTruthy();
 
   const finishStop = effectEvents.find(

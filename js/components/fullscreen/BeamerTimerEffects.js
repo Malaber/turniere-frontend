@@ -31,6 +31,7 @@ const TIMER_EFFECT_CUES = [
 ];
 
 const TICK_MS = 250;
+const PLAYBACK_RETRY_MS = 750;
 
 
 function emitDebugEvent(type, payload) {
@@ -75,9 +76,12 @@ export class BeamerTimerEffects extends React.Component {
         this.finishedTriggered = false;
 
         this.tick = this.tick.bind(this);
+        this.retryPendingCue = this.retryPendingCue.bind(this);
+        this.testCue = this.testCue.bind(this);
     }
 
     componentDidMount() {
+        this.installDebugApi();
         this.tick();
         this.intervalId = setInterval(this.tick, TICK_MS);
     }
@@ -90,7 +94,51 @@ export class BeamerTimerEffects extends React.Component {
 
     componentWillUnmount() {
         clearInterval(this.intervalId);
+        this.uninstallDebugApi();
         this.stopActiveSounds('unmount');
+    }
+
+    installDebugApi() {
+        if (typeof window === 'undefined') return;
+
+        window.__beamerTimerAudio = {
+            clear: () => {
+                if (window.__beamerTimerEffects) {
+                    window.__beamerTimerEffects.events = [];
+                }
+            },
+            cues: TIMER_EFFECT_CUES,
+            events: () => (window.__beamerTimerEffects && window.__beamerTimerEffects.events) || [],
+            policy: () => {
+                if (!navigator.getAutoplayPolicy) return 'unsupported';
+                try {
+                    return navigator.getAutoplayPolicy('mediaelement');
+                } catch (error) {
+                    return 'error: ' + error.message;
+                }
+            },
+            retry: () => this.retryPendingCue('manual-debug'),
+            state: () => ({
+                activeSounds: this.activeSounds.map(audio => ({
+                    currentTime: audio.currentTime,
+                    muted: audio.muted,
+                    paused: audio.paused,
+                    readyState: audio.readyState,
+                    src: audio.currentSrc || audio.src,
+                    volume: audio.volume
+                })),
+                pendingCue: this.pendingCue && this.pendingCue.key,
+                timerSessionKey: this.timerSessionKey
+            }),
+            testCue: this.testCue
+        };
+    }
+
+    uninstallDebugApi() {
+        if (typeof window === 'undefined') return;
+        if (window.__beamerTimerAudio && window.__beamerTimerAudio.testCue === this.testCue) {
+            delete window.__beamerTimerAudio;
+        }
     }
 
     resetSessionIfNeeded(timerState) {
@@ -195,13 +243,19 @@ export class BeamerTimerEffects extends React.Component {
         this.playCue(cue, elapsedSeconds);
     }
 
+    testCue(key, elapsedSeconds) {
+        const cue = TIMER_EFFECT_CUES.find(candidate => candidate.key === key) || TIMER_EFFECT_CUES[0];
+        const elapsed = Number.isFinite(elapsedSeconds) ? elapsedSeconds : 0;
+        this.playCue(cue, elapsed);
+    }
+
     schedulePlaybackRetry(cue, reason) {
         this.pendingCue = cue;
         clearTimeout(this.playbackRetryTimeout);
         this.playbackRetryTimeout = setTimeout(() => {
             this.playbackRetryTimeout = null;
             this.retryPendingCue(reason);
-        }, 750);
+        }, PLAYBACK_RETRY_MS);
     }
 
     playCue(cue, elapsedSeconds) {
@@ -222,6 +276,7 @@ export class BeamerTimerEffects extends React.Component {
         const audio = new Audio(cue.src);
         audio.preload = 'auto';
         audio.volume = cue.volume;
+        audio.muted = false;
         this.activeSounds.push(audio);
 
         const removeAudio = () => {
@@ -232,28 +287,32 @@ export class BeamerTimerEffects extends React.Component {
         audio.addEventListener('ended', removeAudio, {once: true});
 
         const startPlayback = () => {
+            const markStarted = source => {
+                this.pendingCue = null;
+                clearTimeout(this.playbackRetryTimeout);
+                emitDebugEvent('sound-started', {cue: cue.key, source, src: cue.src});
+            };
+            const markBlocked = (error, source) => {
+                emitDebugEvent('sound-unavailable', {
+                    reason: 'play-blocked',
+                    message: error.message,
+                    cue: cue.key,
+                    source,
+                    src: cue.src
+                });
+                this.schedulePlaybackRetry(cue, 'play-blocked');
+            };
+
             try {
                 const playResult = audio.play();
                 if (playResult && playResult.catch) {
                     playResult
-                        .then(() => {
-                            this.pendingCue = null;
-                            clearTimeout(this.playbackRetryTimeout);
-                            emitDebugEvent('sound-started', {cue: cue.key, src: cue.src});
-                        })
+                        .then(() => markStarted('normal'))
                         .catch(error => {
-                            emitDebugEvent('sound-unavailable', {
-                                reason: 'play-blocked',
-                                message: error.message,
-                                cue: cue.key,
-                                src: cue.src
-                            });
-                            this.schedulePlaybackRetry(cue, 'play-blocked');
+                            this.tryMutedBootstrap(audio, cue, markStarted, markBlocked, error);
                         });
                 } else {
-                    this.pendingCue = null;
-                    clearTimeout(this.playbackRetryTimeout);
-                    emitDebugEvent('sound-started', {cue: cue.key, src: cue.src});
+                    markStarted('normal');
                 }
             } catch (error) {
                 emitDebugEvent('sound-unavailable', {
@@ -300,6 +359,34 @@ export class BeamerTimerEffects extends React.Component {
         } else {
             audio.addEventListener('loadedmetadata', seekThenPlay, {once: true});
             audio.load();
+        }
+    }
+
+    tryMutedBootstrap(audio, cue, markStarted, markBlocked, originalError) {
+        try {
+            audio.muted = true;
+            const mutedPlayResult = audio.play();
+            if (!mutedPlayResult || !mutedPlayResult.catch) {
+                audio.muted = false;
+                markStarted('muted-bootstrap');
+                return;
+            }
+
+            mutedPlayResult
+                .then(() => {
+                    setTimeout(() => {
+                        audio.muted = false;
+                        emitDebugEvent('sound-unmuted', {cue: cue.key, src: cue.src});
+                    }, 50);
+                    markStarted('muted-bootstrap');
+                })
+                .catch(error => {
+                    audio.muted = false;
+                    markBlocked(error || originalError, 'muted-bootstrap');
+                });
+        } catch (error) {
+            audio.muted = false;
+            markBlocked(error || originalError, 'muted-bootstrap');
         }
     }
 
