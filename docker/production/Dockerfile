@@ -6,6 +6,8 @@ RUN yarn install --frozen-lockfile --production=true
 
 ### STAGE 2: Build ###
 FROM deps as build
+ARG TURNIERE_FRONTEND_VERSION=development
+ENV NEXT_PUBLIC_TURNIERE_FRONTEND_VERSION=$TURNIERE_FRONTEND_VERSION
 COPY js /srv/js
 COPY pages /srv/pages
 COPY public /srv/public
@@ -17,6 +19,8 @@ RUN yarn cache clean
 FROM node:16-alpine
 WORKDIR /srv
 ENV NODE_ENV=production
+ARG TURNIERE_FRONTEND_VERSION=development
+ENV TURNIERE_FRONTEND_VERSION=$TURNIERE_FRONTEND_VERSION
 COPY --from=deps /srv/node_modules /srv/node_modules
 COPY --from=build /srv/.next /srv/.next
 COPY --from=build /srv/public /srv/public

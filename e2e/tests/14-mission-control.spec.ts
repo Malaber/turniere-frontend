@@ -131,11 +131,13 @@ test('Mission Control saves independent beamer display controls instantly', asyn
   const main = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
     name: 'Main stage',
     display_state: 'between_games',
+    config: {},
   });
   expectStatus(main, 201, 'create main stage beamer');
   const side = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
     name: 'Side wall',
-    display_state: 'groups',
+    display_state: 'group_tables',
+    config: {},
   });
   expectStatus(side, 201, 'create side wall beamer');
 
@@ -149,7 +151,7 @@ test('Mission Control saves independent beamer display controls instantly', asyn
   await expect(page.getByText('Side wall')).toBeVisible();
   await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('between_games');
   await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toBeVisible();
-  await expect(page.getByTestId(`mission-beamer-mode-${side.json.id}`)).toHaveValue('groups');
+  await expect(page.getByTestId(`mission-beamer-mode-${side.json.id}`)).toHaveValue('group_tables');
   await expect(page.getByTestId(`mission-beamer-match-${side.json.id}`)).toHaveCount(0);
   await keyframe(page, testInfo, 'beamer_control_tur37');
 
@@ -162,15 +164,29 @@ test('Mission Control saves independent beamer display controls instantly', asyn
     expectStatus(updated, 200, 'fetch beamers after mode update');
     return updated.json.find((beamer) => beamer.id === main.json.id)?.display_state;
   }, { timeout: 20_000 }).toBe('during_game');
-  await expect(page.getByTestId(`mission-beamer-mode-${side.json.id}`)).toHaveValue('groups');
+  await expect(page.getByTestId(`mission-beamer-mode-${side.json.id}`)).toHaveValue('group_tables');
 
   await page.getByTestId(`mission-beamer-match-${main.json.id}`).selectOption('state:in_progress');
   await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toHaveValue('state:in_progress');
+  await expect.poll(async () => {
+    const updated = await client.get<Array<{ id: number; config?: { match_filter?: string } }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(updated, 200, 'fetch beamers after match filter update');
+    return updated.json.find((beamer) => beamer.id === main.json.id)?.config?.match_filter;
+  }, { timeout: 20_000 }).toBe('state:in_progress');
 
   await page.getByTestId(`mission-beamer-mode-${main.json.id}`).selectOption('static_image');
   await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId(`mission-beamer-image-${main.json.id}`).selectOption('/static/images/bpwstr_logo.png');
-  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveValue('/static/images/bpwstr_logo.png');
+  await page.getByTestId(`mission-beamer-image-${main.json.id}`).selectOption('bpwstr_logo');
+  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveValue('bpwstr_logo');
+  await expect.poll(async () => {
+    const updated = await client.get<Array<{ id: number; config?: { image_key?: string } }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(updated, 200, 'fetch beamers after image update');
+    return updated.json.find((beamer) => beamer.id === main.json.id)?.config?.image_key;
+  }, { timeout: 20_000 }).toBe('bpwstr_logo');
 });
 
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({
@@ -184,12 +200,12 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
 
   const leftStage = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'Left stage',
-    display_state: 'matches_upcoming',
+    display_state: 'between_games',
   });
   expectStatus(leftStage, 201, 'create left stage beamer');
   const backside = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'Backside',
-    display_state: 'matches_finished',
+    display_state: 'group_tables',
   });
   expectStatus(backside, 201, 'create backside beamer');
 

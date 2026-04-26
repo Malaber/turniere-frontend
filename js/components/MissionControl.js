@@ -46,34 +46,30 @@ function errorMessage(errorBody, fallback) {
 }
 
 const DISPLAY_STATES = [
-    {value: 'matches_all', label: 'Alle Matches'},
-    {value: 'matches_in_progress', label: 'Laufende Matches'},
-    {value: 'matches_upcoming', label: 'Kommende Matches'},
-    {value: 'matches_not_started', label: 'Bereit zum Starten'},
-    {value: 'matches_finished', label: 'Beendete Matches'},
-    {value: 'groups', label: 'Gruppenstand'},
     {value: 'between_games', label: 'Zwischen den Spielen'},
-    {value: 'during_game', label: 'Waehrend dem Spiel'}
+    {value: 'during_game', label: 'Waehrend dem Spiel'},
+    {value: 'group_tables', label: 'Gruppenstand'},
+    {value: 'static_image', label: 'Statisches Bild'}
 ];
 
 const BEAMER_MODES = [
-    {value: 'groups', label: 'Group Tables', displayState: 'groups'},
+    {value: 'group_tables', label: 'Group Tables', displayState: 'group_tables'},
     {value: 'during_game', label: 'Matches with Timer', displayState: 'during_game'},
     {value: 'between_games', label: 'Matches Only', displayState: 'between_games'},
-    {value: 'static_image', label: 'Static Image', displayState: 'between_games'}
+    {value: 'static_image', label: 'Static Image', displayState: 'static_image'}
 ];
 
-const BEAMER_MATCH_FILTERS = [
-    {value: '', label: 'Alle Matches'},
-    {value: 'state:in_progress', label: 'Laufende Matches'},
-    {value: 'state:not_started', label: 'Noch nicht gestartete Matches'},
-    {value: 'state:finished', label: 'Beendete Matches'}
+const BEAMER_MATCH_STATES = [
+    {value: '', label: 'Alle Status'},
+    {value: 'in_progress', label: 'Laufend'},
+    {value: 'not_started', label: 'Nicht gestartet'},
+    {value: 'finished', label: 'Beendet'}
 ];
 
 const STATIC_IMAGE_OPTIONS = [
-    {value: '/static/images/bpwstr_banner.jpg', label: 'BPWSTR Banner'},
-    {value: '/static/images/bpwstr_logo.png', label: 'BPWSTR Logo'},
-    {value: '/static/images/logo-questionmark.png', label: 'Turnie Logo'}
+    {value: 'bpwstr_banner', label: 'BPWSTR Banner'},
+    {value: 'bpwstr_logo', label: 'BPWSTR Logo'},
+    {value: 'turniere_logo', label: 'Turnie Logo'}
 ];
 
 const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'teams', 'settings'];
@@ -96,17 +92,8 @@ function displayStateLabel(value) {
 }
 
 function beamerModeFor(beamer) {
-    if (beamer.logo_url && STATIC_IMAGE_OPTIONS.some(option => option.value === beamer.logo_url) &&
-        beamer.display_state === 'between_games') {
-        return 'static_image';
-    }
-    if (beamer.display_state === 'during_game') {
-        return 'during_game';
-    }
-    if (beamer.display_state === 'groups') {
-        return 'groups';
-    }
-    return 'between_games';
+    const mode = BEAMER_MODES.find(item => item.displayState === beamer.display_state);
+    return mode ? mode.value : 'during_game';
 }
 
 function beamerModeLabel(value) {
@@ -114,21 +101,44 @@ function beamerModeLabel(value) {
     return mode ? mode.label : value;
 }
 
-function allTournamentMatches(tournament) {
-    const matches = [];
-    (tournament.groups || []).forEach(group => {
-        (group.matches || []).forEach(match => matches.push(match));
-    });
-    (tournament.stages || []).forEach(stage => {
-        (stage.matches || []).forEach(match => matches.push(match));
-    });
-    return matches.sort(sortMatchesByPositionAscending());
+function matchFilterValue(filters) {
+    const entries = Object.keys(filters)
+        .filter(key => filters[key] !== null && filters[key] !== undefined && filters[key] !== '')
+        .sort()
+        .map(key => key + ':' + filters[key]);
+    return entries.join(',');
 }
 
-function beamerMatchLabel(match) {
-    const groupNumber = match.group ? match.group.number : Math.max(1, match.position);
-    const tableLabel = 'G' + groupNumber + '-S' + match.position;
-    return tableLabel + ' - ' + match.team1.name + ' vs. ' + match.team2.name;
+function addMatchFilterOptions(options, label, filters) {
+    BEAMER_MATCH_STATES.forEach(state => {
+        const stateFilters = state.value ? Object.assign({}, filters, {state: state.value}) : filters;
+        const stateLabel = state.value ? label + ' - ' + state.label : label;
+        options.push({value: matchFilterValue(stateFilters), label: stateLabel});
+    });
+}
+
+function beamerMatchFilterOptions(tournament) {
+    const options = [];
+    addMatchFilterOptions(options, 'Alle Matches', {});
+
+    const groupStage = tournament.groupStage || {};
+    const groupPositions = [];
+    (groupStage.groups || []).forEach(group => {
+        (group.matches || []).forEach(match => {
+            if (groupPositions.indexOf(match.position) === -1) {
+                groupPositions.push(match.position);
+            }
+        });
+    });
+    groupPositions.sort((a, b) => a - b).forEach(position => {
+        addMatchFilterOptions(options, 'Gruppenphase Tisch ' + position, {group_stage_position: position});
+    });
+
+    (tournament.playoffStages || []).forEach(stage => {
+        addMatchFilterOptions(options, stageName(stage.level), {stage_level: stage.level});
+    });
+
+    return options;
 }
 
 function matchStateLabel(state) {
@@ -450,20 +460,11 @@ class MissionBeamer extends React.Component {
 
     reload() {
         getBeamers(this.props.tournament.id,
-            beamers => this.setState(prev => ({
+            beamers => this.setState({
                 beamers: beamers || [],
                 loading: false,
-                savingById: {},
-                selectionsById: (beamers || []).reduce((selections, beamer) => {
-                    const current = prev.selectionsById[beamer.id] || {};
-                    selections[beamer.id] = {
-                        mode: current.mode || beamerModeFor(beamer),
-                        match: beamer.qr_code_url || current.match || '',
-                        image: beamer.logo_url || current.image || STATIC_IMAGE_OPTIONS[0].value
-                    };
-                    return selections;
-                }, {})
-            })),
+                savingById: {}
+            }),
             this.onError);
     }
 
@@ -479,7 +480,8 @@ class MissionBeamer extends React.Component {
         this.setState({loading: true});
         createBeamer(this.props.tournament.id, {
             name: this.state.name.trim(),
-            display_state: 'between_games'
+            display_state: 'during_game',
+            config: {}
         }, () => {
             notify.show('Beamer wurde erstellt.', 'success', 2000);
             this.setState({name: ''});
@@ -506,49 +508,22 @@ class MissionBeamer extends React.Component {
         if (!mode) {
             return;
         }
-        this.setState(prev => ({
-            selectionsById: Object.assign({}, prev.selectionsById, {
-                [beamer.id]: Object.assign({}, prev.selectionsById[beamer.id], {
-                    mode: modeValue,
-                    image: modeValue === 'static_image' ? (
-                        (prev.selectionsById[beamer.id] || {}).image ||
-                        beamer.logo_url ||
-                        STATIC_IMAGE_OPTIONS[0].value
-                    ) :
-                        ''
-                })
-            })
-        }));
-        const payload = {
+        this.update(beamer, {
             display_state: mode.displayState,
-            qr_code_url: ''
-        };
-        if (modeValue !== 'static_image') {
-            payload.logo_url = '';
-        } else {
-            payload.logo_url = beamer.logo_url || STATIC_IMAGE_OPTIONS[0].value;
-        }
-        this.update(beamer, payload);
+            config: Object.assign({}, beamer.config || {})
+        });
     }
 
     updateMatchSelection(beamer, value) {
-        this.setState(prev => ({
-            selectionsById: Object.assign({}, prev.selectionsById, {
-                [beamer.id]: Object.assign({}, prev.selectionsById[beamer.id], {match: value})
-            })
-        }));
-        this.update(beamer, {qr_code_url: value});
+        this.update(beamer, {
+            config: Object.assign({}, beamer.config || {}, {match_filter: value})
+        });
     }
 
     updateImageSelection(beamer, value) {
-        this.setState(prev => ({
-            selectionsById: Object.assign({}, prev.selectionsById, {
-                [beamer.id]: Object.assign({}, prev.selectionsById[beamer.id], {image: value})
-            })
-        }));
         this.update(beamer, {
-            display_state: 'between_games',
-            logo_url: value
+            display_state: 'static_image',
+            config: Object.assign({}, beamer.config || {}, {image_key: value})
         });
     }
 
@@ -570,18 +545,18 @@ class MissionBeamer extends React.Component {
     }
 
     render() {
-        const matches = allTournamentMatches(this.props.tournament);
+        const matchFilters = beamerMatchFilterOptions(this.props.tournament);
         return (
             <section className='mission-control-section mission-pane-beamer' data-testid='mission-beamer-control'>
                 <h3 className='h5 mission-pane-heading'>Aktive Beamer</h3>
                 <div className='mission-beamer-list'>
                     {this.state.beamers.map(beamer => {
-                        const selections = this.state.selectionsById[beamer.id] || {};
-                        const mode = selections.mode || beamerModeFor(beamer);
+                        const config = beamer.config || {};
+                        const mode = beamerModeFor(beamer);
                         const saving = Boolean(this.state.savingById[beamer.id]);
                         const disabled = saving || this.props.disabled;
-                        const matchSelection = selections.match || beamer.qr_code_url || '';
-                        const imageSelection = selections.image || beamer.logo_url || STATIC_IMAGE_OPTIONS[0].value;
+                        const matchSelection = config.match_filter || '';
+                        const imageSelection = config.image_key || STATIC_IMAGE_OPTIONS[0].value;
 
                         return (
                             <div className='mission-beamer-card' key={beamer.id}
@@ -638,14 +613,9 @@ class MissionBeamer extends React.Component {
                                                     beamer,
                                                     event.target.value
                                                 )}>
-                                                {BEAMER_MATCH_FILTERS.map(option => (
+                                                {matchFilters.map(option => (
                                                     <option key={option.value} value={option.value}>
                                                         {option.label}
-                                                    </option>
-                                                ))}
-                                                {matches.map(match => (
-                                                    <option key={match.id} value={'match:' + match.id}>
-                                                        {beamerMatchLabel(match)}
                                                     </option>
                                                 ))}
                                             </Input>

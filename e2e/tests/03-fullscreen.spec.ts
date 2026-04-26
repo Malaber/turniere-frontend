@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
 import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
@@ -8,6 +9,11 @@ const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
+
+async function expectDuringGameEmpty(page: Page): Promise<void> {
+  await expect(page.getByText(/Kein Timer gesetzt/i)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/keine laufenden Matches/i)).toBeVisible({ timeout: 20_000 });
+}
 
 async function startMatches(
   client: ApiClient,
@@ -51,15 +57,11 @@ test('Fullscreen beamer page renders with default fallback', async ({ page }, te
 
   // --- Fullscreen without beamer param (should fallback to default) ---
   await page.goto(`/t/${tournament.id}/fullscreen`);
-  const bottomNavbar = page.locator('.fixed-bottom');
-  await expect(bottomNavbar).toBeVisible({ timeout: 20_000 });
+  await expectDuringGameEmpty(page);
   await keyframe(page, testInfo, 'fullscreen_loaded');
 
   // Cursor is hidden
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
-
-  // Display label shown
-  await expect(page.getByText(/Anzeige:/i)).toBeVisible();
 });
 
 test('Fullscreen beamer page renders with specific beamer param', async ({ page }, testInfo) => {
@@ -72,13 +74,13 @@ test('Fullscreen beamer page renders with specific beamer param', async ({ page 
   await client.login(e2eEmail, e2ePassword);
   await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'projector-a',
-    display_state: 'matches_in_progress',
+    display_state: 'between_games',
   });
 
   // --- Fullscreen with beamer param ---
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=projector-a`);
-  const bottomNavbar = page.locator('.fixed-bottom');
-  await expect(bottomNavbar).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/Nächste Spiele/)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'fullscreen_named_beamer');
 
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
@@ -95,8 +97,7 @@ test('Fullscreen beamer page falls back when beamer name not found', async ({ pa
 
   // --- Fullscreen with nonexistent beamer name ---
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=nonexistent`);
-  const bottomNavbar = page.locator('.fixed-bottom');
-  await expect(bottomNavbar).toBeVisible({ timeout: 20_000 });
+  await expectDuringGameEmpty(page);
   await keyframe(page, testInfo, 'fullscreen_fallback');
 
   // Should still render (falls back to default beamer)
@@ -139,29 +140,29 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
   await client.login(e2eEmail, e2ePassword);
   const createBeamer = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
     name: 'live-projector',
-    display_state: 'matches_all',
+    display_state: 'during_game',
   });
   expectStatus(createBeamer, 201, 'create live beamer');
 
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=live-projector`);
-  await expect(page.getByText(/Anzeige: alle/i)).toBeVisible({ timeout: 20_000 });
-  await keyframe(page, testInfo, 'live_beamer_all');
+  await expectDuringGameEmpty(page);
+  await keyframe(page, testInfo, 'live_beamer_during_game');
 
   const firstUpdate = await client.patch(
     `/tournaments/${tournament.id}/beamers/${createBeamer.json.id}`,
-    { display_state: 'matches_in_progress' },
+    { display_state: 'between_games' },
   );
-  expectStatus(firstUpdate, 200, 'update beamer to in-progress');
-  await expect(page.getByText(/Anzeige: laufend/i)).toBeVisible({ timeout: 10_000 });
-  await keyframe(page, testInfo, 'live_beamer_in_progress');
+  expectStatus(firstUpdate, 200, 'update beamer to between-games');
+  await expect(page.getByText(/Nächste Spiele/)).toBeVisible({ timeout: 10_000 });
+  await keyframe(page, testInfo, 'live_beamer_between_games');
 
   const secondUpdate = await client.patch(
     `/tournaments/${tournament.id}/beamers/${createBeamer.json.id}`,
-    { display_state: 'matches_finished' },
+    { display_state: 'group_tables' },
   );
-  expectStatus(secondUpdate, 200, 'update beamer to finished');
-  await expect(page.getByText(/Anzeige: beendet/i)).toBeVisible({ timeout: 10_000 });
-  await keyframe(page, testInfo, 'live_beamer_finished');
+  expectStatus(secondUpdate, 200, 'update beamer to group tables');
+  await expect(page.getByText(/Gruppe 1/i)).toBeVisible({ timeout: 10_000 });
+  await keyframe(page, testInfo, 'live_beamer_group_tables');
 });
 
 test('Fullscreen match list receives live match snapshots', async ({ page }, testInfo) => {

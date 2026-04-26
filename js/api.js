@@ -7,7 +7,14 @@ import {errorMessages} from './constants';
 import {actionTypesUserinfo, defaultStateUserinfo} from './redux/userInfo';
 import {actionTypesTournamentinfo, defaultStateTournamentinfo} from './redux/tournamentInfo';
 import {actionTypesTournamentlist, defaultStateTournamentlist} from './redux/tournamentList';
-import {deleteRequest, getRequest, patchRequest, postRequest, putRequest} from './redux/backendApi';
+import {
+    configureAuthHandling,
+    deleteRequest,
+    getRequest,
+    patchRequest,
+    postRequest,
+    putRequest
+} from './redux/backendApi';
 import {
     actionTypesTournamentStatistics,
     defaultStateTournamentStatistics,
@@ -51,7 +58,7 @@ function storeOptionalToken(response) {
 function checkForAuthenticationHeaders(response) {
     if (response.headers) {
         const requiredHeaders = [
-            'access-token', 'client', 'uid', 'expiry'
+            'access-token', 'client', 'uid'
         ];
         for (let i = 0; i < requiredHeaders.length; i++) {
             if (!response.headers[requiredHeaders[i]]) {
@@ -166,7 +173,7 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
         return Object.assign({}, state, {
             accesstoken: action.parameters.accesstoken,
             client: action.parameters.client,
-            expiry: action.parameters.expiry,
+            expiry: action.parameters.expiry || state.expiry,
             uid: action.parameters.uid
         });
     case actionTypesUserinfo.VERIFY_CREDENTIALS:
@@ -490,6 +497,10 @@ export function initializeStore(initialState = defaultApplicationState) {
         initialState,
         composeWithDevTools(applyMiddleware(thunkMiddleware))
     );
+    configureAuthHandling({
+        latestStateProvider: () => __store.getState(),
+        authResponseHandler: storeOptionalToken
+    });
     __store.subscribe(() => {
         if (applicationHydrated) {
             localStorage.setItem('reduxState', JSON.stringify(__store.getState()));
@@ -896,6 +907,14 @@ export function requestTournamentStatistics(code, successCallback, errorCallback
             errorCallback: errorCallback
         },
         state: getState()
+    });
+}
+
+export function requestBackendVersion(successCallback, errorCallback) {
+    getRequest(null, '/version').then(resp => {
+        successCallback(resp.data);
+    }).catch(() => {
+        errorCallback();
     });
 }
 

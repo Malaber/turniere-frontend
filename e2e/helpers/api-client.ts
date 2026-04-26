@@ -91,15 +91,17 @@ export class ApiClient {
       json = {} as T;
     }
 
+    this.storeAuthHeaders(responseHeaders);
+
     return { status: res.status, json, headers: responseHeaders };
   }
 
   private storeAuthHeaders(headers: Record<string, string>): void {
-    const next: Record<string, string> = {};
+    const next: Record<string, string> = { ...this.authHeaders };
     for (const key of ['access-token', 'client', 'uid']) {
       if (headers[key]) next[key] = headers[key];
     }
-    if (Object.keys(next).length > 0) {
+    if (next['access-token'] && next.client && next.uid) {
       this.authHeaders = next;
     }
   }
