@@ -3,7 +3,7 @@ import {
     Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Nav, NavItem, NavLink, Row, Table,
     TabContent, TabPane
 } from 'reactstrap';
-import {FaLock, FaSearch, FaTrash, FaUsers} from 'react-icons/fa';
+import {FaExternalLinkAlt, FaKeyboard, FaLock, FaSearch, FaTrash, FaUsers} from 'react-icons/fa';
 import {notify} from 'react-notify-toast';
 import {
     createBeamer,
@@ -23,6 +23,7 @@ import {sortMatchesByPositionAscending} from '../utils/sorting';
 import {TIMER_MODE_COUNTDOWN, TIMER_MODE_COUNTUP} from '../utils/timerState';
 import {TournamentSettingsForm} from './TournamentSettingsForm';
 import {TeamName} from './TeamName';
+import {Timer} from './Timer';
 
 function stageName(level) {
     const names = ['Finale', 'Halbfinale', 'Viertelfinale', 'Achtelfinale'];
@@ -74,6 +75,20 @@ const STATIC_IMAGE_OPTIONS = [
     {value: '/static/images/bpwstr_logo.png', label: 'BPWSTR Logo'},
     {value: '/static/images/logo-questionmark.png', label: 'Turnie Logo'}
 ];
+
+const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'teams', 'settings'];
+const SEARCH_TAB_IDS = ['scores', 'teams'];
+
+function tabFromLocation() {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+
+    const hashTab = window.location.hash ? window.location.hash.replace(/^#/, '') : '';
+    const queryTab = new URLSearchParams(window.location.search).get('tab');
+    const tab = hashTab || queryTab;
+    return TAB_IDS.indexOf(tab) !== -1 ? tab : null;
+}
 
 function displayStateLabel(value) {
     const match = DISPLAY_STATES.find(state => state.value === value);
@@ -154,20 +169,78 @@ export class MissionControl extends React.Component {
             search: '',
             actionRunning: null
         };
+        this.searchInput = React.createRef();
         this.setActiveTab = this.setActiveTab.bind(this);
         this.setSearch = this.setSearch.bind(this);
+        this.handleLocationChange = this.handleLocationChange.bind(this);
+        this.handleGlobalKeyDown = this.handleGlobalKeyDown.bind(this);
+        this.focusSearch = this.focusSearch.bind(this);
         this.startGroupMatches = this.startGroupMatches.bind(this);
         this.startStageMatches = this.startStageMatches.bind(this);
         this.onActionSuccess = this.onActionSuccess.bind(this);
         this.onActionError = this.onActionError.bind(this);
     }
 
-    setActiveTab(tab) {
+    componentDidMount() {
+        const initialTab = tabFromLocation();
+        if (initialTab) {
+            this.setState({activeTab: initialTab});
+        }
+        window.addEventListener('popstate', this.handleLocationChange);
+        window.addEventListener('hashchange', this.handleLocationChange);
+        window.addEventListener('keydown', this.handleGlobalKeyDown);
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener('popstate', this.handleLocationChange);
+        window.removeEventListener('hashchange', this.handleLocationChange);
+        window.removeEventListener('keydown', this.handleGlobalKeyDown);
+    }
+
+    setActiveTab(tab, updateUrl = true) {
+        if (TAB_IDS.indexOf(tab) === -1) {
+            return;
+        }
+
         this.setState({activeTab: tab});
+        if (updateUrl && typeof window !== 'undefined') {
+            window.history.pushState(null, '', '#' + tab);
+        }
     }
 
     setSearch(event) {
         this.setState({search: event.target.value});
+    }
+
+    handleLocationChange() {
+        const tab = tabFromLocation();
+        if (tab && tab !== this.state.activeTab) {
+            this.setActiveTab(tab, false);
+        }
+    }
+
+    handleGlobalKeyDown(event) {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+            event.preventDefault();
+            this.focusSearch();
+        }
+    }
+
+    focusSearch() {
+        const focus = () => {
+            if (this.searchInput.current) {
+                this.searchInput.current.focus();
+                this.searchInput.current.select();
+            }
+        };
+
+        if (SEARCH_TAB_IDS.indexOf(this.state.activeTab) === -1) {
+            this.setActiveTab('scores');
+            window.setTimeout(focus, 0);
+            return;
+        }
+
+        focus();
     }
 
     startGroupMatches() {
@@ -214,6 +287,11 @@ export class MissionControl extends React.Component {
                                 <h2 className='h4 mb-1'>Mission Control</h2>
                                 <div className='text-muted'>Live-Steuerung fuer Turnierleitung</div>
                             </div>
+                            <Button color='outline-primary'
+                                href={'/t/' + tournament.code}
+                                data-testid='mission-tournament-link'>
+                                Turnier oeffnen <FaExternalLinkAlt aria-hidden='true' />
+                            </Button>
                         </div>
 
                         {!canControl &&
@@ -223,7 +301,7 @@ export class MissionControl extends React.Component {
 
                         <Nav tabs className='mb-3'>
                             <NavItem>
-                                <NavLink href='#' active={this.state.activeTab === 'timer'}
+                                <NavLink href='#timer' active={this.state.activeTab === 'timer'}
                                     onClick={event => {
                                         event.preventDefault();
                                         this.setActiveTab('timer');
@@ -232,7 +310,7 @@ export class MissionControl extends React.Component {
                                 </NavLink>
                             </NavItem>
                             <NavItem>
-                                <NavLink href='#' active={this.state.activeTab === 'beamer'}
+                                <NavLink href='#beamer' active={this.state.activeTab === 'beamer'}
                                     onClick={event => {
                                         event.preventDefault();
                                         this.setActiveTab('beamer');
@@ -241,7 +319,7 @@ export class MissionControl extends React.Component {
                                 </NavLink>
                             </NavItem>
                             <NavItem>
-                                <NavLink href='#' active={this.state.activeTab === 'starts'}
+                                <NavLink href='#starts' active={this.state.activeTab === 'starts'}
                                     onClick={event => {
                                         event.preventDefault();
                                         this.setActiveTab('starts');
@@ -250,7 +328,7 @@ export class MissionControl extends React.Component {
                                 </NavLink>
                             </NavItem>
                             <NavItem>
-                                <NavLink href='#' active={this.state.activeTab === 'scores'}
+                                <NavLink href='#scores' active={this.state.activeTab === 'scores'}
                                     onClick={event => {
                                         event.preventDefault();
                                         this.setActiveTab('scores');
@@ -259,7 +337,7 @@ export class MissionControl extends React.Component {
                                 </NavLink>
                             </NavItem>
                             <NavItem>
-                                <NavLink href='#' active={this.state.activeTab === 'teams'}
+                                <NavLink href='#teams' active={this.state.activeTab === 'teams'}
                                     onClick={event => {
                                         event.preventDefault();
                                         this.setActiveTab('teams');
@@ -268,7 +346,7 @@ export class MissionControl extends React.Component {
                                 </NavLink>
                             </NavItem>
                             <NavItem>
-                                <NavLink href='#' active={this.state.activeTab === 'settings'}
+                                <NavLink href='#settings' active={this.state.activeTab === 'settings'}
                                     onClick={event => {
                                         event.preventDefault();
                                         this.setActiveTab('settings');
@@ -307,6 +385,7 @@ export class MissionControl extends React.Component {
                                     tournament={tournament}
                                     search={this.state.search}
                                     onSearchChange={this.setSearch}
+                                    searchInputRef={this.searchInput}
                                     disabled={!canControl}
                                     onTournamentChange={this.props.onTournamentChange}
                                 />
@@ -319,8 +398,14 @@ export class MissionControl extends React.Component {
                                         value={this.state.search}
                                         onChange={this.setSearch}
                                         placeholder='Teams suchen'
+                                        aria-label='Teams suchen'
+                                        title='Mit Cmd+K oder Ctrl+K fokussieren'
+                                        innerRef={this.searchInput}
                                         data-testid='mission-control-search'
                                     />
+                                    <div className='mission-search-hint'>
+                                        <FaKeyboard aria-hidden='true' /> Cmd+K
+                                    </div>
                                 </div>
                                 <MissionTeams
                                     teams={tournament.teams}
@@ -632,7 +717,7 @@ function MissionTournamentSettings(props) {
 class MissionTimer extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {minutes: 15, seconds: '00', timestamp: '', running: false};
+        this.state = {minutes: 20, seconds: '00', timestamp: '', running: false};
         this.setMinutes = this.setMinutes.bind(this);
         this.setSeconds = this.setSeconds.bind(this);
         this.setTimestamp = this.setTimestamp.bind(this);
@@ -657,6 +742,9 @@ class MissionTimer extends React.Component {
     }
 
     setCountdownMinutes() {
+        if (this.props.disabled || this.state.running) {
+            return;
+        }
         const minutes = parseInt(this.state.minutes || 0, 10);
         const remainderSeconds = parseInt(this.state.seconds || 0, 10);
         const seconds = (minutes * 60) + remainderSeconds;
@@ -664,10 +752,16 @@ class MissionTimer extends React.Component {
     }
 
     setQuickCountdown(seconds) {
+        if (this.props.disabled || this.state.running) {
+            return;
+        }
         this.patchTimer({timestamp_seconds: seconds, timer_mode: TIMER_MODE_COUNTDOWN});
     }
 
     setCountdownTimestamp() {
+        if (this.props.disabled || this.state.running || !this.state.timestamp) {
+            return;
+        }
         this.patchTimer({timestamp: this.state.timestamp, timer_mode: TIMER_MODE_COUNTDOWN});
     }
 
@@ -701,9 +795,14 @@ class MissionTimer extends React.Component {
             'kein Timer';
         return (
             <section className='mission-control-section mission-pane-timer' data-testid='mission-timer-control'>
-                <div className='d-flex justify-content-between align-items-center flex-wrap gap-2'>
-                    <h3 className='h5 mission-pane-heading'>Countdown starten</h3>
-                    <span className='text-muted small'>{currentTimer}</span>
+                <div className='mission-current-timer mb-3'>
+                    <div>
+                        <h3 className='h5 mission-pane-heading mb-1'>Countdown starten</h3>
+                        <span className='text-muted small'>{currentTimer}</span>
+                    </div>
+                    <div className='mission-current-timer-display' data-testid='mission-current-timer-display'>
+                        <Timer timerState={this.props.timerState} />
+                    </div>
                 </div>
                 <Row className='g-3'>
                     <Col lg='4'>
@@ -713,23 +812,26 @@ class MissionTimer extends React.Component {
                             <div className='mission-quick-grid'>
                                 <button type='button' className='mission-quick-button'
                                     disabled={this.props.disabled || this.state.running}
-                                    data-testid='mission-timer-quick-20'
-                                    onClick={() => this.setQuickCountdown(20 * 60)}>
-                                    <strong>20:00</strong>
-                                    <span>20 Minuten</span>
+                                    data-testid='mission-timer-quick-20s'
+                                    onClick={() => this.setQuickCountdown(20)}>
+                                    <strong>00:20</strong>
+                                    <span>20 Sekunden</span>
                                 </button>
                                 <button type='button' className='mission-quick-button'
                                     disabled={this.props.disabled || this.state.running}
-                                    data-testid='mission-timer-quick-15s'
-                                    onClick={() => this.setQuickCountdown(15)}>
-                                    <strong>00:15</strong>
-                                    <span>15 Sekunden</span>
+                                    data-testid='mission-timer-quick-2015'
+                                    onClick={() => this.setQuickCountdown((20 * 60) + 15)}>
+                                    <strong>20:15</strong>
+                                    <span>20 Minuten 15 Sekunden</span>
                                 </button>
                             </div>
                         </div>
                     </Col>
                     <Col lg='4'>
-                        <div className='mission-control-panel'>
+                        <form className='mission-control-panel' onSubmit={event => {
+                            event.preventDefault();
+                            this.setCountdownMinutes();
+                        }}>
                             <h4>Manuelle Dauer</h4>
                             <p>Starte einen Countdown mit eigener Zeit.</p>
                             <Row className='g-2'>
@@ -745,26 +847,29 @@ class MissionTimer extends React.Component {
                                 </Col>
                             </Row>
                             <Button color='primary' className='w-100 mt-3'
+                                type='submit'
                                 data-testid='mission-timer-countdown-minutes'
-                                disabled={this.props.disabled || this.state.running}
-                                onClick={this.setCountdownMinutes}>
+                                disabled={this.props.disabled || this.state.running}>
                                 Countdown starten
                             </Button>
-                        </div>
+                        </form>
                     </Col>
                     <Col lg='4'>
-                        <div className='mission-control-panel'>
+                        <form className='mission-control-panel' onSubmit={event => {
+                            event.preventDefault();
+                            this.setCountdownTimestamp();
+                        }}>
                             <h4>Bis Zeitpunkt</h4>
                             <p>Starte einen Countdown bis zu einem bestimmten Zeitpunkt.</p>
                             <Input id='missionTimerTimestamp' type='datetime-local'
                                 value={this.state.timestamp} onChange={this.setTimestamp}/>
                             <Button color='primary' className='w-100 mt-3'
+                                type='submit'
                                 data-testid='mission-timer-countdown-timestamp'
-                                disabled={this.props.disabled || this.state.running || !this.state.timestamp}
-                                onClick={this.setCountdownTimestamp}>
+                                disabled={this.props.disabled || this.state.running || !this.state.timestamp}>
                                 Countdown bis Zeitpunkt starten
                             </Button>
-                        </div>
+                        </form>
                     </Col>
                 </Row>
 
@@ -878,8 +983,13 @@ function MissionMatches(props) {
                         onChange={props.onSearchChange}
                         placeholder='Gruppen, Teams, Matches suchen...'
                         aria-label='Scores suchen'
+                        title='Mit Cmd+K oder Ctrl+K fokussieren'
+                        innerRef={props.searchInputRef}
                         data-testid='mission-control-search'
                     />
+                </div>
+                <div className='mission-search-hint'>
+                    <FaKeyboard aria-hidden='true' /> Cmd+K
                 </div>
                 <Button color='link' className='mission-filter-reset'
                     onClick={() => props.onSearchChange({target: {value: ''}})}>
@@ -986,6 +1096,7 @@ class MissionMatchCard extends React.Component {
         this.setLive = this.setLive.bind(this);
         this.startMatch = this.startMatch.bind(this);
         this.submit = this.submit.bind(this);
+        this.onFormKeyDown = this.onFormKeyDown.bind(this);
         this.onStartSuccess = this.onStartSuccess.bind(this);
         this.onStartError = this.onStartError.bind(this);
         this.onScoresSuccess = this.onScoresSuccess.bind(this);
@@ -1030,16 +1141,41 @@ class MissionMatchCard extends React.Component {
 
     submit(event) {
         event.preventDefault();
+        const form = event.currentTarget;
+        const score1Input = form.querySelector('[data-score-field="score1"]');
+        const score2Input = form.querySelector('[data-score-field="score2"]');
+        const liveInput = form.querySelector('[data-score-field="live"]');
+        const score1 = score1Input ? score1Input.value : this.state.score1;
+        const score2 = score2Input ? score2Input.value : this.state.score2;
+        this.submittedLive = liveInput ? liveInput.checked : this.state.live;
         const submitScores = this.props.match.decider ? submitDeciderMatchScores : submitMatchScores;
-        this.setState({running: true});
+        this.setState({score1, score2, live: this.submittedLive, running: true});
         submitScores(
-            this.state.score1,
+            score1,
             this.props.match.team1.scoreId,
-            this.state.score2,
+            score2,
             this.props.match.team2.scoreId,
             this.onScoresSuccess,
             this.onActionError
         );
+    }
+
+    onFormKeyDown(event) {
+        if (event.key !== 'Enter') {
+            return;
+        }
+
+        if (!event.metaKey && !event.ctrlKey) {
+            event.preventDefault();
+            return;
+        }
+
+        event.preventDefault();
+        if (event.currentTarget.requestSubmit) {
+            event.currentTarget.requestSubmit();
+            return;
+        }
+        event.currentTarget.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
     }
 
     onStartSuccess() {
@@ -1054,7 +1190,7 @@ class MissionMatchCard extends React.Component {
     }
 
     onScoresSuccess() {
-        if (this.state.live) {
+        if (this.submittedLive) {
             notify.show('Score wurde gespeichert.', 'success', 2000);
             this.setState({running: false});
             this.props.onTournamentChange();
@@ -1085,6 +1221,7 @@ class MissionMatchCard extends React.Component {
         const tableLabel = 'G' + groupNumber + '-S' + match.position;
         return (
             <form onSubmit={this.submit} className={'mission-control-match mission-start-card ' + stateClass}
+                onKeyDown={this.onFormKeyDown}
                 data-testid='mission-match-card'>
                 <div className='mission-start-table'>
                     {tableLabel}
@@ -1095,7 +1232,8 @@ class MissionMatchCard extends React.Component {
                         <FaUsers aria-hidden='true' />
                         <TeamName name={match.team1.name}/>
                     </Label>
-                    <Input type='number' value={this.state.score1} onChange={this.setScore1}
+                    <Input type='number' name='score1' data-score-field='score1'
+                        value={this.state.score1} onChange={this.setScore1}
                         disabled={!editable} aria-label={match.team1.name + ' score'} />
                 </div>
                 <div className='mission-start-row'>
@@ -1103,13 +1241,16 @@ class MissionMatchCard extends React.Component {
                         <FaUsers aria-hidden='true' />
                         <TeamName name={match.team2.name}/>
                     </Label>
-                    <Input type='number' value={this.state.score2} onChange={this.setScore2}
+                    <Input type='number' name='score2' data-score-field='score2'
+                        value={this.state.score2} onChange={this.setScore2}
                         disabled={!editable} aria-label={match.team2.name + ' score'} />
                 </div>
                 <div className='mission-start-meta'>
                     <FormGroup check className='mb-0'>
                         <Input
                             id={`mission-match-live-${match.id}`}
+                            name='live'
+                            data-score-field='live'
                             type='checkbox'
                             checked={this.state.live}
                             onChange={this.setLive}
@@ -1160,6 +1301,9 @@ class MissionTeams extends React.Component {
     }
 
     saveTeamName(team) {
+        if (this.props.disabled || this.state.savingTeamId === team.id) {
+            return;
+        }
         this.setState({savingTeamId: team.id});
         updateTeamName({
             id: team.id,
@@ -1187,17 +1331,20 @@ class MissionTeams extends React.Component {
                 <Row className='g-2'>
                     {teams.map(team => (
                         <Col md='6' lg='4' key={team.id}>
-                            <div className='d-flex gap-2'>
+                            <form className='d-flex gap-2' onSubmit={event => {
+                                event.preventDefault();
+                                this.saveTeamName(team);
+                            }}>
                                 <Input value={this.state.teamNames[team.id] || team.name}
                                     onChange={event => this.setTeamName(team.id, event.target.value)}
                                     disabled={this.props.disabled}/>
                                 <Button color='secondary' outline
+                                    type='submit'
                                     data-testid='mission-team-save'
-                                    disabled={this.props.disabled || this.state.savingTeamId === team.id}
-                                    onClick={() => this.saveTeamName(team)}>
+                                    disabled={this.props.disabled || this.state.savingTeamId === team.id}>
                                     Speichern
                                 </Button>
-                            </div>
+                            </form>
                         </Col>
                     ))}
                 </Row>

@@ -18,7 +18,13 @@ export class TurniereNavigation extends React.Component {
     constructor(props) {
         super(props);
         this.toggle = this.toggle.bind(this);
-        this.state = {collapsed: true};
+        this.state = {collapsed: true, currentPath: null};
+    }
+
+    componentDidMount() {
+        this.setState({
+            currentPath: window.location.pathname + window.location.search + window.location.hash
+        });
     }
 
     toggle() {
@@ -43,7 +49,7 @@ export class TurniereNavigation extends React.Component {
                         <NavbarTimer timerState={tournament.timerState} className="m-auto hide-below-992-w"/>
                     }
                     <div className="ms-auto">
-                        <LoginLogoutButtons/>
+                        <LoginLogoutButtons currentPath={this.state.currentPath}/>
                     </div>
                 </Collapse>
             </Navbar>
@@ -74,7 +80,8 @@ class InvisibleLoginLogoutButtons extends React.Component {
     }
 
     render() {
-        const {isSignedIn, username} = this.props;
+        const {currentPath, isSignedIn, username} = this.props;
+        const loginHref = currentPath ? `/login?redirect=${encodeURIComponent(currentPath)}` : '/login';
 
         if (isSignedIn) {
             return (<ButtonGroup className="nav-item">
@@ -85,7 +92,7 @@ class InvisibleLoginLogoutButtons extends React.Component {
             </ButtonGroup>);
         } else {
             return (<ButtonGroup className="nav-item">
-                <Button outline color="success" href="/login"
+                <Button outline color="success" href={loginHref}
                     className="navbar-btn my-2 my-sm-0 px-5">Login</Button>
             </ButtonGroup>);
         }

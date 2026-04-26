@@ -34,6 +34,22 @@ test('Login flow works and shows user state', async ({ page }, testInfo) => {
   await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
 });
 
+test('Navbar login returns to previous page after successful login', async ({ page }, testInfo) => {
+  await page.goto('/faq');
+  await page.waitForLoadState('networkidle');
+
+  await page.getByRole('link', { name: 'Login' }).click();
+  await page.waitForURL('/login?redirect=%2Ffaq');
+
+  await page.fill('input[name="username"]', email);
+  await page.fill('input[name="password"]', password);
+  await page.click('input[type="submit"]');
+
+  await page.waitForURL('/faq', { timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
+  await keyframe(page, testInfo, 'navbar_login_return');
+});
+
 test('Login failure shows an error instead of crashing the page', async ({ page }, testInfo) => {
   await page.goto('/login');
   await page.waitForLoadState('networkidle');
