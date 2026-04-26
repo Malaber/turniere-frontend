@@ -66,16 +66,22 @@ function triggerConfetti() {
 export class BeamerTimerEffects extends React.Component {
     constructor(props) {
         super(props);
+        this.state = {
+            soundBlocked: false
+        };
         this.activeSounds = [];
         this.firedCueKeys = {};
+        this.pendingCue = null;
         this.previousSecondsRemaining = null;
         this.timerSessionKey = null;
         this.finishedTriggered = false;
 
         this.tick = this.tick.bind(this);
+        this.unlockAndRetry = this.unlockAndRetry.bind(this);
     }
 
     componentDidMount() {
+        this.addUnlockListeners();
         this.tick();
         this.intervalId = setInterval(this.tick, TICK_MS);
     }
@@ -88,7 +94,24 @@ export class BeamerTimerEffects extends React.Component {
 
     componentWillUnmount() {
         clearInterval(this.intervalId);
+        this.removeUnlockListeners();
         this.stopActiveSounds('unmount');
+    }
+
+    addUnlockListeners() {
+        if (typeof window === 'undefined') return;
+
+        window.addEventListener('pointerdown', this.unlockAndRetry, true);
+        window.addEventListener('touchend', this.unlockAndRetry, true);
+        window.addEventListener('keydown', this.unlockAndRetry, true);
+    }
+
+    removeUnlockListeners() {
+        if (typeof window === 'undefined') return;
+
+        window.removeEventListener('pointerdown', this.unlockAndRetry, true);
+        window.removeEventListener('touchend', this.unlockAndRetry, true);
+        window.removeEventListener('keydown', this.unlockAndRetry, true);
     }
 
     resetSessionIfNeeded(timerState) {
@@ -100,8 +123,10 @@ export class BeamerTimerEffects extends React.Component {
 
         this.timerSessionKey = nextKey;
         this.firedCueKeys = {};
+        this.pendingCue = null;
         this.previousSecondsRemaining = null;
         this.finishedTriggered = false;
+        this.setState({soundBlocked: false});
         this.stopActiveSounds('timer-changed');
     }
 
@@ -161,6 +186,37 @@ export class BeamerTimerEffects extends React.Component {
         return cue.secondsRemaining + cue.startOffsetSeconds;
     }
 
+    getElapsedSeconds(cue) {
+        const display = getTimerDisplay(this.props.timerState, Date.now());
+        if (!display.active || display.mode !== TIMER_MODE_COUNTDOWN) return null;
+
+        const secondsRemaining = Math.floor(display.ms / 1000);
+        const cueStartSeconds = this.getCueStartSeconds(cue);
+        const elapsedSeconds = Math.max(0, cueStartSeconds - secondsRemaining);
+        if (elapsedSeconds >= cue.durationSeconds) return null;
+
+        return elapsedSeconds;
+    }
+
+    unlockAndRetry(event) {
+        if (event && event.type === 'keydown' && event.key === 'Tab') return;
+        if (!this.pendingCue) return;
+
+        const elapsedSeconds = this.getElapsedSeconds(this.pendingCue);
+        if (elapsedSeconds === null) {
+            this.pendingCue = null;
+            this.setState({soundBlocked: false});
+            return;
+        }
+
+        emitDebugEvent('sound-retry', {
+            cue: this.pendingCue.key,
+            elapsedSeconds,
+            src: this.pendingCue.src
+        });
+        this.playCue(this.pendingCue, elapsedSeconds);
+    }
+
     playCue(cue, elapsedSeconds) {
         if (typeof window === 'undefined' || typeof Audio === 'undefined') {
             emitDebugEvent('sound-unavailable', {reason: 'no-audio-element'});
@@ -168,6 +224,7 @@ export class BeamerTimerEffects extends React.Component {
         }
 
         this.stopActiveSounds('next-cue');
+        this.pendingCue = cue;
         emitDebugEvent('sound', {
             cue: cue.key,
             elapsedSeconds,
@@ -191,17 +248,35 @@ export class BeamerTimerEffects extends React.Component {
             try {
                 const playResult = audio.play();
                 if (playResult && playResult.catch) {
-                    playResult.catch(error => {
-                        emitDebugEvent('sound-unavailable', {
-                            reason: 'play-blocked',
-                            message: error.message
+                    playResult
+                        .then(() => {
+                            this.pendingCue = null;
+                            this.setState({soundBlocked: false});
+                            emitDebugEvent('sound-started', {cue: cue.key, src: cue.src});
+                        })
+                        .catch(error => {
+                            this.pendingCue = cue;
+                            this.setState({soundBlocked: true});
+                            emitDebugEvent('sound-unavailable', {
+                                reason: 'play-blocked',
+                                message: error.message,
+                                cue: cue.key,
+                                src: cue.src
+                            });
                         });
-                    });
+                } else {
+                    this.pendingCue = null;
+                    this.setState({soundBlocked: false});
+                    emitDebugEvent('sound-started', {cue: cue.key, src: cue.src});
                 }
             } catch (error) {
+                this.pendingCue = cue;
+                this.setState({soundBlocked: true});
                 emitDebugEvent('sound-unavailable', {
                     reason: 'play-error',
-                    message: error.message
+                    message: error.message,
+                    cue: cue.key,
+                    src: cue.src
                 });
             }
         };
@@ -259,6 +334,27 @@ export class BeamerTimerEffects extends React.Component {
     }
 
     render() {
-        return null;
+        if (!this.state.soundBlocked) return null;
+
+        return (
+            <button
+                type="button"
+                data-testid="beamer-sound-unlock"
+                onClick={this.unlockAndRetry}
+                style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 2147483647,
+                    border: 0,
+                    background: 'rgba(0, 0, 0, 0.72)',
+                    color: '#ffffff',
+                    fontSize: 'clamp(2rem, 6vw, 6rem)',
+                    fontWeight: 800,
+                    cursor: 'pointer'
+                }}
+            >
+                Ton aktivieren
+            </button>
+        );
     }
 }
