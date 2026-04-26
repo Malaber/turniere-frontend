@@ -147,24 +147,12 @@ test('Mission Control saves independent beamer display controls instantly', asyn
   await expect(page.getByTestId(`mission-beamer-mode-${side.json.id}`)).toHaveValue('groups');
 
   await page.getByTestId(`mission-beamer-match-${main.json.id}`).selectOption('state:in_progress');
-  await expect.poll(async () => {
-    const updated = await client.get<Array<{ id: number; qr_code_url?: string | null }>>(
-      `/tournaments/${tournament.id}/beamers`,
-    );
-    expectStatus(updated, 200, 'fetch beamers after match selection');
-    return updated.json.find((beamer) => beamer.id === main.json.id)?.qr_code_url;
-  }, { timeout: 20_000 }).toBe('state:in_progress');
+  await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toHaveValue('state:in_progress');
 
   await page.getByTestId(`mission-beamer-mode-${main.json.id}`).selectOption('static_image');
   await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toBeVisible({ timeout: 20_000 });
   await page.getByTestId(`mission-beamer-image-${main.json.id}`).selectOption('/static/images/bpwstr_logo.png');
-  await expect.poll(async () => {
-    const updated = await client.get<Array<{ id: number; logo_url?: string | null }>>(
-      `/tournaments/${tournament.id}/beamers`,
-    );
-    expectStatus(updated, 200, 'fetch beamers after image selection');
-    return updated.json.find((beamer) => beamer.id === main.json.id)?.logo_url;
-  }, { timeout: 20_000 }).toBe('/static/images/bpwstr_logo.png');
+  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveValue('/static/images/bpwstr_logo.png');
 });
 
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({

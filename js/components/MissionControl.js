@@ -348,7 +348,7 @@ export class MissionControl extends React.Component {
 class MissionBeamer extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {beamers: [], name: '', loading: false, savingById: {}};
+        this.state = {beamers: [], name: '', loading: false, savingById: {}, selectionsById: {}};
         this.setName = this.setName.bind(this);
         this.reload = this.reload.bind(this);
         this.create = this.create.bind(this);
@@ -365,7 +365,20 @@ class MissionBeamer extends React.Component {
 
     reload() {
         getBeamers(this.props.tournament.id,
-            beamers => this.setState({beamers: beamers || [], loading: false, savingById: {}}),
+            beamers => this.setState(prev => ({
+                beamers: beamers || [],
+                loading: false,
+                savingById: {},
+                selectionsById: (beamers || []).reduce((selections, beamer) => {
+                    const current = prev.selectionsById[beamer.id] || {};
+                    selections[beamer.id] = {
+                        mode: current.mode || beamerModeFor(beamer),
+                        match: beamer.qr_code_url || current.match || '',
+                        image: beamer.logo_url || current.image || STATIC_IMAGE_OPTIONS[0].value
+                    };
+                    return selections;
+                }, {})
+            })),
             this.onError);
     }
 
@@ -408,6 +421,19 @@ class MissionBeamer extends React.Component {
         if (!mode) {
             return;
         }
+        this.setState(prev => ({
+            selectionsById: Object.assign({}, prev.selectionsById, {
+                [beamer.id]: Object.assign({}, prev.selectionsById[beamer.id], {
+                    mode: modeValue,
+                    image: modeValue === 'static_image' ? (
+                        (prev.selectionsById[beamer.id] || {}).image ||
+                        beamer.logo_url ||
+                        STATIC_IMAGE_OPTIONS[0].value
+                    ) :
+                        ''
+                })
+            })
+        }));
         const payload = {
             display_state: mode.displayState,
             qr_code_url: ''
@@ -421,10 +447,20 @@ class MissionBeamer extends React.Component {
     }
 
     updateMatchSelection(beamer, value) {
+        this.setState(prev => ({
+            selectionsById: Object.assign({}, prev.selectionsById, {
+                [beamer.id]: Object.assign({}, prev.selectionsById[beamer.id], {match: value})
+            })
+        }));
         this.update(beamer, {qr_code_url: value});
     }
 
     updateImageSelection(beamer, value) {
+        this.setState(prev => ({
+            selectionsById: Object.assign({}, prev.selectionsById, {
+                [beamer.id]: Object.assign({}, prev.selectionsById[beamer.id], {image: value})
+            })
+        }));
         this.update(beamer, {
             display_state: 'between_games',
             logo_url: value
@@ -455,11 +491,12 @@ class MissionBeamer extends React.Component {
                 <h3 className='h5 mission-pane-heading'>Aktive Beamer</h3>
                 <div className='mission-beamer-list'>
                     {this.state.beamers.map(beamer => {
-                        const mode = beamerModeFor(beamer);
+                        const selections = this.state.selectionsById[beamer.id] || {};
+                        const mode = selections.mode || beamerModeFor(beamer);
                         const saving = Boolean(this.state.savingById[beamer.id]);
                         const disabled = saving || this.props.disabled;
-                        const matchSelection = beamer.qr_code_url || '';
-                        const imageSelection = beamer.logo_url || STATIC_IMAGE_OPTIONS[0].value;
+                        const matchSelection = selections.match || beamer.qr_code_url || '';
+                        const imageSelection = selections.image || beamer.logo_url || STATIC_IMAGE_OPTIONS[0].value;
 
                         return (
                             <div className='mission-beamer-card' key={beamer.id}
