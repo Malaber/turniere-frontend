@@ -11,6 +11,11 @@ app.prepare()
     .then(() => {
         const server = express();
 
+        server.use((req, res, nextMiddleware) => {
+            res.setHeader('Permissions-Policy', 'autoplay=(self)');
+            nextMiddleware();
+        });
+
         server.get('/t/:code', (req, res) => {
             const actualPage = '/tournament';
             const queryParam = {code: req.params.code};

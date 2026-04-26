@@ -43,6 +43,13 @@ function emitDebugEvent(type, payload) {
     }
     window.__beamerTimerEffects.events.push(event);
     window.dispatchEvent(new CustomEvent('beamer-timer-effect', {detail: event}));
+
+    if (window.__beamerTimerAudioLogging !== false && window.console) {
+        const logFn = type === 'sound-unavailable' || type === 'sound-seek-error' ?
+            'warn' :
+            'info';
+        window.console[logFn]('[beamer-audio]', type, event);
+    }
 }
 
 
@@ -109,12 +116,30 @@ export class BeamerTimerEffects extends React.Component {
             },
             cues: TIMER_EFFECT_CUES,
             events: () => (window.__beamerTimerEffects && window.__beamerTimerEffects.events) || [],
+            help: () => ({
+                clear: '__beamerTimerAudio.clear()',
+                disableLogs: 'window.__beamerTimerAudioLogging = false',
+                enableLogs: 'window.__beamerTimerAudioLogging = true',
+                events: '__beamerTimerAudio.events().slice(-20)',
+                policy: '__beamerTimerAudio.policy()',
+                retry: '__beamerTimerAudio.retry()',
+                state: '__beamerTimerAudio.state()',
+                testCue: '__beamerTimerAudio.testCue("start-countdown", 5)'
+            }),
             policy: () => {
-                if (!navigator.getAutoplayPolicy) return 'unsupported';
+                if (!navigator.getAutoplayPolicy) {
+                    return {
+                        audioContext: 'unsupported',
+                        mediaElement: 'unsupported'
+                    };
+                }
                 try {
-                    return navigator.getAutoplayPolicy('mediaelement');
+                    return {
+                        audioContext: navigator.getAutoplayPolicy('audiocontext'),
+                        mediaElement: navigator.getAutoplayPolicy('mediaelement')
+                    };
                 } catch (error) {
-                    return 'error: ' + error.message;
+                    return {error: error.message};
                 }
             },
             retry: () => this.retryPendingCue('manual-debug'),
@@ -128,7 +153,12 @@ export class BeamerTimerEffects extends React.Component {
                     volume: audio.volume
                 })),
                 pendingCue: this.pendingCue && this.pendingCue.key,
-                timerSessionKey: this.timerSessionKey
+                policy: window.__beamerTimerAudio.policy(),
+                timerSessionKey: this.timerSessionKey,
+                userActivation: navigator.userActivation ? {
+                    hasBeenActive: navigator.userActivation.hasBeenActive,
+                    isActive: navigator.userActivation.isActive
+                } : 'unsupported'
             }),
             testCue: this.testCue
         };
