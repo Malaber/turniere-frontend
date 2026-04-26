@@ -899,6 +899,14 @@ export function requestTournamentStatistics(code, successCallback, errorCallback
     });
 }
 
+export function requestBackendVersion(successCallback, errorCallback) {
+    getRequest(null, '/version').then(resp => {
+        successCallback(resp.data);
+    }).catch(() => {
+        errorCallback();
+    });
+}
+
 function rehydrateApplicationState() {
     const persistedState = localStorage.getItem('reduxState') ?
         JSON.parse(localStorage.getItem('reduxState')) :
