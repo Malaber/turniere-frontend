@@ -133,12 +133,12 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
 
   const leftStage = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'Left stage',
-    display_state: 'matches_upcoming',
+    display_state: 'between_games',
   });
   expectStatus(leftStage, 201, 'create left stage beamer');
   const backside = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'Backside',
-    display_state: 'matches_finished',
+    display_state: 'group_tables',
   });
   expectStatus(backside, 201, 'create backside beamer');
 

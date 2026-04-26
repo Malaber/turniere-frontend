@@ -46,14 +46,10 @@ function errorMessage(errorBody, fallback) {
 }
 
 const DISPLAY_STATES = [
-    {value: 'matches_all', label: 'Alle Matches'},
-    {value: 'matches_in_progress', label: 'Laufende Matches'},
-    {value: 'matches_upcoming', label: 'Kommende Matches'},
-    {value: 'matches_not_started', label: 'Bereit zum Starten'},
-    {value: 'matches_finished', label: 'Beendete Matches'},
-    {value: 'groups', label: 'Gruppenstand'},
     {value: 'between_games', label: 'Zwischen den Spielen'},
-    {value: 'during_game', label: 'Waehrend dem Spiel'}
+    {value: 'during_game', label: 'Waehrend dem Spiel'},
+    {value: 'group_tables', label: 'Gruppenstand'},
+    {value: 'static_image', label: 'Statisches Bild'}
 ];
 
 const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'teams', 'settings'];
@@ -406,7 +402,7 @@ class MissionBeamer extends React.Component {
         this.setState({running: true});
         createBeamer(this.props.tournament.id, {
             name: this.state.name.trim(),
-            display_state: 'matches_all'
+            display_state: 'during_game'
         }, () => {
             notify.show('Beamer wurde erstellt.', 'success', 2000);
             this.setState({name: ''});
@@ -457,7 +453,7 @@ class MissionBeamer extends React.Component {
                                     <div className='mission-beamer-display'>
                                         <Input
                                             type='select'
-                                            value={beamer.display_state || 'matches_all'}
+                                            value={beamer.display_state || 'during_game'}
                                             disabled={this.state.running || this.props.disabled}
                                             data-testid={'mission-beamer-display-' + beamer.id}
                                             onChange={event => this.update(beamer, event.target.value)}>
@@ -466,14 +462,14 @@ class MissionBeamer extends React.Component {
                                             ))}
                                         </Input>
                                         <Button color='primary' disabled={this.state.running || this.props.disabled}
-                                            onClick={() => this.update(beamer, beamer.display_state || 'matches_all')}>
+                                            onClick={() => this.update(beamer, beamer.display_state || 'during_game')}>
                                             Aktualisieren
                                         </Button>
                                         <Button color='link'
                                             href={'/t/' + this.props.tournament.id +
                                             '/fullscreen?beamer=' + encodeURIComponent(beamer.name)}
                                             target='_blank'>
-                                            {displayStateLabel(beamer.display_state || 'matches_all')}
+                                            {displayStateLabel(beamer.display_state || 'during_game')}
                                         </Button>
                                     </div>
                                 </td>
