@@ -146,8 +146,9 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
 test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstruck after resolution', async ({ context, page }) => {
   await injectAuth(context, loadAuthState());
   const { tournament, relevantTeamNames } = await seedAdvancingDeciderScenario();
-  const teamOneRow = page.locator('[data-decider-match="true"]').first().locator('tbody tr').nth(0).locator('td');
-  const teamTwoRow = page.locator('[data-decider-match="true"]').first().locator('tbody tr').nth(1).locator('td');
+  const deciderCard = page.locator('[data-decider-match="true"]').first();
+  const teamOneRow = deciderCard.locator('tbody tr', { hasText: relevantTeamNames[0] }).locator('td');
+  const teamTwoRow = deciderCard.locator('tbody tr', { hasText: relevantTeamNames[1] }).locator('td');
 
   await page.goto(`/t/${tournament.id}`);
   await page.waitForLoadState('networkidle');
@@ -166,7 +167,6 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
   await expect(modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' })).toBeVisible();
   await modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' }).click();
 
-  const deciderCard = page.locator('[data-decider-match="true"]').first();
   await expect(deciderCard).toBeVisible({ timeout: 15000 });
   await expect.poll(async () => {
     await deciderCard.click({ force: true });
@@ -203,10 +203,10 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
   await modal.getByRole('button', { name: 'Spiel beenden' }).click({ force: true });
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20000 });
   await expect(page.getByLabel('Tie-Break erklärt')).toHaveCount(2, { timeout: 20000 });
-  await expectNoLineThrough(teamOneRow);
-  await expectNoLineThrough(teamTwoRow);
   await expect(teamOneRow).toContainText(relevantTeamNames[0]);
   await expect(teamTwoRow).toContainText(relevantTeamNames[1]);
+  await expectNoLineThrough(teamOneRow);
+  await expectNoLineThrough(teamTwoRow);
 });
 
 test('Public user can inspect a required decider modal', async ({ page }, testInfo) => {
