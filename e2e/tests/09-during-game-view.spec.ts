@@ -314,8 +314,7 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'effects_loaded');
   await waitForBeamerEffect(page, 'sound', 'start-countdown');
-  await expect(page.getByTestId('beamer-sound-unlock')).toBeVisible();
-  await page.getByTestId('beamer-sound-unlock').click();
+  await waitForBeamerEffect(page, 'sound-retry', 'start-countdown');
   await waitForBeamerEffect(page, 'sound-started', 'start-countdown');
   await keyframe(page, testInfo, 'start_countdown_sound_synced');
 

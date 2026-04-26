@@ -66,22 +66,18 @@ function triggerConfetti() {
 export class BeamerTimerEffects extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {
-            soundBlocked: false
-        };
         this.activeSounds = [];
         this.firedCueKeys = {};
         this.pendingCue = null;
+        this.playbackRetryTimeout = null;
         this.previousSecondsRemaining = null;
         this.timerSessionKey = null;
         this.finishedTriggered = false;
 
         this.tick = this.tick.bind(this);
-        this.unlockAndRetry = this.unlockAndRetry.bind(this);
     }
 
     componentDidMount() {
-        this.addUnlockListeners();
         this.tick();
         this.intervalId = setInterval(this.tick, TICK_MS);
     }
@@ -94,24 +90,7 @@ export class BeamerTimerEffects extends React.Component {
 
     componentWillUnmount() {
         clearInterval(this.intervalId);
-        this.removeUnlockListeners();
         this.stopActiveSounds('unmount');
-    }
-
-    addUnlockListeners() {
-        if (typeof window === 'undefined') return;
-
-        window.addEventListener('pointerdown', this.unlockAndRetry, true);
-        window.addEventListener('touchend', this.unlockAndRetry, true);
-        window.addEventListener('keydown', this.unlockAndRetry, true);
-    }
-
-    removeUnlockListeners() {
-        if (typeof window === 'undefined') return;
-
-        window.removeEventListener('pointerdown', this.unlockAndRetry, true);
-        window.removeEventListener('touchend', this.unlockAndRetry, true);
-        window.removeEventListener('keydown', this.unlockAndRetry, true);
     }
 
     resetSessionIfNeeded(timerState) {
@@ -126,7 +105,6 @@ export class BeamerTimerEffects extends React.Component {
         this.pendingCue = null;
         this.previousSecondsRemaining = null;
         this.finishedTriggered = false;
-        this.setState({soundBlocked: false});
         this.stopActiveSounds('timer-changed');
     }
 
@@ -198,23 +176,32 @@ export class BeamerTimerEffects extends React.Component {
         return elapsedSeconds;
     }
 
-    unlockAndRetry(event) {
-        if (event && event.type === 'keydown' && event.key === 'Tab') return;
-        if (!this.pendingCue) return;
+    retryPendingCue(reason) {
+        const cue = this.pendingCue;
+        if (!cue) return;
 
-        const elapsedSeconds = this.getElapsedSeconds(this.pendingCue);
+        const elapsedSeconds = this.getElapsedSeconds(cue);
         if (elapsedSeconds === null) {
             this.pendingCue = null;
-            this.setState({soundBlocked: false});
             return;
         }
 
         emitDebugEvent('sound-retry', {
-            cue: this.pendingCue.key,
+            cue: cue.key,
             elapsedSeconds,
-            src: this.pendingCue.src
+            reason,
+            src: cue.src
         });
-        this.playCue(this.pendingCue, elapsedSeconds);
+        this.playCue(cue, elapsedSeconds);
+    }
+
+    schedulePlaybackRetry(cue, reason) {
+        this.pendingCue = cue;
+        clearTimeout(this.playbackRetryTimeout);
+        this.playbackRetryTimeout = setTimeout(() => {
+            this.playbackRetryTimeout = null;
+            this.retryPendingCue(reason);
+        }, 750);
     }
 
     playCue(cue, elapsedSeconds) {
@@ -251,33 +238,31 @@ export class BeamerTimerEffects extends React.Component {
                     playResult
                         .then(() => {
                             this.pendingCue = null;
-                            this.setState({soundBlocked: false});
+                            clearTimeout(this.playbackRetryTimeout);
                             emitDebugEvent('sound-started', {cue: cue.key, src: cue.src});
                         })
                         .catch(error => {
-                            this.pendingCue = cue;
-                            this.setState({soundBlocked: true});
                             emitDebugEvent('sound-unavailable', {
                                 reason: 'play-blocked',
                                 message: error.message,
                                 cue: cue.key,
                                 src: cue.src
                             });
+                            this.schedulePlaybackRetry(cue, 'play-blocked');
                         });
                 } else {
                     this.pendingCue = null;
-                    this.setState({soundBlocked: false});
+                    clearTimeout(this.playbackRetryTimeout);
                     emitDebugEvent('sound-started', {cue: cue.key, src: cue.src});
                 }
             } catch (error) {
-                this.pendingCue = cue;
-                this.setState({soundBlocked: true});
                 emitDebugEvent('sound-unavailable', {
                     reason: 'play-error',
                     message: error.message,
                     cue: cue.key,
                     src: cue.src
                 });
+                this.schedulePlaybackRetry(cue, 'play-error');
             }
         };
 
@@ -319,6 +304,8 @@ export class BeamerTimerEffects extends React.Component {
     }
 
     stopActiveSounds(reason) {
+        clearTimeout(this.playbackRetryTimeout);
+        this.playbackRetryTimeout = null;
         if (this.activeSounds.length === 0) return;
 
         this.activeSounds.forEach(audio => {
@@ -334,27 +321,6 @@ export class BeamerTimerEffects extends React.Component {
     }
 
     render() {
-        if (!this.state.soundBlocked) return null;
-
-        return (
-            <button
-                type="button"
-                data-testid="beamer-sound-unlock"
-                onClick={this.unlockAndRetry}
-                style={{
-                    position: 'fixed',
-                    inset: 0,
-                    zIndex: 2147483647,
-                    border: 0,
-                    background: 'rgba(0, 0, 0, 0.72)',
-                    color: '#ffffff',
-                    fontSize: 'clamp(2rem, 6vw, 6rem)',
-                    fontWeight: 800,
-                    cursor: 'pointer'
-                }}
-            >
-                Ton aktivieren
-            </button>
-        );
+        return null;
     }
 }
