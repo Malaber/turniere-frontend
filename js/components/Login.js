@@ -7,6 +7,14 @@ import {login} from '../api';
 
 import {notify} from 'react-notify-toast';
 
+function redirectTargetFromQuery(redirect) {
+    const target = Array.isArray(redirect) ? redirect[0] : redirect;
+    if (typeof target === 'string' && target.startsWith('/') && !target.startsWith('//')) {
+        return target;
+    }
+    return '/';
+}
+
 export function Login(props) {
     return (<Container className="py-5">
         <Card className="shadow">
@@ -48,7 +56,8 @@ const VisibleLoginErrorList = connect(mapStateToErrorMessages)(LoginErrorList);
 class LoginSuccessRedirectComponent extends React.Component {
     render() {
         if (this.props.isSignedIn) {
-            Router.push('/');
+            const query = Router.router ? Router.router.query : {};
+            Router.push(redirectTargetFromQuery(query.redirect));
         }
         return null;
     }
