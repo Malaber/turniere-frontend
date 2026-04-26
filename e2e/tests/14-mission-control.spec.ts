@@ -104,6 +104,69 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   expect(teams.json.teams.some((team) => team.name === renamed)).toBe(true);
 });
 
+test('Mission Control saves independent beamer display controls instantly', async ({ context, page }, testInfo) => {
+  await injectAuth(context);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = await loggedInClient();
+
+  const main = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
+    name: 'Main stage',
+    display_state: 'between_games',
+  });
+  expectStatus(main, 201, 'create main stage beamer');
+  const side = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
+    name: 'Side wall',
+    display_state: 'groups',
+  });
+  expectStatus(side, 201, 'create side wall beamer');
+
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('link', { name: 'Beamer' }).click();
+
+  await expect(page.getByTestId('mission-beamer-control')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Aktualisieren' })).toHaveCount(0);
+  await expect(page.getByText('Main stage')).toBeVisible();
+  await expect(page.getByText('Side wall')).toBeVisible();
+  await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('between_games');
+  await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toBeVisible();
+  await expect(page.getByTestId(`mission-beamer-mode-${side.json.id}`)).toHaveValue('groups');
+  await expect(page.getByTestId(`mission-beamer-match-${side.json.id}`)).toHaveCount(0);
+  await keyframe(page, testInfo, 'beamer_control_tur37');
+
+  await page.getByTestId(`mission-beamer-mode-${main.json.id}`).selectOption('during_game');
+  await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toBeVisible({ timeout: 20_000 });
+  await expect.poll(async () => {
+    const updated = await client.get<Array<{ id: number; display_state: string }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(updated, 200, 'fetch beamers after mode update');
+    return updated.json.find((beamer) => beamer.id === main.json.id)?.display_state;
+  }, { timeout: 20_000 }).toBe('during_game');
+  await expect(page.getByTestId(`mission-beamer-mode-${side.json.id}`)).toHaveValue('groups');
+
+  await page.getByTestId(`mission-beamer-match-${main.json.id}`).selectOption('state:in_progress');
+  await expect.poll(async () => {
+    const updated = await client.get<Array<{ id: number; qr_code_url?: string | null }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(updated, 200, 'fetch beamers after match selection');
+    return updated.json.find((beamer) => beamer.id === main.json.id)?.qr_code_url;
+  }, { timeout: 20_000 }).toBe('state:in_progress');
+
+  await page.getByTestId(`mission-beamer-mode-${main.json.id}`).selectOption('static_image');
+  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId(`mission-beamer-image-${main.json.id}`).selectOption('/static/images/bpwstr_logo.png');
+  await expect.poll(async () => {
+    const updated = await client.get<Array<{ id: number; logo_url?: string | null }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(updated, 200, 'fetch beamers after image selection');
+    return updated.json.find((beamer) => beamer.id === main.json.id)?.logo_url;
+  }, { timeout: 20_000 }).toBe('/static/images/bpwstr_logo.png');
+});
+
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({
   context,
   page,
@@ -149,7 +212,7 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   const created = beamers.json.find((beamer) => beamer.name === 'Main hall');
   expect(created).toBeTruthy();
 
-  await page.getByTestId(`mission-beamer-display-${created!.id}`).selectOption('during_game');
+  await page.getByTestId(`mission-beamer-mode-${created!.id}`).selectOption('during_game');
   await expect.poll(async () => {
     const updated = await client.get<Array<{ id: number; name: string; display_state: string }>>(
       `/tournaments/${tournament.id}/beamers`,
