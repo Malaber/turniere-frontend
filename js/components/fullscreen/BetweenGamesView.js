@@ -44,19 +44,18 @@ export class BetweenGamesView extends React.Component {
         clearInterval(this.intervalId);
     }
 
-    getUpcoming() {
+    getVisibleMatches() {
         const {matches} = this.props;
         if (!matches) return [];
         return [...matches]
-            .sort(sortMatchesByPositionAscending())
-            .filter(m => m.state === 'not_started');
+            .sort(sortMatchesByPositionAscending());
     }
 
     cycleChunk() {
-        const upcoming = this.getUpcoming();
-        if (upcoming.length === 0) return;
+        const visibleMatches = this.getVisibleMatches();
+        if (visibleMatches.length === 0) return;
         const total = Math.ceil(
-            upcoming.length / MATCHES_PER_PAGE
+            visibleMatches.length / MATCHES_PER_PAGE
         );
         this.setState(prev => ({
             chunkIndex: (prev.chunkIndex + 1) % total
@@ -81,12 +80,12 @@ export class BetweenGamesView extends React.Component {
             );
         }
 
-        const upcoming = this.getUpcoming();
+        const visibleMatches = this.getVisibleMatches();
         const totalChunks = Math.max(
-            1, Math.ceil(upcoming.length / MATCHES_PER_PAGE)
+            1, Math.ceil(visibleMatches.length / MATCHES_PER_PAGE)
         );
         const start = chunkIndex * MATCHES_PER_PAGE;
-        const chunk = upcoming.slice(
+        const chunk = visibleMatches.slice(
             start, start + MATCHES_PER_PAGE
         );
 
@@ -103,7 +102,7 @@ export class BetweenGamesView extends React.Component {
 
                 {chunk.length === 0 ? (
                     <div className={styles.empty}>
-                        keine weiteren Spiele
+                        keine Matches
                     </div>
                 ) : (
                     <div

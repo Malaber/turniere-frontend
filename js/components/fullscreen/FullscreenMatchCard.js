@@ -60,6 +60,7 @@ export function FullscreenMatchCard({
             )}
             style={{animationDelay: delay}}
             data-testid="fullscreen-match-card"
+            data-match-id={match.id}
             data-match-state={match.state}
         >
             <div className={styles.matchContent}>

@@ -59,6 +59,21 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
     return matches.json.filter((m) => m.state === 'not_started').length;
   }, { timeout: 20_000 }).toBeGreaterThanOrEqual(32);
 
+  const seededMatches = await client.get<Array<{ id: number; position: number; state: string }>>(
+    `/tournaments/${tournamentId}/matches`,
+  );
+  expectStatus(seededMatches, 200, 'fetch matches for state mix');
+  const firstMatch = seededMatches.json.slice().sort((a, b) => a.position - b.position)[0];
+  const startRes = await client.patch(`/matches/${firstMatch.id}`, { state: 'in_progress' });
+  expectStatus(startRes, 200, 'start first between-games match');
+  await expect.poll(async () => {
+    const matches = await client.get<Array<{ id: number; state: string }>>(
+      `/tournaments/${tournamentId}/matches`,
+    );
+    expectStatus(matches, 200, 'fetch started match state');
+    return matches.json.find((m) => m.id === firstMatch.id)?.state;
+  }, { timeout: 20_000 }).toBe('in_progress');
+
   // Navigate to fullscreen
   await page.goto(`/t/${tournamentId}/fullscreen?display=between_games`);
 
@@ -80,6 +95,15 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   await expectFullscreenMatchCardFrame(
     matchCards.first(),
     badges.first(),
+    {
+      state: 'in_progress',
+      cardBackground: 'rgb(255, 243, 205)',
+      badgeBackground: 'rgb(181, 129, 0)',
+    },
+  );
+  await expectFullscreenMatchCardFrame(
+    matchCards.nth(1),
+    badges.nth(1),
     {
       state: 'not_started',
       cardBackground: 'rgb(248, 249, 250)',
