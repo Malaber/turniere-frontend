@@ -3,7 +3,7 @@ import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
 import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
 import styles from './DuringGameView.module.css';
-import {TeamName} from '../TeamName';
+import {FullscreenMatchCard} from './FullscreenMatchCard';
 
 
 const MATCHES_PER_PAGE = 16;
@@ -153,49 +153,6 @@ class AnimatedTimer extends React.Component {
 }
 
 
-function FullscreenMatchCard({match, index}) {
-    const team1 = match.team1;
-    const team2 = match.team2;
-    const score1 = match.decider ?
-        team1.hiddenScore : team1.score;
-    const score2 = match.decider ?
-        team2.hiddenScore : team2.score;
-
-    const finished = match.state === 'finished';
-    const t1Win = finished && match.winnerTeamId === team1.id;
-    const t2Win = finished && match.winnerTeamId === team2.id;
-    const t1Cls = t1Win ? styles.teamNameWinner : styles.teamName;
-    const t2Cls = t2Win ? styles.teamNameWinner : styles.teamName;
-
-    const delay = (index * 0.06) + 's';
-    const badge = match.group ?
-        match.group.number :
-        match.position;
-
-    return (
-        <div
-            className={styles.matchCard}
-            style={{animationDelay: delay}}
-            data-testid="fullscreen-match-card"
-        >
-            <div className={styles.matchContent}>
-                <div className={styles.matchTeamRow}>
-                    <TeamName name={team1.name} className={t1Cls} testId="fullscreen-team-name"/>
-                    <span className={styles.teamScore}>{score1}</span>
-                </div>
-                <div className={styles.matchTeamRow}>
-                    <TeamName name={team2.name} className={t2Cls} testId="fullscreen-team-name"/>
-                    <span className={styles.teamScore}>{score2}</span>
-                </div>
-            </div>
-            <div className={styles.matchBadge} data-testid="fullscreen-match-badge">
-                {badge}
-            </div>
-        </div>
-    );
-}
-
-
 export class DuringGameView extends React.Component {
     constructor(props) {
         super(props);
@@ -289,6 +246,7 @@ export class DuringGameView extends React.Component {
                             key={m.id}
                             match={m}
                             index={i}
+                            showScores
                         />
                     )}
                 </div>

@@ -1,0 +1,115 @@
+.matchCard {
+    --match-bg: #f8f9fa;
+    --match-accent: #6c757d;
+    background: var(--match-bg);
+    border-left: 4px solid var(--match-accent);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    overflow: hidden;
+    container-type: size;
+    animation-name: cardEnter;
+    animation-duration: 0.5s;
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+    animation-fill-mode: both;
+}
+
+.matchCardAspect {
+    aspect-ratio: 5 / 1;
+}
+
+.matchCardFill {
+    height: 100%;
+}
+
+.stateInProgress {
+    --match-bg: #fff3cd;
+    --match-accent: #b58100;
+}
+
+.stateFinished,
+.stateSingleTeam {
+    --match-bg: #d1e7dd;
+    --match-accent: #198754;
+}
+
+.stateNotStarted,
+.stateNotReady {
+    --match-bg: #f8f9fa;
+    --match-accent: #6c757d;
+}
+
+@keyframes cardEnter {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.matchContent {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(0.3rem, 8cqh, 1.5rem) clamp(0.6rem, 5cqw, 2rem);
+}
+
+.matchTeamRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 0;
+    padding: 0.1rem 0;
+}
+
+.matchTeamRow + .matchTeamRow {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding-top: 0.15rem;
+}
+
+.teamName {
+    color: #1a1a1a;
+    font-size: clamp(1.1rem, 18cqh, 2.2rem);
+    font-weight: 600;
+    flex: 1;
+    line-height: 1.25;
+    padding-right: 0.5rem;
+}
+
+.teamNameWinner {
+    color: #1a1a1a;
+    font-size: clamp(1.1rem, 18cqh, 2.2rem);
+    font-weight: 800;
+    flex: 1;
+    line-height: 1.25;
+    padding-right: 0.5rem;
+}
+
+.teamScore {
+    color: #0055b8;
+    font-family: Halt, sans-serif;
+    font-size: clamp(1rem, 21cqh, 2.6rem);
+    font-weight: 700;
+    min-width: 1.75rem;
+    text-align: right;
+}
+
+.matchBadge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--match-accent);
+    color: #ffffff;
+    font-size: clamp(1.2rem, 25cqh, 3.2rem);
+    font-weight: 700;
+    width: 2ch;
+    padding: 0 clamp(0.2rem, 2cqw, 0.6rem);
+    flex-shrink: 0;
+    box-sizing: content-box;
+}

@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
+import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
 import {
   LONG_TEAM_NAME_SINGLE_WORD,
   longGroupStageTeamName,
@@ -192,6 +193,15 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   // Wait for match cards to confirm the page loaded
   const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
+  await expectFullscreenMatchCardFrame(
+    matchCards.first(),
+    page.getByTestId('fullscreen-match-badge').first(),
+    {
+      state: 'in_progress',
+      cardBackground: 'rgb(255, 243, 205)',
+      badgeBackground: 'rgb(181, 129, 0)',
+    },
+  );
   const longTeamName = page.getByTestId('fullscreen-team-name').filter({ hasText: LONG_TEAM_NAME_SINGLE_WORD }).first();
   await expect(longTeamName).toHaveAttribute('title', new RegExp(LONG_TEAM_NAME_SINGLE_WORD));
   await expect(longTeamName).toHaveCSS('overflow-x', 'hidden');
