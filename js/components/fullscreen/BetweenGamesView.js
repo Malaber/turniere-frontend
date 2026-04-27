@@ -2,41 +2,11 @@ import React from 'react';
 import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
 import styles from './BetweenGamesView.module.css';
-import {TeamName} from '../TeamName';
+import {FullscreenMatchCard} from './FullscreenMatchCard';
 
 
 const MATCHES_PER_PAGE = 32;
 const CHUNK_CYCLE_MS = 12000;
-
-
-function MatchCard({match, index}) {
-    const team1 = match.team1;
-    const team2 = match.team2;
-    const delay = (index * 0.03) + 's';
-    const badge = match.group ?
-        match.group.number :
-        match.position;
-
-    return (
-        <div
-            className={styles.matchCard}
-            style={{animationDelay: delay}}
-            data-testid="fullscreen-match-card"
-        >
-            <div className={styles.matchContent}>
-                <div className={styles.matchTeamRow}>
-                    <TeamName name={team1.name} className={styles.teamName} testId="fullscreen-team-name"/>
-                </div>
-                <div className={styles.matchTeamRow}>
-                    <TeamName name={team2.name} className={styles.teamName} testId="fullscreen-team-name"/>
-                </div>
-            </div>
-            <div className={styles.matchBadge} data-testid="fullscreen-match-badge">
-                {badge}
-            </div>
-        </div>
-    );
-}
 
 
 function ChunkDots({total, active}) {
@@ -141,10 +111,12 @@ export class BetweenGamesView extends React.Component {
                         key={chunkIndex}
                     >
                         {chunk.map((m, i) =>
-                            <MatchCard
+                            <FullscreenMatchCard
                                 key={m.id}
                                 match={m}
                                 index={i}
+                                fillHeight
+                                animationDelayStep={0.03}
                             />
                         )}
                     </div>

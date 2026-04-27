@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
+import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 import {
   LONG_TEAM_NAME_SENTENCE,
@@ -75,6 +76,16 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
 
   // First page shows exactly 32 cards (36 total, capped at 32)
   await expect(matchCards).toHaveCount(32, { timeout: 20_000 });
+  const badges = page.getByTestId('fullscreen-match-badge');
+  await expectFullscreenMatchCardFrame(
+    matchCards.first(),
+    badges.first(),
+    {
+      state: 'not_started',
+      cardBackground: 'rgb(248, 249, 250)',
+      badgeBackground: 'rgb(108, 117, 125)',
+    },
+  );
 
   // Team names are rendered (CSS handles truncation via text-overflow)
   const teamNames = page.getByTestId('fullscreen-team-name');
@@ -90,7 +101,6 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   expect(await sentenceName.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
 
   // Group number badges should be present
-  const badges = page.getByTestId('fullscreen-match-badge');
   const badgeTexts = await badges.allInnerTexts();
   expect(badgeTexts.length).toBe(32);
   // Badges show group numbers (1-6)
