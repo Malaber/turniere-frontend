@@ -49,16 +49,14 @@ app.prepare()
         const server = express();
 
         server.get('/t/:code', async (req, res) => {
-            if (!/^\d+$/.test(req.params.code)) {
-                try {
-                    const tournamentId = await resolveTournamentId(req.params.code);
-                    if (tournamentId) {
-                        res.redirect(302, `/t/${tournamentId}`);
-                        return;
-                    }
-                } catch (error) {
-                    console.warn(`Could not resolve tournament code ${req.params.code}: ${error.message}`);
+            try {
+                const tournamentId = await resolveTournamentId(req.params.code);
+                if (tournamentId && String(tournamentId) !== req.params.code) {
+                    res.redirect(302, `/t/${tournamentId}`);
+                    return;
                 }
+            } catch (error) {
+                console.warn(`Could not resolve tournament code ${req.params.code}: ${error.message}`);
             }
             const actualPage = '/tournament';
             const queryParam = {code: req.params.code};
