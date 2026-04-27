@@ -52,6 +52,26 @@ const DISPLAY_STATES = [
     {value: 'static_image', label: 'Statisches Bild'}
 ];
 
+const BEAMER_MODES = [
+    {value: 'group_tables', label: 'Group Tables', displayState: 'group_tables'},
+    {value: 'during_game', label: 'Matches with Timer', displayState: 'during_game'},
+    {value: 'between_games', label: 'Matches Only', displayState: 'between_games'},
+    {value: 'static_image', label: 'Static Image', displayState: 'static_image'}
+];
+
+const BEAMER_MATCH_STATES = [
+    {value: '', label: 'Alle Status'},
+    {value: 'in_progress', label: 'Laufend'},
+    {value: 'not_started', label: 'Nicht gestartet'},
+    {value: 'finished', label: 'Beendet'}
+];
+
+const STATIC_IMAGE_OPTIONS = [
+    {value: 'bpwstr_banner', label: 'BPWSTR Banner'},
+    {value: 'bpwstr_logo', label: 'BPWSTR Logo'},
+    {value: 'turniere_logo', label: 'Turnie Logo'}
+];
+
 const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'teams', 'settings'];
 const SEARCH_TAB_IDS = ['scores', 'teams'];
 
@@ -69,6 +89,56 @@ function tabFromLocation() {
 function displayStateLabel(value) {
     const match = DISPLAY_STATES.find(state => state.value === value);
     return match ? match.label : value;
+}
+
+function beamerModeFor(beamer) {
+    const mode = BEAMER_MODES.find(item => item.displayState === beamer.display_state);
+    return mode ? mode.value : 'during_game';
+}
+
+function beamerModeLabel(value) {
+    const mode = BEAMER_MODES.find(item => item.value === value);
+    return mode ? mode.label : value;
+}
+
+function matchFilterValue(filters) {
+    const entries = Object.keys(filters)
+        .filter(key => filters[key] !== null && filters[key] !== undefined && filters[key] !== '')
+        .sort()
+        .map(key => key + ':' + filters[key]);
+    return entries.join(',');
+}
+
+function addMatchFilterOptions(options, label, filters) {
+    BEAMER_MATCH_STATES.forEach(state => {
+        const stateFilters = state.value ? Object.assign({}, filters, {state: state.value}) : filters;
+        const stateLabel = state.value ? label + ' - ' + state.label : label;
+        options.push({value: matchFilterValue(stateFilters), label: stateLabel});
+    });
+}
+
+function beamerMatchFilterOptions(tournament) {
+    const options = [];
+    addMatchFilterOptions(options, 'Alle Matches', {});
+
+    const groupStage = tournament.groupStage || {};
+    const groupPositions = [];
+    (groupStage.groups || []).forEach(group => {
+        (group.matches || []).forEach(match => {
+            if (groupPositions.indexOf(match.position) === -1) {
+                groupPositions.push(match.position);
+            }
+        });
+    });
+    groupPositions.sort((a, b) => a - b).forEach(position => {
+        addMatchFilterOptions(options, 'Gruppenphase Tisch ' + position, {group_stage_position: position});
+    });
+
+    (tournament.playoffStages || []).forEach(stage => {
+        addMatchFilterOptions(options, stageName(stage.level), {stage_level: stage.level});
+    });
+
+    return options;
 }
 
 function matchStateLabel(state) {
@@ -373,10 +443,14 @@ export class MissionControl extends React.Component {
 class MissionBeamer extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {beamers: [], name: '', running: false};
+        this.state = {beamers: [], name: '', loading: false, savingById: {}, selectionsById: {}};
         this.setName = this.setName.bind(this);
         this.reload = this.reload.bind(this);
         this.create = this.create.bind(this);
+        this.update = this.update.bind(this);
+        this.updateMode = this.updateMode.bind(this);
+        this.updateMatchSelection = this.updateMatchSelection.bind(this);
+        this.updateImageSelection = this.updateImageSelection.bind(this);
         this.onError = this.onError.bind(this);
     }
 
@@ -386,7 +460,11 @@ class MissionBeamer extends React.Component {
 
     reload() {
         getBeamers(this.props.tournament.id,
-            beamers => this.setState({beamers: beamers || [], running: false}),
+            beamers => this.setState({
+                beamers: beamers || [],
+                loading: false,
+                savingById: {}
+            }),
             this.onError);
     }
 
@@ -399,10 +477,11 @@ class MissionBeamer extends React.Component {
         if (!this.state.name.trim()) {
             return;
         }
-        this.setState({running: true});
+        this.setState({loading: true});
         createBeamer(this.props.tournament.id, {
             name: this.state.name.trim(),
-            display_state: 'during_game'
+            display_state: 'during_game',
+            config: {}
         }, () => {
             notify.show('Beamer wurde erstellt.', 'success', 2000);
             this.setState({name: ''});
@@ -410,85 +489,165 @@ class MissionBeamer extends React.Component {
         }, this.onError);
     }
 
-    update(beamer, displayState) {
-        this.setState({running: true});
-        updateBeamer(this.props.tournament.id, beamer.id, {
-            display_state: displayState
-        }, () => {
+    setBeamerSaving(beamerId, saving) {
+        this.setState(prev => ({
+            savingById: Object.assign({}, prev.savingById, {[beamerId]: saving})
+        }));
+    }
+
+    update(beamer, payload) {
+        this.setBeamerSaving(beamer.id, true);
+        updateBeamer(this.props.tournament.id, beamer.id, payload, () => {
             notify.show('Beamer wurde aktualisiert.', 'success', 2000);
             this.reload();
-        }, this.onError);
+        }, errorBody => this.onError(errorBody, beamer.id));
+    }
+
+    updateMode(beamer, modeValue) {
+        const mode = BEAMER_MODES.find(item => item.value === modeValue);
+        if (!mode) {
+            return;
+        }
+        this.update(beamer, {
+            display_state: mode.displayState,
+            config: Object.assign({}, beamer.config || {})
+        });
+    }
+
+    updateMatchSelection(beamer, value) {
+        this.update(beamer, {
+            config: Object.assign({}, beamer.config || {}, {match_filter: value})
+        });
+    }
+
+    updateImageSelection(beamer, value) {
+        this.update(beamer, {
+            display_state: 'static_image',
+            config: Object.assign({}, beamer.config || {}, {image_key: value})
+        });
     }
 
     remove(beamer) {
-        this.setState({running: true});
+        this.setBeamerSaving(beamer.id, true);
         deleteBeamer(this.props.tournament.id, beamer.id, () => {
             notify.show('Beamer wurde geloescht.', 'success', 2000);
             this.reload();
-        }, this.onError);
+        }, errorBody => this.onError(errorBody, beamer.id));
     }
 
-    onError(errorBody) {
+    onError(errorBody, beamerId) {
         notify.show(errorMessage(errorBody, 'Beamer konnte nicht aktualisiert werden.'), 'error', 3000);
-        this.setState({running: false});
+        if (beamerId) {
+            this.setBeamerSaving(beamerId, false);
+        } else {
+            this.setState({loading: false});
+        }
     }
 
     render() {
+        const matchFilters = beamerMatchFilterOptions(this.props.tournament);
         return (
             <section className='mission-control-section mission-pane-beamer' data-testid='mission-beamer-control'>
                 <h3 className='h5 mission-pane-heading'>Aktive Beamer</h3>
-                <Table responsive bordered className='mission-beamer-table'>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Anzeige</th>
-                            <th>Aktionen</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {this.state.beamers.map(beamer => (
-                            <tr key={beamer.id}>
-                                <td className='mission-beamer-name'>{beamer.name}</td>
-                                <td>
-                                    <div className='mission-beamer-display'>
-                                        <Input
-                                            type='select'
-                                            value={beamer.display_state || 'during_game'}
-                                            disabled={this.state.running || this.props.disabled}
-                                            data-testid={'mission-beamer-display-' + beamer.id}
-                                            onChange={event => this.update(beamer, event.target.value)}>
-                                            {DISPLAY_STATES.map(state => (
-                                                <option key={state.value} value={state.value}>{state.label}</option>
-                                            ))}
-                                        </Input>
-                                        <Button color='primary' disabled={this.state.running || this.props.disabled}
-                                            onClick={() => this.update(beamer, beamer.display_state || 'during_game')}>
-                                            Aktualisieren
-                                        </Button>
+                <div className='mission-beamer-list'>
+                    {this.state.beamers.map(beamer => {
+                        const config = beamer.config || {};
+                        const mode = beamerModeFor(beamer);
+                        const saving = Boolean(this.state.savingById[beamer.id]);
+                        const disabled = saving || this.props.disabled;
+                        const matchSelection = config.match_filter || '';
+                        const imageSelection = config.image_key || STATIC_IMAGE_OPTIONS[0].value;
+
+                        return (
+                            <div className='mission-beamer-card' key={beamer.id}
+                                data-testid={'mission-beamer-card-' + beamer.id}>
+                                <div className='mission-beamer-card-header'>
+                                    <div>
+                                        <div className='mission-beamer-name'>{beamer.name}</div>
+                                        <div className='mission-beamer-current'>
+                                            {beamerModeLabel(mode)} · {displayStateLabel(beamer.display_state)}
+                                        </div>
+                                    </div>
+                                    <div className='mission-beamer-actions'>
+                                        {saving && <span className='mission-beamer-saving'>Speichert...</span>}
                                         <Button color='link'
                                             href={'/t/' + this.props.tournament.id +
                                             '/fullscreen?beamer=' + encodeURIComponent(beamer.name)}
                                             target='_blank'>
-                                            {displayStateLabel(beamer.display_state || 'during_game')}
+                                            Anzeigen
+                                        </Button>
+                                        <Button outline color='danger'
+                                            disabled={disabled}
+                                            data-testid={'mission-beamer-delete-' + beamer.id}
+                                            onClick={() => this.remove(beamer)}>
+                                            <FaTrash aria-hidden='true' /> Loeschen
                                         </Button>
                                     </div>
-                                </td>
-                                <td>
-                                    <Button outline color='danger'
-                                        disabled={this.state.running || this.props.disabled}
-                                        data-testid={'mission-beamer-delete-' + beamer.id}
-                                        onClick={() => this.remove(beamer)}>
-                                        <FaTrash aria-hidden='true' /> Loeschen
-                                    </Button>
-                                </td>
-                            </tr>
-                        ))}
-                        {this.state.beamers.length === 0 &&
-                            <tr>
-                                <td colSpan='3' className='text-muted'>Keine Beamer vorhanden.</td>
-                            </tr>}
-                    </tbody>
-                </Table>
+                                </div>
+                                <div className='mission-beamer-display'>
+                                    <FormGroup>
+                                        <Label for={'missionBeamerMode' + beamer.id}>Modus</Label>
+                                        <Input
+                                            id={'missionBeamerMode' + beamer.id}
+                                            type='select'
+                                            value={mode}
+                                            disabled={disabled}
+                                            data-testid={'mission-beamer-mode-' + beamer.id}
+                                            onChange={event => this.updateMode(beamer, event.target.value)}>
+                                            {BEAMER_MODES.map(item => (
+                                                <option key={item.value} value={item.value}>{item.label}</option>
+                                            ))}
+                                        </Input>
+                                    </FormGroup>
+
+                                    {(mode === 'during_game' || mode === 'between_games') &&
+                                        <FormGroup>
+                                            <Label for={'missionBeamerMatch' + beamer.id}>Matchauswahl</Label>
+                                            <Input
+                                                id={'missionBeamerMatch' + beamer.id}
+                                                type='select'
+                                                value={matchSelection}
+                                                disabled={disabled}
+                                                data-testid={'mission-beamer-match-' + beamer.id}
+                                                onChange={event => this.updateMatchSelection(
+                                                    beamer,
+                                                    event.target.value
+                                                )}>
+                                                {matchFilters.map(option => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </Input>
+                                        </FormGroup>}
+
+                                    {mode === 'static_image' &&
+                                        <FormGroup>
+                                            <Label for={'missionBeamerImage' + beamer.id}>Bild</Label>
+                                            <Input
+                                                id={'missionBeamerImage' + beamer.id}
+                                                type='select'
+                                                value={imageSelection}
+                                                disabled={disabled}
+                                                data-testid={'mission-beamer-image-' + beamer.id}
+                                                onChange={event => this.updateImageSelection(
+                                                    beamer,
+                                                    event.target.value
+                                                )}>
+                                                {STATIC_IMAGE_OPTIONS.map(option => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </Input>
+                                        </FormGroup>}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {this.state.beamers.length === 0 &&
+                        <div className='text-muted mission-beamer-empty'>Keine Beamer vorhanden.</div>}
+                </div>
 
                 <hr className='my-4' />
 
@@ -498,11 +657,11 @@ class MissionBeamer extends React.Component {
                     <Input id='missionBeamerName'
                         value={this.state.name}
                         onChange={this.setName}
-                        disabled={this.state.running || this.props.disabled}
+                        disabled={this.state.loading || this.props.disabled}
                         placeholder='z.B. Hauptbeamer'
                         data-testid='mission-beamer-name' />
                     <Button type='submit' color='primary' className='mt-3'
-                        disabled={this.state.running || this.props.disabled || !this.state.name.trim()}
+                        disabled={this.state.loading || this.props.disabled || !this.state.name.trim()}
                         data-testid='mission-beamer-create'>
                         Beamer erstellen
                     </Button>
