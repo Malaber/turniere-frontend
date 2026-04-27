@@ -168,6 +168,9 @@ function matchStateClass(state) {
     return 'is-live';
 }
 
+const UNLOCK_HOLD_DURATION_MS = 600;
+const UNLOCK_RESET_MS = 6000;
+
 function nextPlayoffTable(match) {
     return Math.ceil(match.position / 2);
 }
@@ -1075,6 +1078,9 @@ class MissionMatchCard extends React.Component {
         this.onFormKeyDown = this.onFormKeyDown.bind(this);
         this.startUnlockHold = this.startUnlockHold.bind(this);
         this.cancelUnlockHold = this.cancelUnlockHold.bind(this);
+        this.updateUnlockHoldProgress = this.updateUnlockHoldProgress.bind(this);
+        this.onUnlockKeyDown = this.onUnlockKeyDown.bind(this);
+        this.onUnlockKeyUp = this.onUnlockKeyUp.bind(this);
         this.unlockTemporarily = this.unlockTemporarily.bind(this);
         this.onStartSuccess = this.onStartSuccess.bind(this);
         this.onStartError = this.onStartError.bind(this);
@@ -1089,12 +1095,14 @@ class MissionMatchCard extends React.Component {
             score2: scoreFor(props.match, 'team2'),
             live: props.match.state === 'in_progress',
             temporaryUnlocked: false,
+            unlockHolding: false,
+            unlockHoldProgress: 0,
             running: false
         };
     }
 
     componentWillUnmount() {
-        this.cancelUnlockHold();
+        this.cancelUnlockHold(false);
         if (this.unlockResetTimer) {
             window.clearTimeout(this.unlockResetTimer);
         }
@@ -1169,33 +1177,85 @@ class MissionMatchCard extends React.Component {
         event.currentTarget.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
     }
 
+    canUnlockFinishedMatch() {
+        return !this.props.disabled && this.props.match.state === 'finished' && !this.state.temporaryUnlocked;
+    }
+
     startUnlockHold(event) {
-        if (this.props.disabled || this.props.match.state !== 'finished') {
+        if (!this.canUnlockFinishedMatch()) {
             return;
         }
 
         event.preventDefault();
         this.cancelUnlockHold();
-        this.unlockHoldTimer = window.setTimeout(this.unlockTemporarily, 600);
+        this.unlockHoldStartedAt = window.performance.now();
+        this.setState({unlockHolding: true, unlockHoldProgress: 0});
+        this.unlockHoldTimer = window.setTimeout(this.unlockTemporarily, UNLOCK_HOLD_DURATION_MS);
+        this.unlockHoldFrame = window.requestAnimationFrame(this.updateUnlockHoldProgress);
     }
 
-    cancelUnlockHold() {
+    cancelUnlockHold(resetState = true) {
         if (this.unlockHoldTimer) {
             window.clearTimeout(this.unlockHoldTimer);
             this.unlockHoldTimer = null;
         }
+        if (this.unlockHoldFrame) {
+            window.cancelAnimationFrame(this.unlockHoldFrame);
+            this.unlockHoldFrame = null;
+        }
+        this.unlockHoldStartedAt = null;
+        if (resetState !== false && (this.state.unlockHolding || this.state.unlockHoldProgress !== 0)) {
+            this.setState({unlockHolding: false, unlockHoldProgress: 0});
+        }
+    }
+
+    updateUnlockHoldProgress(timestamp) {
+        if (!this.unlockHoldTimer || !this.unlockHoldStartedAt) {
+            return;
+        }
+
+        const elapsed = timestamp - this.unlockHoldStartedAt;
+        const progress = Math.min(1, elapsed / UNLOCK_HOLD_DURATION_MS);
+        this.setState({unlockHoldProgress: progress});
+        if (progress < 1) {
+            this.unlockHoldFrame = window.requestAnimationFrame(this.updateUnlockHoldProgress);
+        }
+    }
+
+    onUnlockKeyDown(event) {
+        if (event.key !== ' ' && event.key !== 'Spacebar' && event.code !== 'Space') {
+            return;
+        }
+        if (event.repeat || this.unlockHoldTimer) {
+            event.preventDefault();
+            return;
+        }
+        this.startUnlockHold(event);
+    }
+
+    onUnlockKeyUp(event) {
+        if (event.key !== ' ' && event.key !== 'Spacebar' && event.code !== 'Space') {
+            return;
+        }
+        event.preventDefault();
+        this.cancelUnlockHold();
     }
 
     unlockTemporarily() {
         this.unlockHoldTimer = null;
-        this.setState({temporaryUnlocked: true});
+        if (this.unlockHoldFrame) {
+            window.cancelAnimationFrame(this.unlockHoldFrame);
+            this.unlockHoldFrame = null;
+        }
+        this.unlockHoldStartedAt = null;
+        this.setState({temporaryUnlocked: true, unlockHolding: false, unlockHoldProgress: 0});
         if (this.unlockResetTimer) {
             window.clearTimeout(this.unlockResetTimer);
         }
         this.unlockResetTimer = window.setTimeout(() => {
             this.unlockResetTimer = null;
             this.setState({temporaryUnlocked: false});
-        }, 6000);
+        }, UNLOCK_RESET_MS);
     }
 
     onStartSuccess() {
@@ -1235,6 +1295,10 @@ class MissionMatchCard extends React.Component {
         const match = this.props.match;
         const editable = (match.state === 'in_progress' || this.state.temporaryUnlocked) && !this.props.disabled;
         const canStart = match.state === 'not_started' && !this.props.disabled;
+        const showUnlockButton = match.state === 'finished' && !this.props.disabled;
+        const showStaticLock = match.state === 'not_started' || match.state === 'not_ready' ||
+            (match.state === 'finished' && this.props.disabled);
+        const unlockProgress = Math.round(this.state.unlockHoldProgress * 100);
         const stateClass = matchStateClass(match.state);
         const stateLabel = match.state === 'in_progress' ? 'Live' : matchStateLabel(match.state);
         return (
@@ -1280,19 +1344,40 @@ class MissionMatchCard extends React.Component {
                             <i className={stateClass}></i>{stateLabel}
                         </Label>
                     </FormGroup>
-                    <button type='button'
-                        className='mission-lock-button'
-                        data-testid='mission-match-lock'
-                        onMouseDown={this.startUnlockHold}
-                        onMouseUp={this.cancelUnlockHold}
-                        onMouseLeave={this.cancelUnlockHold}
-                        onTouchStart={this.startUnlockHold}
-                        onTouchEnd={this.cancelUnlockHold}
-                        onTouchCancel={this.cancelUnlockHold}
-                        title='Gedrückt halten, um Ergebnis kurz zu entsperren'>
-                        <FaLock aria-hidden='true' />
-                        {this.state.temporaryUnlocked ? 'Kurz entsperrt' : 'Locked'}
-                    </button>
+                    {showStaticLock &&
+                        <span className='mission-lock-status' data-testid='mission-match-lock' aria-label='Locked'>
+                            <span className='mission-lock-label'>
+                                <FaLock aria-hidden='true' />
+                                Locked
+                            </span>
+                        </span>}
+                    {showUnlockButton &&
+                        <button type='button'
+                            className={'mission-lock-button' + (this.state.unlockHolding ? ' is-holding' : '')}
+                            data-testid='mission-match-lock'
+                            onPointerDown={this.startUnlockHold}
+                            onPointerUp={this.cancelUnlockHold}
+                            onPointerLeave={this.cancelUnlockHold}
+                            onPointerCancel={this.cancelUnlockHold}
+                            onKeyDown={this.onUnlockKeyDown}
+                            onKeyUp={this.onUnlockKeyUp}
+                            onBlur={this.cancelUnlockHold}
+                            aria-pressed={this.state.temporaryUnlocked}
+                            title='Gedrückt halten, um Ergebnis kurz zu entsperren'>
+                            <span className='mission-lock-label'>
+                                <FaLock aria-hidden='true' />
+                                {this.state.temporaryUnlocked ? 'Kurz entsperrt' : 'Locked'}
+                            </span>
+                            <span
+                                className='mission-lock-progress'
+                                data-testid='mission-match-unlock-progress'
+                                role='progressbar'
+                                aria-valuemin='0'
+                                aria-valuemax='100'
+                                aria-valuenow={unlockProgress}>
+                                <span className='mission-lock-progress-bar' style={{width: `${unlockProgress}%`}} />
+                            </span>
+                        </button>}
                 </div>
                 {this.props.playoff &&
                     <div className='mission-next-table'>

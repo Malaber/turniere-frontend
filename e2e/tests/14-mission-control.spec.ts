@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { injectAuth } from '../helpers/auth';
 import { keyframe } from '../helpers/screenshot';
 import {
@@ -55,6 +55,52 @@ async function expectMatchStateCountAtLeast(
   }, { timeout: 20_000 }).toBeGreaterThanOrEqual(minimum);
 }
 
+async function expectUnlockProgressStarted(card: Locator) {
+  const progress = card.getByTestId('mission-match-unlock-progress');
+  await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow')), {
+    timeout: 500,
+  }).toBeGreaterThan(0);
+}
+
+async function holdMouseUntilUnlocked(page: Page, card: Locator) {
+  const lock = card.getByTestId('mission-match-lock');
+  await lock.hover();
+  await page.mouse.down();
+  await expectUnlockProgressStarted(card);
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+}
+
+async function holdTouchUntilUnlocked(page: Page, card: Locator) {
+  const lock = card.getByTestId('mission-match-lock');
+  await lock.dispatchEvent('pointerdown', {
+    pointerId: 41,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    buttons: 1,
+  });
+  await expectUnlockProgressStarted(card);
+  await page.waitForTimeout(700);
+  await lock.dispatchEvent('pointerup', {
+    pointerId: 41,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    buttons: 0,
+  });
+}
+
+async function holdSpaceUntilUnlocked(page: Page, card: Locator) {
+  const lock = card.getByTestId('mission-match-lock');
+  await lock.focus();
+  await expect(lock).toBeFocused();
+  await page.keyboard.down('Space');
+  await expectUnlockProgressStarted(card);
+  await page.waitForTimeout(700);
+  await page.keyboard.up('Space');
+}
+
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
@@ -89,6 +135,27 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await scoresPane.getByTestId('mission-control-search').fill('gruppe 1');
   await expect(scoresPane.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).toBeVisible();
   await expect(scoresPane.getByRole('heading', { name: 'Gruppe 2 0 Matches' })).toHaveCount(0);
+  const notStartedCard = scoresPane.getByTestId('mission-match-card').filter({ hasText: 'Not Started' }).first();
+  const notStartedScore = notStartedCard.locator('input[type="number"]').first();
+  await expect(notStartedCard.getByTestId('mission-match-lock')).toBeVisible();
+  await expect(notStartedCard.getByRole('button', { name: /Locked/ })).toHaveCount(0);
+  await expect(notStartedScore).toBeDisabled();
+  await notStartedCard.getByTestId('mission-match-lock').dispatchEvent('pointerdown', {
+    pointerId: 42,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    buttons: 1,
+  });
+  await page.waitForTimeout(700);
+  await notStartedCard.getByTestId('mission-match-lock').dispatchEvent('pointerup', {
+    pointerId: 42,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    buttons: 0,
+  });
+  await expect(notStartedScore).toBeDisabled();
 
   await scoresPane.getByTestId('mission-control-search').fill('G1-S1');
   const activeCard = scoresPane
@@ -115,6 +182,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
 
   await expect(activeCard.getByLabel('Live')).toBeVisible({ timeout: 20_000 });
   await expect(activeCard.getByLabel('Live')).toBeChecked();
+  await expect(activeCard.getByTestId('mission-match-lock')).toHaveCount(0);
   await activeCard.getByLabel('Live').uncheck();
   await expect(activeCard.getByLabel('Live')).not.toBeChecked();
   await activeCard.getByTestId('mission-match-save').click();
@@ -125,10 +193,11 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await keyframe(page, testInfo, 'mission_control_finished_match');
 
   await expect(g1s1Score).toBeDisabled();
-  await activeCard.getByTestId('mission-match-lock').hover();
-  await page.mouse.down();
-  await page.waitForTimeout(700);
-  await page.mouse.up();
+  await expect(activeCard.getByTestId('mission-match-lock')).toHaveAttribute(
+    'title',
+    'Gedrückt halten, um Ergebnis kurz zu entsperren',
+  );
+  await holdMouseUntilUnlocked(page, activeCard);
   await expect(g1s1Score).toBeEnabled();
   await g1s1Score.fill('8');
   await g1s2Score.fill('5');
@@ -137,6 +206,20 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(g1s1Score).toHaveValue('8', { timeout: 20_000 });
   await expect(g1s2Score).toHaveValue('5', { timeout: 20_000 });
   await keyframe(page, testInfo, 'mission_control_unlocked_finished_score');
+
+  await expect(g1s1Score).toBeDisabled({ timeout: 20_000 });
+  await holdTouchUntilUnlocked(page, activeCard);
+  await expect(g1s1Score).toBeEnabled();
+  await g1s1Score.fill('9');
+  await g1s2Score.fill('6');
+  await g1s2Score.press(submitShortcut);
+  await expectMatchStateCount(client, tournament.id, 'finished', 1);
+  await expect(g1s1Score).toHaveValue('9', { timeout: 20_000 });
+  await expect(g1s2Score).toHaveValue('6', { timeout: 20_000 });
+
+  await expect(g1s1Score).toBeDisabled({ timeout: 20_000 });
+  await holdSpaceUntilUnlocked(page, activeCard);
+  await expect(g1s1Score).toBeEnabled();
 
   await page.getByRole('link', { name: 'Teams' }).click();
   await expect(page).toHaveURL(/#teams$/);
