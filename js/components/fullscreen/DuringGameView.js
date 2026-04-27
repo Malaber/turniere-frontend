@@ -12,6 +12,12 @@ const COUNTDOWN_THRESHOLD_S = 10;
 const FINISHED_DISPLAY_MS = 10000;
 
 
+function getTotalPages(matches) {
+    if (!matches || matches.length === 0) return 0;
+    return Math.ceil(matches.length / MATCHES_PER_PAGE);
+}
+
+
 function AnimatedDigit({value}) {
     const offset = -(value * 10);
     return (
@@ -153,7 +159,7 @@ class AnimatedTimer extends React.Component {
 }
 
 
-function FullscreenMatchCard({match, index}) {
+function FullscreenMatchCard({match, index, animateEntry, isActive}) {
     const team1 = match.team1;
     const team2 = match.team2;
     const score1 = match.decider ?
@@ -167,28 +173,41 @@ function FullscreenMatchCard({match, index}) {
     const t1Cls = t1Win ? styles.teamNameWinner : styles.teamName;
     const t2Cls = t2Win ? styles.teamNameWinner : styles.teamName;
 
-    const delay = (index * 0.06) + 's';
+    const delay = animateEntry ? (index * 0.06) + 's' : '0s';
     const badge = match.group ?
         match.group.number :
         match.position;
+    const className = styles.matchCard +
+        (animateEntry ? ' ' + styles.matchCardEnter : '');
 
     return (
         <div
-            className={styles.matchCard}
+            className={className}
             style={{animationDelay: delay}}
-            data-testid="fullscreen-match-card"
+            data-testid={isActive ? 'fullscreen-match-card' : null}
         >
             <div className={styles.matchContent}>
                 <div className={styles.matchTeamRow}>
-                    <TeamName name={team1.name} className={t1Cls} testId="fullscreen-team-name"/>
+                    <TeamName
+                        name={team1.name}
+                        className={t1Cls}
+                        testId={isActive ? 'fullscreen-team-name' : null}
+                    />
                     <span className={styles.teamScore}>{score1}</span>
                 </div>
                 <div className={styles.matchTeamRow}>
-                    <TeamName name={team2.name} className={t2Cls} testId="fullscreen-team-name"/>
+                    <TeamName
+                        name={team2.name}
+                        className={t2Cls}
+                        testId={isActive ? 'fullscreen-team-name' : null}
+                    />
                     <span className={styles.teamScore}>{score2}</span>
                 </div>
             </div>
-            <div className={styles.matchBadge} data-testid="fullscreen-match-badge">
+            <div
+                className={styles.matchBadge}
+                data-testid={isActive ? 'fullscreen-match-badge' : null}
+            >
                 {badge}
             </div>
         </div>
@@ -201,6 +220,7 @@ export class DuringGameView extends React.Component {
         super(props);
         this.state = {
             pageIndex: 0,
+            hasPaged: false,
             timerPhase: 'normal' // 'normal' | 'countdown' | 'finished'
         };
         this.cyclePage = this.cyclePage.bind(this);
@@ -212,6 +232,25 @@ export class DuringGameView extends React.Component {
         this.intervalId = setInterval(
             this.cyclePage, PAGE_CYCLE_MS
         );
+    }
+
+    componentDidUpdate(prevProps) {
+        const prevTotal = getTotalPages(prevProps.matches);
+        const total = getTotalPages(this.props.matches);
+        const nextState = {};
+
+        if (total > 0 && this.state.pageIndex >= total) {
+            nextState.pageIndex = 0;
+        }
+
+        if (prevTotal === 0 && total > 0 && this.state.hasPaged) {
+            nextState.hasPaged = false;
+            nextState.pageIndex = 0;
+        }
+
+        if (Object.keys(nextState).length > 0) {
+            this.setState(nextState);
+        }
     }
 
     componentWillUnmount() {
@@ -242,7 +281,8 @@ export class DuringGameView extends React.Component {
         const total = Math.ceil(matches.length / MATCHES_PER_PAGE);
         if (total <= 1) return;
         this.setState(prev => ({
-            pageIndex: (prev.pageIndex + 1) % total
+            pageIndex: (prev.pageIndex + 1) % total,
+            hasPaged: true
         }));
     }
 
@@ -256,11 +296,15 @@ export class DuringGameView extends React.Component {
             [...matches].sort(sortMatchesByPositionAscending()) :
             [];
         const totalPages = Math.ceil(sorted.length / MATCHES_PER_PAGE);
-        const start = pageIndex * MATCHES_PER_PAGE;
-        const page = sorted.slice(start, start + MATCHES_PER_PAGE);
+        const pages = [];
+        for (let i = 0; i < totalPages; i++) {
+            pages.push(sorted.slice(
+                i * MATCHES_PER_PAGE,
+                (i + 1) * MATCHES_PER_PAGE
+            ));
+        }
 
-        // Choose grid columns: 4 cols for a full page, fewer when < 4 matches
-        const cols = Math.min(4, page.length);
+        const page = pages[pageIndex] || [];
         let matchContent;
         if (matches == null) {
             matchContent = (
@@ -277,20 +321,45 @@ export class DuringGameView extends React.Component {
             );
         } else {
             matchContent = (
-                <div
-                    className={styles.matchGrid}
-                    key={pageIndex}
-                    style={{
-                        gridTemplateColumns: 'repeat(' + cols + ', 1fr)'
-                    }}
-                >
-                    {page.map((m, i) =>
-                        <FullscreenMatchCard
-                            key={m.id}
-                            match={m}
-                            index={i}
-                        />
-                    )}
+                <div className={styles.matchCarousel}>
+                    <div
+                        className={styles.matchCarouselTrack}
+                        data-testid="fullscreen-match-carousel-track"
+                        style={{
+                            transform: 'translateX(-' + (pageIndex * 100) + '%)'
+                        }}
+                    >
+                        {pages.map((matchPage, pageNumber) => {
+                            const active = pageNumber === pageIndex;
+                            const animateCards = active && !this.state.hasPaged;
+                            const cols = Math.min(4, matchPage.length);
+
+                            return (
+                                <div
+                                    key={pageNumber}
+                                    className={styles.matchCarouselPage}
+                                    aria-hidden={!active}
+                                >
+                                    <div
+                                        className={styles.matchGrid}
+                                        style={{
+                                            gridTemplateColumns: 'repeat(' + cols + ', 1fr)'
+                                        }}
+                                    >
+                                        {matchPage.map((m, i) =>
+                                            <FullscreenMatchCard
+                                                key={m.id}
+                                                match={m}
+                                                index={i}
+                                                animateEntry={animateCards}
+                                                isActive={active}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             );
         }
