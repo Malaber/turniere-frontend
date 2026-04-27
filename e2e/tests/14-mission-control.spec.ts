@@ -197,6 +197,12 @@ test('Mission Control saves independent beamer display controls instantly', asyn
   await expect(page.getByText('Side wall')).toBeVisible();
   await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('between_games');
   await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toBeVisible();
+  const mainMatchSelect = page.getByTestId(`mission-beamer-match-${main.json.id}`);
+  await expect(mainMatchSelect.locator('option').filter({ hasText: /^Gruppenphase Runde 1$/ }))
+    .toHaveAttribute('value', 'group_stage_position:0');
+  await expect(mainMatchSelect.locator('option').filter({ hasText: /^Gruppenphase Runde 1 - Laufend$/ }))
+    .toHaveAttribute('value', 'group_stage_position:0,state:in_progress');
+  await expect(mainMatchSelect.locator('option').filter({ hasText: /Gruppenphase Tisch/ })).toHaveCount(0);
   await expect(page.getByTestId(`mission-beamer-mode-${side.json.id}`)).toHaveValue('group_tables');
   await expect(page.getByTestId(`mission-beamer-match-${side.json.id}`)).toHaveCount(0);
   await keyframe(page, testInfo, 'beamer_control_tur37');
