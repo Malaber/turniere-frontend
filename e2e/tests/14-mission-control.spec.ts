@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { injectAuth } from '../helpers/auth';
 import { keyframe } from '../helpers/screenshot';
-import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
+import {
+  LONG_TEAM_NAME_SINGLE_WORD,
+  longGroupStageTeamName,
+  seedAndPlayGroupStage,
+  seedGroupStageTournament,
+} from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
@@ -323,6 +328,44 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   await scoresPane.getByTestId('mission-control-search').fill('G2-S1');
   await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G2-S1' }).first()).toBeVisible();
   await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G1-S4' })).toHaveCount(0);
+});
+
+test('Mission Control score cards keep long generated team names inside card bounds', async ({
+  context,
+  page,
+}, testInfo) => {
+  await injectAuth(context);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { tournament } = await seedGroupStageTournament(2, 4, 4, longGroupStageTeamName);
+
+  await page.goto(`/t/${tournament.id}/mission-control#scores`);
+  await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  const scoresPane = page.locator('.tab-pane.active');
+  const card = scoresPane.getByTestId('mission-match-card').filter({
+    hasText: LONG_TEAM_NAME_SINGLE_WORD,
+  }).first();
+  await expect(card).toBeVisible();
+
+  const longName = card.getByTestId('mission-match-team-name').filter({
+    hasText: LONG_TEAM_NAME_SINGLE_WORD,
+  }).first();
+  await expect(longName).toHaveAttribute('title', new RegExp(LONG_TEAM_NAME_SINGLE_WORD));
+  await expect(longName).toHaveCSS('overflow-x', 'hidden');
+  expect(await longName.evaluate((el) => getComputedStyle(el).textOverflow)).toMatch(/ellipsis|"\.\.\."/);
+
+  const geometry = await card.evaluate((el) => {
+    const longTeamName = el.querySelector('[data-testid="mission-match-team-name"]');
+    return {
+      cardClientWidth: el.clientWidth,
+      cardScrollWidth: el.scrollWidth,
+      longNameClientWidth: longTeamName?.clientWidth ?? 0,
+      longNameScrollWidth: longTeamName?.scrollWidth ?? 0,
+    };
+  });
+
+  expect(geometry.cardScrollWidth).toBeLessThanOrEqual(geometry.cardClientWidth + 1);
+  expect(geometry.longNameScrollWidth).toBeGreaterThan(geometry.longNameClientWidth);
+  await keyframe(page, testInfo, 'mission_control_long_team_names_scores');
 });
 
 test('Mission Control hidden for anonymous viewers', async ({ page }, testInfo) => {
