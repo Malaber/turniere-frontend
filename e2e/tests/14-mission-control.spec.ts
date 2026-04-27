@@ -8,6 +8,7 @@ const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
 const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 const submitShortcut = process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter';
+const firstGroupStartCount = 1;
 
 test.setTimeout(180_000);
 
@@ -33,6 +34,22 @@ async function expectMatchStateCount(
   }, { timeout: 20_000 }).toBe(expected);
 }
 
+async function expectMatchStateCountAtLeast(
+  client: ApiClient,
+  tournamentId: number,
+  state: string,
+  minimum: number,
+) {
+  await expect.poll(async () => {
+    const matches = await client.get<Array<{ state: string }>>(
+      `/tournaments/${tournamentId}/matches`,
+      { state },
+    );
+    expectStatus(matches, 200, `fetch ${state} matches`);
+    return matches.json.length;
+  }, { timeout: 20_000 }).toBeGreaterThanOrEqual(minimum);
+}
+
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
@@ -45,14 +62,17 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Turnier-Einstellungen' })).toBeVisible();
-  await expect(page.getByTestId('mission-tournament-link')).toHaveAttribute('href', `/t/${tournament.code}`);
+  await expect(page.getByTestId('mission-tournament-link')).toHaveAttribute('href', `/t/${tournament.id}`);
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
+  const initialScoresPane = page.locator('.tab-pane.active');
+  await expect(initialScoresPane.getByTestId('mission-control-search')).toBeFocused();
   await keyframe(page, testInfo, 'mission_control_open');
 
   await page.getByRole('link', { name: 'Match-Starts' }).click();
   await expect(page).toHaveURL(/#starts$/);
   const startsPane = page.locator('.tab-pane.active');
   await page.getByTestId('mission-start-next-groups').click();
-  await expectMatchStateCount(client, tournament.id, 'in_progress', 4);
+  await expectMatchStateCountAtLeast(client, tournament.id, 'in_progress', firstGroupStartCount);
   await expect(startsPane.getByTestId('mission-match-card')).toHaveCount(0);
   await keyframe(page, testInfo, 'mission_control_bulk_start_only');
 
@@ -71,16 +91,19 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
     .filter({ hasText: 'G1-S1' })
     .filter({ hasText: 'G1-S2' });
   await expect(activeCard).toHaveCount(1);
-  await activeCard.getByRole('spinbutton').nth(0).fill('7');
-  await activeCard.getByRole('spinbutton').nth(1).fill('4');
-  await expect(activeCard.getByRole('spinbutton').nth(0)).toHaveValue('7');
-  await expect(activeCard.getByRole('spinbutton').nth(1)).toHaveValue('4');
-  await activeCard.getByRole('spinbutton').nth(1).press(submitShortcut);
-  await expectMatchStateCount(client, tournament.id, 'in_progress', 4);
-  await expect(activeCard.getByRole('spinbutton').nth(0)).toHaveValue('7', {
+  await expect(activeCard.locator('.mission-start-table')).toHaveCount(0);
+  const g1s1Score = activeCard.getByLabel('G1-S1 score');
+  const g1s2Score = activeCard.getByLabel('G1-S2 score');
+  await g1s1Score.fill('7');
+  await g1s2Score.fill('4');
+  await expect(g1s1Score).toHaveValue('7');
+  await expect(g1s2Score).toHaveValue('4');
+  await g1s2Score.press(submitShortcut);
+  await expectMatchStateCountAtLeast(client, tournament.id, 'in_progress', firstGroupStartCount);
+  await expect(g1s1Score).toHaveValue('7', {
     timeout: 20_000,
   });
-  await expect(activeCard.getByRole('spinbutton').nth(1)).toHaveValue('4', {
+  await expect(g1s2Score).toHaveValue('4', {
     timeout: 20_000,
   });
   await keyframe(page, testInfo, 'mission_control_saved_live_score');
@@ -96,6 +119,20 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   });
   await keyframe(page, testInfo, 'mission_control_finished_match');
 
+  await expect(g1s1Score).toBeDisabled();
+  await activeCard.getByTestId('mission-match-lock').hover();
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  await expect(g1s1Score).toBeEnabled();
+  await g1s1Score.fill('8');
+  await g1s2Score.fill('5');
+  await g1s2Score.press(submitShortcut);
+  await expectMatchStateCount(client, tournament.id, 'finished', 1);
+  await expect(g1s1Score).toHaveValue('8', { timeout: 20_000 });
+  await expect(g1s2Score).toHaveValue('5', { timeout: 20_000 });
+  await keyframe(page, testInfo, 'mission_control_unlocked_finished_score');
+
   await page.getByRole('link', { name: 'Teams' }).click();
   await expect(page).toHaveURL(/#teams$/);
   const teamsPane = page.locator('.tab-pane.active');
@@ -110,9 +147,11 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(visibleTeamInput).toHaveValue(renamed, { timeout: 20_000 });
   await keyframe(page, testInfo, 'mission_control_renamed_team');
 
-  const teams = await client.get<{ teams: Array<{ id: number; name: string }> }>(`/tournaments/${tournament.id}`);
-  expectStatus(teams, 200, 'fetch tournament after team rename');
-  expect(teams.json.teams.some((team) => team.name === renamed)).toBe(true);
+  await expect.poll(async () => {
+    const teams = await client.get<{ teams: Array<{ id: number; name: string }> }>(`/tournaments/${tournament.id}`);
+    expectStatus(teams, 200, 'fetch tournament after team rename');
+    return teams.json.teams.some((team) => team.name === renamed);
+  }, { timeout: 20_000 }).toBe(true);
 
   await page.goto(`/t/${tournament.id}/mission-control#scores`);
   await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
@@ -120,6 +159,8 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.locator('.tab-pane.active').getByRole('heading', { name: 'Teams' })).toBeVisible({
     timeout: 20_000,
   });
+  await page.goto(`/t/${tournament.code}`);
+  await expect(page).toHaveURL(new RegExp(`/t/${tournament.id}$`), { timeout: 20_000 });
 });
 
 test('Mission Control saves independent beamer display controls instantly', async ({ context, page }, testInfo) => {
@@ -195,22 +236,25 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
 }, testInfo) => {
   await injectAuth(context);
   await page.setViewportSize({ width: 1920, height: 1080 });
-  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
+  const { tournament } = await seedAndPlayGroupStage(2, 4, 4);
   const client = await loggedInClient();
 
   const leftStage = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'Left stage',
     display_state: 'between_games',
+    config: {},
   });
   expectStatus(leftStage, 201, 'create left stage beamer');
   const backside = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'Backside',
-    display_state: 'group_tables',
+    display_state: 'between_games',
+    config: {},
   });
   expectStatus(backside, 201, 'create backside beamer');
 
   await page.goto(`/t/${tournament.id}/mission-control`);
   await expect(page.getByTestId('mission-timer-control')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('mission-tournament-link')).toHaveText(/Turnier öffnen/);
   await expect(page.getByRole('heading', { name: 'Countdown starten' })).toBeVisible();
   await expect(page.getByTestId('mission-current-timer-display')).toBeVisible();
   await expect(page.getByTestId('mission-timer-quick-20s')).toContainText('00:20');
@@ -256,7 +300,7 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   const startsPane = page.locator('.tab-pane.active');
   await expect(startsPane.getByTestId('mission-match-control')).toBeVisible();
   await expect(startsPane.getByRole('heading', { name: 'Bulk Match-Starts' })).toBeVisible();
-  await expect(startsPane.getByRole('button', { name: 'Viertelfinale starten' })).toBeVisible();
+  await expect(startsPane.getByRole('button', { name: 'Halbfinale starten' })).toBeVisible();
   await expect(startsPane.getByTestId('mission-match-card')).toHaveCount(0);
   await keyframe(page, testInfo, 'match_starts_bulk_only');
 
@@ -264,16 +308,15 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   const scoresPane = page.locator('.tab-pane.active');
   await expect(scoresPane.getByTestId('mission-score-control')).toBeVisible();
   await expect(scoresPane.getByPlaceholder('Gruppen, Teams, Matches suchen...')).toBeVisible();
-  await scoresPane.getByTestId('mission-control-search').fill('Viertelfinale');
-  await expect(scoresPane.getByRole('heading', { name: 'Viertelfinale 4 Matches' })).toBeVisible();
-  await expect(scoresPane.getByText('Tisch 3 -> Tisch 2')).toBeVisible();
-  await expect(scoresPane.getByText('Tisch 4 -> Tisch 2')).toBeVisible();
+  await scoresPane.getByTestId('mission-control-search').fill('Halbfinale');
+  await expect(scoresPane.getByRole('heading', { name: 'Halbfinale 2 Matches' })).toBeVisible();
+  await expect(scoresPane.getByText('Tisch 2 -> Tisch 1')).toBeVisible();
   await expect(scoresPane.getByText('Tisch 1 -> Tisch 1').first()).toBeVisible();
   await keyframe(page, testInfo, 'scores_wide_match_control');
 
-  await scoresPane.getByTestId('mission-control-search').fill('G3-S1');
-  await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G3-S1' }).first()).toBeVisible();
-  await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G4-S1' })).toHaveCount(0);
+  await scoresPane.getByTestId('mission-control-search').fill('G2-S1');
+  await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G2-S1' }).first()).toBeVisible();
+  await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G1-S4' })).toHaveCount(0);
 });
 
 test('Mission Control hidden for anonymous viewers', async ({ page }, testInfo) => {

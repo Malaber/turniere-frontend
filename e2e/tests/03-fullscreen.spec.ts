@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
-import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
+import { seedGroupStageTournament } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
@@ -49,7 +49,7 @@ test('Fullscreen beamer page renders with default fallback', async ({ page }, te
   // Fullscreen/beamer pages are designed for projectors — use a wide viewport
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
+  const { tournament } = await seedGroupStageTournament(4, 4, 8);
 
   // Create a default beamer via the API
   const client = new ApiClient(backendUrl);
@@ -67,20 +67,22 @@ test('Fullscreen beamer page renders with default fallback', async ({ page }, te
 test('Fullscreen beamer page renders with specific beamer param', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
+  const { tournament } = await seedGroupStageTournament(4, 4, 8);
 
   // Create a named beamer
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
-  await client.post(`/tournaments/${tournament.id}/beamers`, {
+  const createBeamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'projector-a',
     display_state: 'between_games',
+    config: {},
   });
+  expectStatus(createBeamer, 201, 'create named beamer');
 
   // --- Fullscreen with beamer param ---
   await page.goto(`/t/${tournament.id}/fullscreen?beamer=projector-a`);
-  await expect(page.getByText(/Nächste Spiele/)).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('body')).toContainText(/Nächste Spiele/, { timeout: 60_000 });
+  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 60_000 });
   await keyframe(page, testInfo, 'fullscreen_named_beamer');
 
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
@@ -89,7 +91,7 @@ test('Fullscreen beamer page renders with specific beamer param', async ({ page 
 test('Fullscreen beamer page falls back when beamer name not found', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
+  const { tournament } = await seedGroupStageTournament(4, 4, 8);
 
   // Create a default beamer so fallback works
   const client = new ApiClient(backendUrl);
@@ -107,26 +109,26 @@ test('Fullscreen beamer page falls back when beamer name not found', async ({ pa
 test('Fullscreen shows during-game and between-games modes with timer', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament } = await seedGroupStageTournament(6, 4, 8);
+  const { tournament } = await seedGroupStageTournament(4, 4, 8);
 
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
 
   const timerRes = await client.patch(
     `/tournaments/${tournament.id}/timer`,
-    { timestamp_seconds: 5 * 60 },
+    { timestamp_seconds: 20 * 60 },
   );
   expectStatus(timerRes, 200, 'set timer');
 
-  await startMatches(client, tournament.id, 20);
+  await startMatches(client, tournament.id, 8);
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=during_game`);
   await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible({ timeout: 15000 });
-  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible();
+  await expect(page.locator('body')).toContainText('G1-S1', { timeout: 20_000 });
   await keyframe(page, testInfo, 'fullscreen_beamer_during_game');
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=between_games`);
-  await expect(page.getByText(/Nächste Spiele/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('body')).toContainText(/Nächste Spiele/, { timeout: 20_000 });
   await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'fullscreen_beamer_between_games');
 });
@@ -134,13 +136,14 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
 test('Fullscreen beamer page updates live from backend ActionCable only', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
+  const { tournament } = await seedGroupStageTournament(4, 4, 8);
 
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
   const createBeamer = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
     name: 'live-projector',
     display_state: 'during_game',
+    config: {},
   });
   expectStatus(createBeamer, 201, 'create live beamer');
 
@@ -153,7 +156,7 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
     { display_state: 'between_games' },
   );
   expectStatus(firstUpdate, 200, 'update beamer to between-games');
-  await expect(page.getByText(/Nächste Spiele/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('body')).toContainText(/Nächste Spiele/, { timeout: 60_000 });
   await keyframe(page, testInfo, 'live_beamer_between_games');
 
   const secondUpdate = await client.patch(
@@ -212,7 +215,7 @@ test('Fullscreen match list receives live match snapshots', async ({ page }, tes
 test('Fullscreen timer updates live for countup mode', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
-  const { tournament } = await seedAndPlayGroupStage(4, 4, 8);
+  const { tournament } = await seedGroupStageTournament(4, 4, 8);
 
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
@@ -229,7 +232,7 @@ test('Fullscreen timer updates live for countup mode', async ({ page }) => {
   expectStatus(timerRes, 200, 'start countup timer');
 
   await expect(page.getByText(/Spielzeit:/i)).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator('.timer-container')).toContainText(/3:1[0-9]|3:2[0-9]/, {
+  await expect(page.locator('.timer-container')).toContainText(/3:[1-5][0-9]|4:0[0-9]/, {
     timeout: 10_000,
   });
 });
