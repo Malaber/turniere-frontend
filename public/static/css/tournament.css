@@ -233,24 +233,59 @@
     color: #07121f;
 }
 
-.mission-beamer-table th {
-    background: #f8fafc;
+.mission-beamer-list {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.mission-beamer-card {
+    border: 1px solid #d9e1ea;
+    border-radius: 8px;
+    padding: 1rem;
+    background: #ffffff;
+}
+
+.mission-beamer-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: 0.85rem;
 }
 
 .mission-beamer-name {
     font-weight: 700;
-    vertical-align: middle;
+}
+
+.mission-beamer-current,
+.mission-beamer-saving {
+    color: #667586;
+    font-size: 0.9rem;
+}
+
+.mission-beamer-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .mission-beamer-display {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.85rem;
+    align-items: end;
 }
 
-.mission-beamer-display select {
-    max-width: 18rem;
+.mission-beamer-display .form-group {
+    margin-bottom: 0;
+}
+
+.mission-beamer-empty {
+    border: 1px dashed #d9e1ea;
+    border-radius: 8px;
+    padding: 1rem;
 }
 
 .mission-beamer-create {

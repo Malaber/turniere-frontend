@@ -173,7 +173,7 @@ async function main() {
   const beamers = [
     { name: 'between', display_state: 'between_games' },
     { name: 'during', display_state: 'during_game' },
-    { name: 'groups', display_state: 'groups' },
+    { name: 'groups', display_state: 'group_tables' },
   ];
 
   for (const beamer of beamers) {

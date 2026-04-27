@@ -168,7 +168,7 @@ class Main extends React.Component {
     }
 
     onTournamentRequestError(error) {
-        if (error.response && error.response.status === 404 && !/^\d+$/.test(String(this.props.query.code))) {
+        if (error.response && error.response.status === 404) {
             this.redirectCodeFromTournamentLists(true);
             return;
         }

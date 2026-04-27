@@ -10,13 +10,19 @@ export function connectToTournamentSocket({tournamentId, onMessage}) {
     });
 }
 
-export function connectToTournamentMatchesSocket({tournamentId, state, onMessage}) {
+export function connectToTournamentMatchesSocket({tournamentId, state, filters, onMessage}) {
     const identifier = {
         channel: 'TournamentMatchesChannel',
         tournament_id: tournamentId
     };
 
-    if (state) {
+    Object.entries(filters || (state ? {state} : {})).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== '') {
+            identifier[key] = value;
+        }
+    });
+
+    if (state && !identifier.state) {
         identifier.state = state;
     }
 

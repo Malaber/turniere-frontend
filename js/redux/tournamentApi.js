@@ -36,16 +36,16 @@ export function getTournamentMeta(tournamentId, successCallback, errorCallback) 
         .catch(errorCallback);
 }
 
-export function getTournamentMatches(tournamentId, successCallback, errorCallback, matchState = null) {
-    let matchFilter = '';
-    if (matchState) {
-        matchFilter = '?state=' + matchState;
-    }
+export function getTournamentMatches(tournamentId, successCallback, errorCallback, matchFilters = null) {
+    const filters = typeof matchFilters === 'string' ? {state: matchFilters} : (matchFilters || {});
+    const query = new URLSearchParams(filters).toString();
+    const matchFilter = query ? '?' + query : '';
     getRequest(getState(), '/tournaments/' + tournamentId + '/matches' + matchFilter)
         .then(response => {
+            const matches = Array.isArray(response.data) ? response.data : response.data.matches;
             successCallback(
                 response.status,
-                convertMatchesSnapshot(response.data)
+                convertMatchesSnapshot(matches)
             );
         })
         .catch(errorCallback);

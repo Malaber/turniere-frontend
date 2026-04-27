@@ -1,7 +1,7 @@
 export function Footer() {
     return (
         <footer className="footer mt-5 p-3 bg-dark text-light text-center">
-            <Copyright/> &middot; <Privacy/> &middot; <Imprint/>
+            <Copyright/> &middot; <Version/> &middot; <Privacy/> &middot; <Imprint/>
         </footer>
     );
 }
@@ -12,6 +12,10 @@ function Copyright() {
 
 function Privacy() {
     return <a className="text-white" href="/privacy">Datenschutzerklärung</a>;
+}
+
+function Version() {
+    return <a className="text-white" href="/version">Version</a>;
 }
 
 function Imprint() {

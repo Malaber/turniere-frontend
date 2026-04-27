@@ -24,19 +24,60 @@ const DISPLAY_STATE_LABELS = {
     'matches_not_started': 'bereit zum Starten',
     'matches_finished': 'beendet',
     'groups': 'Gruppenstand',
+    'group_tables': 'Gruppenstand',
     'between_games': 'Zwischen den Spielen',
-    'during_game': 'Während dem Spiel'
+    'during_game': 'Während dem Spiel',
+    'static_image': 'Statisches Bild'
 };
 
-const DISPLAY_STATE_TO_BACKEND_FILTER = {
-    'matches_all': null,
-    'matches_in_progress': 'in_progress',
-    'matches_upcoming': 'upcoming',
-    'matches_not_started': 'not_started',
-    'matches_finished': 'finished',
-    'between_games': null,
-    'during_game': 'in_progress'
+const DEFAULT_DISPLAY_STATE_FILTERS = {
+    'matches_all': {},
+    'matches_in_progress': {state: 'in_progress'},
+    'matches_upcoming': {state: 'upcoming'},
+    'matches_not_started': {state: 'not_started'},
+    'matches_finished': {state: 'finished'},
+    'during_game': {state: 'in_progress'},
+    'between_games': {},
+    'groups': {},
+    'group_tables': {},
+    'static_image': {}
 };
+
+const STATIC_IMAGE_URLS = {
+    bpwstr_banner: '/static/images/bpwstr_banner.jpg',
+    bpwstr_logo: '/static/images/bpwstr_logo.png',
+    turniere_logo: '/static/images/logo-questionmark.png'
+};
+
+const GROUPS_QR_CODE_URL = '/static/images/logo-questionmark.png';
+const GROUPS_LOGO_URL = '/static/images/bpwstr_logo.png';
+
+function filtersFromConfig(config) {
+    if (!config || typeof config.match_filter !== 'string') {
+        return null;
+    }
+
+    return config.match_filter.split(',').reduce((filters, part) => {
+        const pieces = part.split(':');
+        if (pieces.length !== 2 || !pieces[0] || !pieces[1]) {
+            return filters;
+        }
+        filters[pieces[0]] = pieces[1];
+        return filters;
+    }, {});
+}
+
+function filtersForDisplayState(displayState, config = null) {
+    return filtersFromConfig(config) || DEFAULT_DISPLAY_STATE_FILTERS[displayState] || {};
+}
+
+function filterKey(filters) {
+    return Object.keys(filters || {})
+        .filter(key => filters[key] !== null && filters[key] !== undefined && filters[key] !== '')
+        .sort()
+        .map(key => key + ':' + filters[key])
+        .join(',');
+}
 
 
 class Main extends React.Component {
@@ -52,10 +93,9 @@ class Main extends React.Component {
             tournament: null,
             matches: [],
             timerState: {mode: null, timestampIso: null},
-            displayState: props.query.display || 'matches_all',
+            displayState: props.query.display || 'during_game',
+            beamerConfig: null,
             beamerName: props.query.beamer || 'default',
-            qrCodeUrl: null,
-            logoUrl: null,
             loadedMeta: false,
             loadedMatches: false,
             metaStatus: null,
@@ -179,8 +219,8 @@ class Main extends React.Component {
             return;
         }
 
-        const state = DISPLAY_STATE_TO_BACKEND_FILTER[this.state.displayState];
-        const key = tournamentId + ':' + (state || '');
+        const filters = filtersForDisplayState(this.state.displayState, this.state.beamerConfig);
+        const key = tournamentId + ':' + filterKey(filters);
         if (this.matchesSocketKey === key) {
             return;
         }
@@ -191,7 +231,7 @@ class Main extends React.Component {
 
         const matchesSocket = connectToTournamentMatchesSocket({
             tournamentId,
-            state,
+            filters,
             onMessage: this.onMatchesMessage
         });
         this.matchesSocketKey = key;
@@ -203,9 +243,8 @@ class Main extends React.Component {
             (status, beamer) => {
                 this.setState({
                     displayState: beamer.display_state,
+                    beamerConfig: beamer.config || null,
                     beamerName: beamer.name,
-                    qrCodeUrl: beamer.qr_code_url,
-                    logoUrl: beamer.logo_url,
                     loadedMatches: false
                 }, () => {
                     this.connectBeamerSocket(beamer.name);
@@ -216,7 +255,15 @@ class Main extends React.Component {
                 });
             },
             () => {
-                this.updateMatches();
+                if (beamerName !== 'default') {
+                    this.refreshBeamerConfig(code, 'default');
+                    return;
+                }
+                this.setState({
+                    displayState: 'during_game',
+                    beamerConfig: null,
+                    loadedMatches: false
+                }, this.updateMatches);
             }
         );
     }
@@ -235,9 +282,8 @@ class Main extends React.Component {
         const reconnectNeeded = this.state.beamerName !== beamer.name;
         this.setState({
             displayState: beamer.display_state,
+            beamerConfig: beamer.config || null,
             beamerName: beamer.name,
-            qrCodeUrl: beamer.qr_code_url,
-            logoUrl: beamer.logo_url,
             loadedMatches: false
         }, () => {
             if (reconnectNeeded) {
@@ -287,9 +333,9 @@ class Main extends React.Component {
             return;
         }
 
-        const currentFilter = DISPLAY_STATE_TO_BACKEND_FILTER[this.state.displayState] || null;
-        const messageFilter = message.state || null;
-        if (messageFilter !== currentFilter) {
+        const currentFilterKey = filterKey(filtersForDisplayState(this.state.displayState, this.state.beamerConfig));
+        const messageFilters = message.filters || (message.state ? {state: message.state} : {});
+        if (filterKey(messageFilters) !== currentFilterKey) {
             return;
         }
 
@@ -302,7 +348,7 @@ class Main extends React.Component {
 
     updateMatches() {
         const code = this.props.query.code;
-        const backendFilter = DISPLAY_STATE_TO_BACKEND_FILTER[this.state.displayState];
+        const backendFilter = filtersForDisplayState(this.state.displayState, this.state.beamerConfig);
         getTournamentMatches(code,
             (status, matches) => {
                 this.setState({matchesStatus: status, matches: matches, loadedMatches: true});
@@ -337,14 +383,14 @@ class Main extends React.Component {
 
     renderView() {
         const {displayState, tournamentMeta, matches, timerState, tournament} = this.state;
-        const {qrCodeUrl, logoUrl} = this.state;
 
         switch (displayState) {
         case 'groups':
+        case 'group_tables':
             return <GroupsView
                 tournament={tournament}
-                qrCodeUrl={qrCodeUrl}
-                logoUrl={logoUrl}/>;
+                qrCodeUrl={GROUPS_QR_CODE_URL}
+                logoUrl={GROUPS_LOGO_URL}/>;
         case 'during_game':
             return <DuringGameView
                 tournamentMeta={tournamentMeta}
@@ -355,6 +401,29 @@ class Main extends React.Component {
                 tournamentMeta={tournamentMeta}
                 matches={this.state.loadedMatches ? matches : null}
                 timerState={timerState}/>;
+        case 'static_image':
+            return <div className="fullscreen-static-image">
+                <img
+                    src={STATIC_IMAGE_URLS[(this.state.beamerConfig || {}).image_key] || STATIC_IMAGE_URLS.bpwstr_logo}
+                    alt=""
+                />
+                <style jsx>{`
+                    .fullscreen-static-image {
+                        align-items: center;
+                        background: #07121f;
+                        display: flex;
+                        height: 100vh;
+                        justify-content: center;
+                        width: 100vw;
+                    }
+
+                    .fullscreen-static-image img {
+                        max-height: 100vh;
+                        max-width: 100vw;
+                        object-fit: contain;
+                    }
+                `}</style>
+            </div>;
         case 'matches_all':
         case 'matches_in_progress':
         case 'matches_upcoming':
