@@ -1245,18 +1245,20 @@ class MissionMatchCard extends React.Component {
                         <Badge color='warning'>Entscheidung</Badge>
                     </div>}
                 <div className='mission-start-row'>
-                    <Label className='mb-0'>
+                    <Label className='mission-match-team-label mb-0'>
                         <FaUsers aria-hidden='true' />
-                        <TeamName name={match.team1.name}/>
+                        <TeamName name={match.team1.name} className='mission-match-team-name'
+                            testId='mission-match-team-name'/>
                     </Label>
                     <Input type='number' name='score1' data-score-field='score1'
                         value={this.state.score1} onChange={this.setScore1}
                         disabled={!editable} aria-label={match.team1.name + ' score'} />
                 </div>
                 <div className='mission-start-row'>
-                    <Label className='mb-0'>
+                    <Label className='mission-match-team-label mb-0'>
                         <FaUsers aria-hidden='true' />
-                        <TeamName name={match.team2.name}/>
+                        <TeamName name={match.team2.name} className='mission-match-team-name'
+                            testId='mission-match-team-name'/>
                     </Label>
                     <Input type='number' name='score2' data-score-field='score2'
                         value={this.state.score2} onChange={this.setScore2}
