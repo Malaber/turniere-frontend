@@ -212,6 +212,46 @@ test('Fullscreen match list receives live match snapshots', async ({ page }, tes
   await keyframe(page, testInfo, 'live_matches_finished_removed');
 });
 
+test('Matches-only beamer displays backend-returned matches without client state filtering', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(1, 4, 2);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const matchesRes = await client.get<Array<{
+    id: number;
+    state: string;
+    match_scores: Array<{ id: number; team: { name: string } | null }>;
+  }>>(`/tournaments/${tournament.id}/matches`);
+  expectStatus(matchesRes, 200, 'fetch matches-only beamer matches');
+  const match = matchesRes.json.find((candidate) =>
+    candidate.state === 'not_started' && candidate.match_scores.length === 2
+  );
+  expect(match).toBeTruthy();
+
+  const started = await client.patch(`/matches/${match!.id}`, { state: 'in_progress' });
+  expectStatus(started, 200, 'start matches-only beamer match');
+  for (const [index, score] of match!.match_scores.entries()) {
+    const updated = await client.patch(`/match_scores/${score.id}`, { points: index === 0 ? 10 : 1 });
+    expectStatus(updated, 200, `score matches-only beamer match_score ${score.id}`);
+  }
+  const finished = await client.patch(`/matches/${match!.id}`, { state: 'finished' });
+  expectStatus(finished, 200, 'finish matches-only beamer match');
+
+  const beamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'matches-only-finished',
+    display_state: 'between_games',
+    config: { match_filter: 'state:finished' },
+  });
+  expectStatus(beamer, 201, 'create matches-only finished beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=matches-only-finished`);
+  await expect(page.locator(`[data-match-id="${match!.id}"]`)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('fullscreen-match-card')).toHaveCount(1);
+  await keyframe(page, testInfo, 'matches_only_finished_match');
+});
+
 test('Fullscreen timer updates live for countup mode', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 

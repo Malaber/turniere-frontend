@@ -125,13 +125,14 @@ function beamerMatchFilterOptions(tournament) {
     const groupPositions = [];
     (groupStage.groups || []).forEach(group => {
         (group.matches || []).forEach(match => {
-            if (groupPositions.indexOf(match.position) === -1) {
-                groupPositions.push(match.position);
+            const backendPosition = match.backendPosition !== undefined ? match.backendPosition : match.position - 1;
+            if (groupPositions.indexOf(backendPosition) === -1) {
+                groupPositions.push(backendPosition);
             }
         });
     });
     groupPositions.sort((a, b) => a - b).forEach(position => {
-        addMatchFilterOptions(options, 'Gruppenphase Tisch ' + position, {group_stage_position: position});
+        addMatchFilterOptions(options, 'Gruppenphase Runde ' + (position + 1), {group_stage_position: position});
     });
 
     (tournament.playoffStages || []).forEach(stage => {

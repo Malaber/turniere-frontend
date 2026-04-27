@@ -214,6 +214,7 @@ function convertMatch(apiMatch, allowUndecided) {
         allowUndecided: allowUndecided,
         scoreMode: scoreMode,
         winnerTeamId: apiMatch.winner ? apiMatch.winner.id : null,
+        backendPosition: apiMatch.position,
         position: apiMatch.position + 1,
         group: apiMatch.group ? {id: apiMatch.group.id, number: apiMatch.group.number} : null
     };
