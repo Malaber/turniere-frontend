@@ -177,7 +177,7 @@ export class MatchModal extends Component {
                                 disabled={this.props.swapInProgress} data-testid='swap-match-position-select'>
                                 {this.props.swapTargets.map(target => (
                                     <option key={target.id} value={target.id}>
-                                        Sp. {target.position}
+                                        {target.position}
                                     </option>
                                 ))}
                             </Input>

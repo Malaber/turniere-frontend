@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { injectAuth, loadAuthState } from '../helpers/auth';
 import { keyframe, modalKeyframe } from '../helpers/screenshot';
 import {
@@ -44,6 +44,18 @@ async function expectNoLineThrough(locator) {
 async function expectResolvedDeciderText(locator) {
   await expect(locator.getByText(/hat das Entscheidungsmatch gegen .* (gewonnen|verloren)\./)).toBeVisible();
   await expect(locator.getByText(/Entscheidungsmatch gegen .*: (gewonnen|verloren)\./)).toBeVisible();
+}
+
+async function expectCleanMatchPositionBadge(card: Locator, position: number) {
+  const badge = card.getByTestId('match-position-badge');
+  const number = card.getByTestId('match-position-badge-number');
+  await expect(badge).toHaveAttribute('data-match-position', String(position));
+  await expect(number).toHaveText(String(position));
+  await expect(card.locator('[data-decider-label]')).toHaveCount(0);
+  await expect(card).not.toContainText('Sp.');
+  await expect(card).not.toContainText('Entscheidung');
+  const fontSize = await number.evaluate((element) => parseFloat(window.getComputedStyle(element).fontSize));
+  expect(fontSize).toBeGreaterThanOrEqual(30);
 }
 
 async function waitForRankingDecisionTrigger(page, timeout = 20000) {
@@ -92,6 +104,7 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await modalKeyframe(page, testInfo, 'decider_decision_modal');
   await modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' }).click();
   await expect(deciderCard).toBeVisible({ timeout: 15000 });
+  await expectCleanMatchPositionBadge(deciderCard, 7);
   await keyframe(page, testInfo, 'decider_match_created');
 
   await deciderCard.click({ force: true });
@@ -267,6 +280,24 @@ test('Fullscreen groups view keeps decider tables compact', async ({ page }, tes
   await expect(page.locator('[data-ranking-decision-trigger]')).toHaveCount(2, { timeout: 15000 });
   await expectNoHorizontalOverflow(page);
   await keyframe(page, testInfo, 'fullscreen_decider_groups');
+});
+
+test('Fullscreen match cards render deciders with the normal match number badge', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const { tournament } = await seedResolvedDeciderScenario();
+  const groupStage = tournament.stages.find((stage) => stage.level === -1);
+  const deciderMatch = groupStage?.groups[0]?.matches.find((match) => match.decider);
+  expect(deciderMatch).toBeTruthy();
+
+  await page.goto(`/t/${tournament.id}/fullscreen?display=between_games`);
+  await page.waitForLoadState('networkidle');
+
+  const card = page.locator(`[data-match-id="${deciderMatch!.id}"]`);
+  await expect(card).toBeVisible({ timeout: 20000 });
+  const badge = card.getByTestId('fullscreen-match-badge');
+  await expect(badge).toHaveText(String(deciderMatch!.position + 1));
+  await expect(card).not.toContainText('Sp.');
+  await expect(card).not.toContainText('Entscheidung');
 });
 
 test('Mobile tournament view keeps decider tables readable without side scrolling', async ({ context, page }, testInfo) => {

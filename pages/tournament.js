@@ -166,6 +166,11 @@ class Main extends React.Component {
         if (!tournament || !tournament.id) {
             return;
         }
+        if (String(this.props.query.code) !== String(tournament.id) &&
+            String(this.props.query.code) !== String(tournament.code)) {
+            this.redirectCodeFromTournamentLists(true);
+            return;
+        }
         if (String(this.props.query.code) === String(tournament.id)) {
             if (String(tournament.code) !== String(this.props.query.code)) {
                 this.redirectCodeFromTournamentLists(false);
