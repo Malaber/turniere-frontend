@@ -525,7 +525,8 @@ i.is-finished {
     width: 100%;
 }
 
-.mission-lock-button.is-holding .mission-lock-progress {
+.mission-lock-button.is-holding .mission-lock-progress,
+.mission-lock-button.is-unlocked .mission-lock-progress {
     opacity: 1;
 }
 

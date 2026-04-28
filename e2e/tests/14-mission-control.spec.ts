@@ -101,6 +101,19 @@ async function holdSpaceUntilUnlocked(page: Page, card: Locator) {
   await page.keyboard.up('Space');
 }
 
+async function expectUnlockProgressDrainsAndLocks(card: Locator, score: Locator) {
+  const progress = card.getByTestId('mission-match-unlock-progress');
+  await expect(card.getByRole('button', { name: /Kurz entsperrt/ })).toBeVisible();
+  const initialValue = Number(await progress.getAttribute('aria-valuenow'));
+  expect(initialValue).toBeGreaterThan(0);
+  await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow')), {
+    timeout: 2_000,
+  }).toBeLessThan(initialValue);
+  await expect(score).toBeDisabled({ timeout: 8_000 });
+  await expect(progress).toHaveAttribute('aria-valuenow', '0');
+  await expect(card.getByRole('button', { name: /Locked/ })).toBeVisible();
+}
+
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
@@ -220,6 +233,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(g1s1Score).toBeDisabled({ timeout: 20_000 });
   await holdSpaceUntilUnlocked(page, activeCard);
   await expect(g1s1Score).toBeEnabled();
+  await expectUnlockProgressDrainsAndLocks(activeCard, g1s1Score);
 
   await page.getByRole('link', { name: 'Teams' }).click();
   await expect(page).toHaveURL(/#teams$/);

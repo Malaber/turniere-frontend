@@ -1099,6 +1099,8 @@ class MissionMatchCard extends React.Component {
         this.startUnlockHold = this.startUnlockHold.bind(this);
         this.cancelUnlockHold = this.cancelUnlockHold.bind(this);
         this.updateUnlockHoldProgress = this.updateUnlockHoldProgress.bind(this);
+        this.cancelUnlockReset = this.cancelUnlockReset.bind(this);
+        this.updateUnlockResetProgress = this.updateUnlockResetProgress.bind(this);
         this.onUnlockKeyDown = this.onUnlockKeyDown.bind(this);
         this.onUnlockKeyUp = this.onUnlockKeyUp.bind(this);
         this.unlockTemporarily = this.unlockTemporarily.bind(this);
@@ -1123,15 +1125,15 @@ class MissionMatchCard extends React.Component {
 
     componentWillUnmount() {
         this.cancelUnlockHold(false);
-        if (this.unlockResetTimer) {
-            window.clearTimeout(this.unlockResetTimer);
-        }
+        this.cancelUnlockReset(false);
     }
 
     componentDidUpdate(prevProps) {
         const scoreChanged = scoreFor(prevProps.match, 'team1') !== scoreFor(this.props.match, 'team1') ||
             scoreFor(prevProps.match, 'team2') !== scoreFor(this.props.match, 'team2');
         if (prevProps.match.id !== this.props.match.id || prevProps.match.state !== this.props.match.state) {
+            this.cancelUnlockHold(false);
+            this.cancelUnlockReset(false);
             this.setState(this.scoreStateFromProps(this.props));
         } else if (scoreChanged) {
             this.setState({
@@ -1224,7 +1226,10 @@ class MissionMatchCard extends React.Component {
             this.unlockHoldFrame = null;
         }
         this.unlockHoldStartedAt = null;
-        if (resetState !== false && (this.state.unlockHolding || this.state.unlockHoldProgress !== 0)) {
+        if (resetState !== false && this.state.temporaryUnlocked && this.state.unlockHolding) {
+            this.setState({unlockHolding: false});
+        } else if (resetState !== false && !this.state.temporaryUnlocked &&
+            (this.state.unlockHolding || this.state.unlockHoldProgress !== 0)) {
             this.setState({unlockHolding: false, unlockHoldProgress: 0});
         }
     }
@@ -1239,6 +1244,34 @@ class MissionMatchCard extends React.Component {
         this.setState({unlockHoldProgress: progress});
         if (progress < 1) {
             this.unlockHoldFrame = window.requestAnimationFrame(this.updateUnlockHoldProgress);
+        }
+    }
+
+    cancelUnlockReset(resetState = true) {
+        if (this.unlockResetTimer) {
+            window.clearTimeout(this.unlockResetTimer);
+            this.unlockResetTimer = null;
+        }
+        if (this.unlockResetFrame) {
+            window.cancelAnimationFrame(this.unlockResetFrame);
+            this.unlockResetFrame = null;
+        }
+        this.unlockResetStartedAt = null;
+        if (resetState !== false && (this.state.temporaryUnlocked || this.state.unlockHoldProgress !== 0)) {
+            this.setState({temporaryUnlocked: false, unlockHoldProgress: 0});
+        }
+    }
+
+    updateUnlockResetProgress(timestamp) {
+        if (!this.unlockResetTimer || !this.unlockResetStartedAt) {
+            return;
+        }
+
+        const elapsed = timestamp - this.unlockResetStartedAt;
+        const progress = Math.max(0, 1 - (elapsed / UNLOCK_RESET_MS));
+        this.setState({unlockHoldProgress: progress});
+        if (progress > 0) {
+            this.unlockResetFrame = window.requestAnimationFrame(this.updateUnlockResetProgress);
         }
     }
 
@@ -1268,14 +1301,19 @@ class MissionMatchCard extends React.Component {
             this.unlockHoldFrame = null;
         }
         this.unlockHoldStartedAt = null;
-        this.setState({temporaryUnlocked: true, unlockHolding: false, unlockHoldProgress: 0});
-        if (this.unlockResetTimer) {
-            window.clearTimeout(this.unlockResetTimer);
-        }
+        this.cancelUnlockReset(false);
+        this.unlockResetStartedAt = window.performance.now();
+        this.setState({temporaryUnlocked: true, unlockHolding: false, unlockHoldProgress: 1});
         this.unlockResetTimer = window.setTimeout(() => {
             this.unlockResetTimer = null;
-            this.setState({temporaryUnlocked: false});
+            if (this.unlockResetFrame) {
+                window.cancelAnimationFrame(this.unlockResetFrame);
+                this.unlockResetFrame = null;
+            }
+            this.unlockResetStartedAt = null;
+            this.setState({temporaryUnlocked: false, unlockHoldProgress: 0});
         }, UNLOCK_RESET_MS);
+        this.unlockResetFrame = window.requestAnimationFrame(this.updateUnlockResetProgress);
     }
 
     onStartSuccess() {
@@ -1292,7 +1330,8 @@ class MissionMatchCard extends React.Component {
     onScoresSuccess() {
         if (this.submittedLive || this.state.temporaryUnlocked) {
             notify.show('Score wurde gespeichert.', 'success', 2000);
-            this.setState({temporaryUnlocked: false, running: false});
+            this.cancelUnlockReset(false);
+            this.setState({temporaryUnlocked: false, unlockHoldProgress: 0, running: false});
             this.props.onTournamentChange();
             return;
         }
@@ -1373,7 +1412,9 @@ class MissionMatchCard extends React.Component {
                         </span>}
                     {showUnlockButton &&
                         <button type='button'
-                            className={'mission-lock-button' + (this.state.unlockHolding ? ' is-holding' : '')}
+                            className={'mission-lock-button' +
+                                (this.state.unlockHolding ? ' is-holding' : '') +
+                                (this.state.temporaryUnlocked ? ' is-unlocked' : '')}
                             data-testid='mission-match-lock'
                             onPointerDown={this.startUnlockHold}
                             onPointerUp={this.cancelUnlockHold}
