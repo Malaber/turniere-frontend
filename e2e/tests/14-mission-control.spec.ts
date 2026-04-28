@@ -144,7 +144,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await page.goto(`/t/${tournament.id}/mission-control`);
   await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
 
-  await expect(page.getByRole('heading', { name: 'Timer' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Timer', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Checklisten' })).toBeVisible();

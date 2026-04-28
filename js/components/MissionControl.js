@@ -509,7 +509,8 @@ class MissionBeamer extends React.Component {
             beamers => this.setState({
                 beamers: beamers || [],
                 loading: false,
-                savingById: {}
+                savingById: {},
+                selectionsById: {}
             }),
             this.onError);
     }
@@ -595,9 +596,13 @@ class MissionBeamer extends React.Component {
             display_mode: 'timer_only',
             show_timer_reason: checked
         });
-        this.update(beamer, {
-            display_state: 'during_game',
-            config
+        this.setState(prev => ({
+            selectionsById: Object.assign({}, prev.selectionsById, {[beamer.id]: checked})
+        }), () => {
+            this.update(beamer, {
+                display_state: 'during_game',
+                config
+            });
         });
     }
 
@@ -631,7 +636,10 @@ class MissionBeamer extends React.Component {
                         const disabled = saving || this.props.disabled;
                         const matchSelection = config.match_filter || '';
                         const imageSelection = config.image_key || STATIC_IMAGE_OPTIONS[0].value;
-                        const showTimerReason = config.show_timer_reason !== false;
+                        const timerReasonSelection = this.state.selectionsById[beamer.id];
+                        const showTimerReason = timerReasonSelection === undefined ?
+                            config.show_timer_reason !== false :
+                            timerReasonSelection;
 
                         return (
                             <div className='mission-beamer-card' key={beamer.id}
