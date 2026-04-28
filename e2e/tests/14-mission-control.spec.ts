@@ -322,6 +322,20 @@ test('Mission Control saves independent beamer display controls instantly', asyn
     expectStatus(updated, 200, 'fetch beamers after image update');
     return updated.json.find((beamer) => beamer.id === main.json.id)?.config?.image_key;
   }, { timeout: 20_000 }).toBe('bpwstr_logo');
+
+  await page.getByTestId(`mission-beamer-mode-${main.json.id}`).selectOption('timer_only');
+  await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('timer_only');
+  await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toHaveCount(0);
+  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveCount(0);
+  await expect(page.getByText('Timer Only · Nur Timer')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(async () => {
+    const updated = await client.get<Array<{ id: number; display_state: string; config?: { display_mode?: string } }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(updated, 200, 'fetch beamers after timer-only update');
+    const beamer = updated.json.find((candidate) => candidate.id === main.json.id);
+    return `${beamer?.display_state}:${beamer?.config?.display_mode}`;
+  }, { timeout: 20_000 }).toBe('during_game:timer_only');
 });
 
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({
