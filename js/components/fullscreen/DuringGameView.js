@@ -1,7 +1,7 @@
 import React from 'react';
 import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
-import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
+import {formatTimerMs, getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
 import styles from './DuringGameView.module.css';
 import {FullscreenMatchCard} from './FullscreenMatchCard';
 
@@ -112,21 +112,10 @@ export class AnimatedTimer extends React.Component {
         }
 
         const totalSeconds = Math.floor(display.ms / 1000);
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
         const isUrgent = display.mode === TIMER_MODE_COUNTDOWN &&
             (totalSeconds <= 10 || this.props.forceUrgent);
 
-        const chars = [];
-        if (hours > 0) {
-            String(hours).split('').forEach(c => chars.push(c));
-            chars.push(':');
-        }
-        String(minutes).split('').forEach(c => chars.push(c));
-        chars.push(':');
-        String(seconds).padStart(2, '0').split('')
-            .forEach(c => chars.push(c));
+        const chars = formatTimerMs(display.ms).split('');
 
         const cls = styles.timer +
             (isUrgent ? ' ' + styles.timerUrgent : '') +

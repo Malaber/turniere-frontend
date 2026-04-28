@@ -1,11 +1,9 @@
-import getConfig from 'next/config';
-
-const {publicRuntimeConfig} = getConfig();
+import {getApiUrl} from '../runtimeConfig';
 
 const ACTION_CABLE_PROTOCOL = 'actioncable-v1-json';
 
 function websocketUrl() {
-    const apiUrl = (publicRuntimeConfig.api_url || '').replace(/\/$/, '');
+    const apiUrl = getApiUrl().replace(/\/$/, '');
     if (!apiUrl) {
         throw new Error('TURNIERE_API_URL missing for ActionCable connection');
     }

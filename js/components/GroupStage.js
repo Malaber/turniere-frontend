@@ -4,7 +4,7 @@ import {
 import {Match} from './Match';
 import React, {Component} from 'react';
 import {getGroup} from '../redux/tournamentApi';
-import {notify} from 'react-notify-toast';
+import {notify} from './Notifications';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
 import {
     FaChevronDown, FaCircleExclamation, FaCircleInfo

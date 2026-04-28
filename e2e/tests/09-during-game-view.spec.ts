@@ -106,6 +106,14 @@ async function setupBeamerAndMatches(
 async function installBeamerEffectSpies(page: Page) {
   await page.addInitScript(() => {
     (window as any).__beamerAudioEvents = [];
+    (window as any).__beamerAudioUnlocked = false;
+
+    const markAudioUnlocked = () => {
+      (window as any).__beamerAudioUnlocked = true;
+    };
+    window.addEventListener('click', markAudioUnlocked, { capture: true });
+    window.addEventListener('pointerup', markAudioUnlocked, { capture: true });
+    window.addEventListener('touchend', markAudioUnlocked, { capture: true });
 
     class FakeAudio {
       src: string;
@@ -121,8 +129,11 @@ async function installBeamerEffectSpies(page: Page) {
       }
 
       play() {
-        if ((window as any).__blockBeamerAudioOnce && !this.muted) {
-          (window as any).__blockBeamerAudioOnce = false;
+        if (
+          (window as any).__blockBeamerAudioUntilInteraction &&
+          !(window as any).__beamerAudioUnlocked &&
+          !this.muted
+        ) {
           (window as any).__beamerAudioEvents.push({
             type: 'audio-blocked',
             src: this.src,
@@ -178,6 +189,27 @@ async function waitForBeamerEffect(page: Page, type: string, cue?: string) {
     { expectedType: type, expectedCue: cue },
     { timeout: 8_000 },
   );
+}
+
+async function readAnimatedTimerText(page: Page, testId: string): Promise<string> {
+  return page.getByTestId(testId).evaluate((el) => {
+    return Array.from(el.children)
+      .map((child) => {
+        const strip = child.querySelector('[class*="digitStrip"]');
+        if (!strip) return child.textContent ?? '';
+
+        const style = (strip as HTMLElement).style.transform;
+        const match = style.match(/translateY\((-?\d+(?:\.\d+)?)%\)/);
+        return match ? String(Math.abs(parseFloat(match[1])) / 10) : '?';
+      })
+      .join('');
+  });
+}
+
+async function expectAnimatedTimerText(page: Page, testId: string, expected: RegExp): Promise<void> {
+  await expect
+    .poll(() => readAnimatedTimerText(page, testId), { timeout: 10_000 })
+    .toMatch(expected);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +349,7 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   await page.setViewportSize({ width: 1920, height: 1080 });
   await installBeamerEffectSpies(page);
   await page.addInitScript(() => {
-    (window as any).__blockBeamerAudioOnce = true;
+    (window as any).__blockBeamerAudioUntilInteraction = true;
   });
 
   const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(12, {
@@ -414,6 +446,30 @@ test('Timer-only beamer renders urgent timer without matches and keeps sound act
   await keyframe(page, testInfo, 'timer_only_countdown_sound');
 });
 
+test('Animated fullscreen timer pads minutes after hours and days', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(0, {
+    timerSeconds: 5 * 60 * 60 + 3 * 60 + 30,
+    beamerName: 'timer-leading-zero',
+    displayState: 'timer_only',
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+  await expect(page.getByTestId('timer-only-timer')).toBeVisible({ timeout: 20_000 });
+  await expectAnimatedTimerText(page, 'timer-only-timer', /^5:03:\d{2}$/);
+
+  const overDay = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 25 * 60 * 60 + 3 * 60 + 30,
+  });
+  expectStatus(overDay, 200, 'set over-day timer');
+
+  await page.reload();
+  await expect(page.getByTestId('timer-only-timer')).toBeVisible({ timeout: 20_000 });
+  await expectAnimatedTimerText(page, 'timer-only-timer', /^25:03:\d{2}$/);
+});
+
 test.describe('Fullscreen mobile viewport', () => {
   const mobileDevice = devices['iPhone 13'];
 
@@ -429,7 +485,7 @@ test.describe('Fullscreen mobile viewport', () => {
     test.setTimeout(180_000);
     await installBeamerEffectSpies(page);
     await page.addInitScript(() => {
-      (window as any).__blockBeamerAudioOnce = true;
+      (window as any).__blockBeamerAudioUntilInteraction = true;
     });
 
     const { tournament, fullscreenQuery } = await setupBeamerAndMatches(8, {

@@ -1,6 +1,5 @@
-import {applyMiddleware, combineReducers, createStore} from 'redux';
-import {composeWithDevTools} from 'redux-devtools-extension';
-import thunkMiddleware from 'redux-thunk';
+import {applyMiddleware, combineReducers, compose, createStore} from 'redux';
+import {thunk as thunkMiddleware} from 'redux-thunk';
 
 import {errorMessages} from './constants';
 
@@ -492,10 +491,13 @@ let __store;
 let applicationHydrated = false;
 
 export function initializeStore(initialState = defaultApplicationState) {
+    const composeEnhancers = typeof window !== 'undefined' &&
+        window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ ?
+        window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ : compose;
     __store = createStore(
         combineReducers(reducers),
         initialState,
-        composeWithDevTools(applyMiddleware(thunkMiddleware))
+        composeEnhancers(applyMiddleware(thunkMiddleware))
     );
     configureAuthHandling({
         latestStateProvider: () => __store.getState(),

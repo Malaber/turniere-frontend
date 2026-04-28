@@ -81,7 +81,6 @@ export class BeamerTimerEffects extends React.Component {
         this.timerSessionKey = null;
         this.finishedTriggered = false;
         this.unlockInProgress = false;
-        this.lastUnlockAt = 0;
 
         this.checkAudioPermission = this.checkAudioPermission.bind(this);
         this.attemptAudioPlayback = this.attemptAudioPlayback.bind(this);
@@ -236,10 +235,13 @@ export class BeamerTimerEffects extends React.Component {
             event.preventDefault();
         }
 
-        const now = Date.now();
-        if (this.unlockInProgress || now - this.lastUnlockAt < 750) return;
+        if (
+            this.unlockInProgress ||
+            (this.audioPermissionStatus === 'allowed' && !this.pendingCue)
+        ) {
+            return;
+        }
 
-        this.lastUnlockAt = now;
         this.unlockInProgress = true;
 
         const hadPendingCue = Boolean(this.pendingCue);
