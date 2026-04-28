@@ -451,6 +451,60 @@ test('Mission Control score cards keep long generated team names inside card bou
   await keyframe(page, testInfo, 'mission_control_long_team_names_scores');
 });
 
+test('Mission Control group tables match compact tournament standings columns', async ({
+  context,
+  page,
+}, testInfo) => {
+  await injectAuth(context);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const { tournament } = await seedGroupStageTournament(1, 4, 2, longGroupStageTeamName);
+
+  await page.goto(`/t/${tournament.id}/mission-control#scores`);
+  await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  const scoresPane = page.locator('.tab-pane.active');
+  await expect(scoresPane.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).toBeVisible();
+  const table = scoresPane.getByRole('table').filter({
+    hasText: LONG_TEAM_NAME_SINGLE_WORD,
+  }).first();
+  await expect(table).toBeVisible();
+  await expect(table.locator('thead th')).toHaveText(['#', 'Team', 'Pkt.', 'Dif.', 'Gew.']);
+  await expect(table.locator('thead')).not.toContainText('Differenz');
+  await expect(table.locator('tbody tr').first().locator('td')).toHaveCount(5);
+  await expect(table.locator('tbody tr').first().locator('td').nth(4)).toHaveText('0');
+
+  const wideGeometry = await table.evaluate((el) => {
+    const stage = el.closest('.mission-match-stage');
+    return {
+      stageWidth: stage?.clientWidth ?? 0,
+      tableWidth: el.clientWidth,
+    };
+  });
+  expect(wideGeometry.tableWidth).toBeLessThan(wideGeometry.stageWidth - 100);
+
+  await page.setViewportSize({ width: 520, height: 900 });
+  const longName = table.getByTestId('team-name').filter({
+    hasText: LONG_TEAM_NAME_SINGLE_WORD,
+  }).first();
+  await expect(longName).toHaveCSS('overflow-x', 'hidden');
+  expect(await longName.evaluate((el) => getComputedStyle(el).textOverflow)).toMatch(/ellipsis|"\.\.\."/);
+
+  const narrowGeometry = await table.evaluate((el) => {
+    const stage = el.closest('.mission-match-stage');
+    const longTeamName = el.querySelector('[data-testid="team-name"]');
+    return {
+      stageWidth: stage?.clientWidth ?? 0,
+      tableWidth: el.clientWidth,
+      tableScrollWidth: el.scrollWidth,
+      longNameClientWidth: longTeamName?.clientWidth ?? 0,
+      longNameScrollWidth: longTeamName?.scrollWidth ?? 0,
+    };
+  });
+  expect(narrowGeometry.tableWidth).toBeLessThanOrEqual(narrowGeometry.stageWidth);
+  expect(narrowGeometry.tableScrollWidth).toBeLessThanOrEqual(narrowGeometry.tableWidth + 1);
+  expect(narrowGeometry.longNameScrollWidth).toBeGreaterThan(narrowGeometry.longNameClientWidth);
+  await keyframe(page, testInfo, 'mission_control_group_table_compact');
+});
+
 test('Mission Control hidden for anonymous viewers', async ({ page }, testInfo) => {
   const { tournament } = await seedGroupStageTournament(2, 4, 4);
 

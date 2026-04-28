@@ -1042,14 +1042,21 @@ function MissionStageBlock(props) {
 
 function MissionGroupTable(props) {
     return (
-        <Table size='sm' bordered responsive className='mission-control-group-table'
-            style={{tableLayout: 'fixed', width: '100%'}}>
+        <Table size='sm' bordered className='mission-control-group-table' data-testid='mission-group-table'>
+            <colgroup>
+                <col className='mission-control-group-rank-column' />
+                <col className='mission-control-group-team-column' />
+                <col className='mission-control-group-stat-column' />
+                <col className='mission-control-group-stat-column' />
+                <col className='mission-control-group-stat-column' />
+            </colgroup>
             <thead>
                 <tr>
-                    <th style={{width: '3rem'}}>#</th>
+                    <th>#</th>
                     <th>Team</th>
-                    <th style={{width: '5rem'}}>Punkte</th>
-                    <th style={{width: '5rem'}}>Differenz</th>
+                    <th><span title='Punkte'>Pkt.</span></th>
+                    <th><span title='Becherdifferenz'>Dif.</span></th>
+                    <th><span title='Getroffene Becher (Geworfen)'>Gew.</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -1059,6 +1066,7 @@ function MissionGroupTable(props) {
                         <td><TeamName name={score.team.name}/></td>
                         <td>{score.group_points}</td>
                         <td>{score.difference_in_points}</td>
+                        <td>{score.scored_points}</td>
                     </tr>
                 ))}
             </tbody>
