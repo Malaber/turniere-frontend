@@ -1,7 +1,7 @@
 import React from 'react';
 import {
-    Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Nav, NavItem, NavLink, Row, Table,
-    TabContent, TabPane
+    Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader,
+    Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
 } from 'reactstrap';
 import {FaExternalLinkAlt, FaKeyboard, FaLock, FaSearch, FaTrash, FaUsers} from 'react-icons/fa';
 import {notify} from 'react-notify-toast';
@@ -170,6 +170,7 @@ function matchStateClass(state) {
 
 const UNLOCK_HOLD_DURATION_MS = 600;
 const UNLOCK_RESET_MS = 6000;
+const START_HOLD_DURATION_MS = 600;
 
 function nextPlayoffTable(match) {
     return Math.ceil(match.position / 2);
@@ -899,12 +900,15 @@ function MissionNextMatches(props) {
                     <div className='mission-control-panel'>
                         <h4>Gruppenphase</h4>
                         <p>Startet das nächste offene Match pro Gruppe.</p>
-                        <Button color='success'
-                            data-testid='mission-start-next-groups'
+                        <MissionStartConfirmButton
+                            testId='mission-start-next-groups'
+                            color='success'
                             disabled={props.disabled || props.actionRunning === 'group'}
-                            onClick={props.onStartGroupMatches}>
+                            onConfirm={props.onStartGroupMatches}
+                            title='Match-Starts bestätigen'
+                            message='Nächste offene Gruppenmatches werden erst nach OK gestartet.'>
                             Nächste Gruppenmatches starten
-                        </Button>
+                        </MissionStartConfirmButton>
                     </div> :
                     <div className='mission-control-panel'>
                         <h4>Gruppenphase</h4>
@@ -914,11 +918,17 @@ function MissionNextMatches(props) {
                     <div key={stageInfo.stage.id} className='mission-control-panel'>
                         <h4>{stageName(stageInfo.stage.level)}</h4>
                         <p>{stageInfo.readyCount} startbare Matches.</p>
-                        <Button color='success' outline
+                        <MissionStartConfirmButton
+                            testId={'mission-start-stage-' + stageInfo.stage.id}
+                            color='success'
+                            outline
                             disabled={props.disabled || props.actionRunning === 'stage-' + stageInfo.stage.id}
-                            onClick={() => props.onStartStageMatches(stageInfo.stage)}>
+                            onConfirm={() => props.onStartStageMatches(stageInfo.stage)}
+                            title='Match-Starts bestätigen'
+                            message={stageName(stageInfo.stage.level) + ' startet ' + stageInfo.readyCount +
+                                ' startbare Matches erst nach OK.'}>
                             {stageName(stageInfo.stage.level)} starten
-                        </Button>
+                        </MissionStartConfirmButton>
                     </div>
                 ))}
                 {stagesWithReadyMatches.length === 0 && (!groupStage || groupStage.state === 'finished') &&
@@ -929,6 +939,165 @@ function MissionNextMatches(props) {
             </div>
         </section>
     );
+}
+
+class MissionStartConfirmButton extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+            holding: false,
+            holdProgress: 0,
+            confirmOpen: false
+        };
+        this.startHold = this.startHold.bind(this);
+        this.cancelHold = this.cancelHold.bind(this);
+        this.updateHoldProgress = this.updateHoldProgress.bind(this);
+        this.openConfirm = this.openConfirm.bind(this);
+        this.closeConfirm = this.closeConfirm.bind(this);
+        this.confirm = this.confirm.bind(this);
+        this.onKeyDown = this.onKeyDown.bind(this);
+        this.onKeyUp = this.onKeyUp.bind(this);
+    }
+
+    componentDidUpdate(prevProps) {
+        if (!prevProps.disabled && this.props.disabled) {
+            this.cancelHold();
+        }
+    }
+
+    componentWillUnmount() {
+        this.cancelHold(false);
+    }
+
+    startHold(event) {
+        if (this.props.disabled) {
+            return;
+        }
+
+        event.preventDefault();
+        this.cancelHold();
+        this.holdStartedAt = window.performance.now();
+        this.setState({holding: true, holdProgress: 0});
+        this.holdTimer = window.setTimeout(this.openConfirm, START_HOLD_DURATION_MS);
+        this.holdFrame = window.requestAnimationFrame(this.updateHoldProgress);
+    }
+
+    cancelHold(resetState = true) {
+        if (this.holdTimer) {
+            window.clearTimeout(this.holdTimer);
+            this.holdTimer = null;
+        }
+        if (this.holdFrame) {
+            window.cancelAnimationFrame(this.holdFrame);
+            this.holdFrame = null;
+        }
+        this.holdStartedAt = null;
+        if (resetState !== false && (this.state.holding || this.state.holdProgress !== 0)) {
+            this.setState({holding: false, holdProgress: 0});
+        }
+    }
+
+    updateHoldProgress(timestamp) {
+        if (!this.holdTimer || !this.holdStartedAt) {
+            return;
+        }
+
+        const elapsed = timestamp - this.holdStartedAt;
+        const progress = Math.min(1, elapsed / START_HOLD_DURATION_MS);
+        this.setState({holdProgress: progress});
+        if (progress < 1) {
+            this.holdFrame = window.requestAnimationFrame(this.updateHoldProgress);
+        }
+    }
+
+    openConfirm() {
+        this.holdTimer = null;
+        if (this.holdFrame) {
+            window.cancelAnimationFrame(this.holdFrame);
+            this.holdFrame = null;
+        }
+        this.holdStartedAt = null;
+        this.setState({holding: false, holdProgress: 0, confirmOpen: true});
+    }
+
+    closeConfirm() {
+        this.setState({confirmOpen: false});
+    }
+
+    confirm() {
+        if (this.props.disabled) {
+            return;
+        }
+        this.closeConfirm();
+        this.props.onConfirm();
+    }
+
+    onKeyDown(event) {
+        if (event.key !== ' ' && event.key !== 'Spacebar' && event.code !== 'Space' && event.key !== 'Enter') {
+            return;
+        }
+        if (event.repeat || this.holdTimer) {
+            event.preventDefault();
+            return;
+        }
+        this.startHold(event);
+    }
+
+    onKeyUp(event) {
+        if (event.key !== ' ' && event.key !== 'Spacebar' && event.code !== 'Space' && event.key !== 'Enter') {
+            return;
+        }
+        event.preventDefault();
+        this.cancelHold();
+    }
+
+    render() {
+        const holdProgress = Math.round(this.state.holdProgress * 100);
+        const className = 'mission-hold-start-button' + (this.state.holding ? ' is-holding' : '');
+
+        return (
+            <>
+                <Button color={this.props.color}
+                    outline={this.props.outline}
+                    className={className}
+                    data-testid={this.props.testId}
+                    disabled={this.props.disabled}
+                    onPointerDown={this.startHold}
+                    onPointerUp={this.cancelHold}
+                    onPointerLeave={this.cancelHold}
+                    onPointerCancel={this.cancelHold}
+                    onKeyDown={this.onKeyDown}
+                    onKeyUp={this.onKeyUp}
+                    onBlur={this.cancelHold}
+                    title='Gedrückt halten, um Start zu bestätigen'>
+                    <span>{this.props.children}</span>
+                    <span
+                        className='mission-lock-progress'
+                        data-testid='mission-start-hold-progress'
+                        role='progressbar'
+                        aria-valuemin='0'
+                        aria-valuemax='100'
+                        aria-valuenow={holdProgress}>
+                        <span className='mission-lock-progress-bar' style={{width: `${holdProgress}%`}} />
+                    </span>
+                </Button>
+                <Modal isOpen={this.state.confirmOpen} toggle={this.closeConfirm}
+                    fade={false} data-testid='mission-start-confirm-modal'>
+                    <ModalHeader toggle={this.closeConfirm}>{this.props.title}</ModalHeader>
+                    <ModalBody>
+                        <p className='mb-0'>{this.props.message}</p>
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button color='success' onClick={this.confirm} disabled={this.props.disabled}
+                            data-testid='mission-start-confirm-ok'>
+                            OK
+                        </Button>
+                        <Button color='secondary' onClick={this.closeConfirm}>Abbrechen</Button>
+                    </ModalFooter>
+                </Modal>
+            </>
+        );
+    }
 }
 
 function MissionMatches(props) {
