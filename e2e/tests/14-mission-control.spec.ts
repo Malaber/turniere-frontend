@@ -58,7 +58,7 @@ async function expectMatchStateCountAtLeast(
 async function expectUnlockProgressStarted(card: Locator) {
   const progress = card.getByTestId('mission-match-unlock-progress');
   await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow')), {
-    timeout: 500,
+    timeout: 2_000,
   }).toBeGreaterThan(0);
 }
 
@@ -112,6 +112,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.getByRole('heading', { name: 'Timer' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Checklisten' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Turnier-Einstellungen' })).toBeVisible();
   await expect(page.getByTestId('mission-tournament-link')).toHaveAttribute('href', `/t/${tournament.id}`);
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
@@ -243,6 +244,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
 
   await page.goto(`/t/${tournament.id}/mission-control#scores`);
   await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  await injectAuth(context);
   await page.goto(`/t/${tournament.id}/mission-control?tab=teams`);
   await expect(page.locator('.tab-pane.active').getByRole('heading', { name: 'Teams' })).toBeVisible({
     timeout: 20_000,

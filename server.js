@@ -89,10 +89,17 @@ app.prepare()
             app.render(req, res, actualPage, queryParam);
         });
 
-        server.get('/t/:code/checklists', (req, res) => {
-            const actualPage = '/tournament-checklists';
-            const queryParam = {code: req.params.code};
-            app.render(req, res, actualPage, queryParam);
+        server.get('/t/:code/checklists', async (req, res) => {
+            try {
+                const tournamentId = await resolveTournamentId(req.params.code);
+                if (tournamentId) {
+                    res.redirect(302, `/t/${tournamentId}/mission-control#checklists`);
+                    return;
+                }
+            } catch (error) {
+                console.warn(`Could not resolve tournament checklist URL ${req.params.code}: ${error.message}`);
+            }
+            res.redirect(302, `/t/${req.params.code}/mission-control#checklists`);
         });
 
         server.get('*', (req, res) => {
