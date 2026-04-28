@@ -64,3 +64,25 @@ test.describe('Mobile footer', () => {
     await keyframe(page, testInfo, 'mobile_footer_long_content');
   });
 });
+
+test.describe('Footer page position', () => {
+  test('starts at the top of the page on desktop', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto('/');
+
+    const navigationBox = await page.locator('nav.navbar').boundingBox();
+    expect(navigationBox).not.toBeNull();
+    expect(navigationBox!.y).toBeLessThanOrEqual(1);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
+
+  test('starts at the top of the page on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+
+    const navigationBox = await page.locator('nav.navbar').boundingBox();
+    expect(navigationBox).not.toBeNull();
+    expect(navigationBox!.y).toBeLessThanOrEqual(1);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
+});
