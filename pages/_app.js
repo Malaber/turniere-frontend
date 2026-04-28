@@ -1,9 +1,9 @@
 import App from 'next/app';
 import React from 'react';
 import {Provider} from 'react-redux';
-import Notifications from 'react-notify-toast';
 import Head from 'next/head';
 
+import Notifications from '../js/components/Notifications';
 import withReduxStore from '../js/redux/reduxStoreBinder';
 import {verifyCredentials} from '../js/api.js';
 

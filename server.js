@@ -10,6 +10,13 @@ const apiUrl = process.env.TURNIERE_API_URL || 'https://api.turnie.re';
 const app = next({dev});
 const handle = app.getRequestHandler();
 
+function runtimeConfigScript() {
+    const runtimeConfig = JSON.stringify({
+        apiUrl
+    }).replace(/</g, '\\u003c');
+    return `window.__TURNIERE_RUNTIME_CONFIG__=${runtimeConfig};`;
+}
+
 function requestJson(url) {
     return new Promise((resolve, reject) => {
         const parsedUrl = new URL(url);
@@ -48,6 +55,12 @@ app.prepare()
     .then(() => {
         const server = express();
 
+        server.get('/turniere-runtime-config.js', (req, res) => {
+            res.setHeader('Cache-Control', 'no-store');
+            res.type('application/javascript');
+            res.send(runtimeConfigScript());
+        });
+
         server.get('/t/:code', async (req, res) => {
             try {
                 const tournamentId = await resolveTournamentId(req.params.code);
@@ -73,13 +86,13 @@ app.prepare()
             app.render(req, res, actualPage, queryParam);
         });
 
-        server.get('/t/:id(\\d+)/edit', (req, res) => {
-            res.redirect(`/t/${req.params.id}/mission-control`);
+        server.get(/^\/t\/(\d+)\/edit$/, (req, res) => {
+            res.redirect(`/t/${req.params[0]}/mission-control`);
         });
 
-        server.get('/t/:id(\\d+)/mission-control', (req, res) => {
+        server.get(/^\/t\/(\d+)\/mission-control$/, (req, res) => {
             const actualPage = '/tournament-mission-control';
-            const queryParam = {id: req.params.id};
+            const queryParam = {id: req.params[0]};
             app.render(req, res, actualPage, queryParam);
         });
 
@@ -95,7 +108,7 @@ app.prepare()
             app.render(req, res, actualPage, queryParam);
         });
 
-        server.get('*', (req, res) => {
+        server.use((req, res) => {
             return handle(req, res);
         });
 

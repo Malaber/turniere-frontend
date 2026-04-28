@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import React from 'react';
-import {notify} from 'react-notify-toast';
+import {notify} from '../js/components/Notifications';
 import {connect} from 'react-redux';
 import {
     Button,

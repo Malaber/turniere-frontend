@@ -4,7 +4,7 @@ import {
     TabContent, TabPane
 } from 'reactstrap';
 import {FaExternalLinkAlt, FaKeyboard, FaLock, FaSearch, FaTrash, FaUsers} from 'react-icons/fa';
-import {notify} from 'react-notify-toast';
+import {notify} from './Notifications';
 import {
     createBeamer,
     deleteBeamer,

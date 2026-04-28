@@ -1,5 +1,7 @@
 node_modules/**
 .next/**
+e2e/screenshots/**
+e2e/test-results/**
 .idea/**
 README.md
 .hound.yml

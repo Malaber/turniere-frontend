@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import shutil
 import signal
@@ -42,6 +43,12 @@ DOCKER_COMPOSE_FILE = ROOT / "docker-compose.e2e.yml"
 DECIDER_MATCH_SPEC = "tests/08-decider-matches.spec.ts"
 MANUAL_SCENARIOS_SCRIPT = E2E_DIR / "scripts" / "seed-manual-scenarios.mjs"
 SCREENSHOTS_DIR = E2E_DIR / "screenshots"
+
+
+def _default_compose_project_name() -> str:
+    raw_name = f"{ROOT.name}-{ROOT.parent.name}".lower()
+    normalized = re.sub(r"[^a-z0-9_-]+", "-", raw_name).strip("-")
+    return normalized[:63] or "turniere-frontend-e2e"
 
 
 def _zsh_script(command: str, cwd: Path, env: dict[str, str] | None = None, node_version: str | None = None) -> str:
@@ -146,7 +153,11 @@ def _run_subprocess(command: list[str], env: dict[str, str] | None = None, check
 
 
 def _compose(command: list[str], env: dict[str, str] | None = None, check: bool = True):
-    return _run_subprocess(_docker_compose_cmd() + ["-f", str(DOCKER_COMPOSE_FILE)] + command, env=env, check=check)
+    compose_env = {
+        "COMPOSE_PROJECT_NAME": os.environ.get("COMPOSE_PROJECT_NAME", _default_compose_project_name()),
+        **(env or {}),
+    }
+    return _run_subprocess(_docker_compose_cmd() + ["-f", str(DOCKER_COMPOSE_FILE)] + command, env=compose_env, check=check)
 
 
 @task
@@ -397,12 +408,13 @@ def seed_manual_scenarios(
 
 
 @task(name="e2e-docker")
-def e2e_docker(c, backend_version="latest", keep_running=False):
+def e2e_docker(c, backend_version="latest", keep_running=False, spec=""):
     """
     Run Playwright against the same Dockerized backend image family the pipeline uses.
 
     This boots Postgres + the GitLab backend production image + the local frontend
     container build, then runs the E2E container on the same internal network.
+    Pass --spec to run one Playwright spec file in the same Docker stack.
     """
     env = {"BACKEND_VERSION": backend_version}
     exit_error = None
@@ -417,7 +429,10 @@ def e2e_docker(c, backend_version="latest", keep_running=False):
             ["up", "-d", "--force-recreate", "postgres", "backend", "frontend"],
             env=env,
         )
-        _compose(["run", "--rm", "e2e"], env=env)
+        run_command = ["run", "--rm", "e2e"]
+        if spec:
+            run_command += ["npx", "playwright", "test", spec]
+        _compose(run_command, env=env)
     except subprocess.CalledProcessError as error:
         exit_error = error
         _compose(["logs", "--no-color", "backend", "frontend", "e2e"], env=env, check=False)

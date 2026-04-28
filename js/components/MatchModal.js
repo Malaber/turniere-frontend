@@ -4,7 +4,7 @@ import {EditableMatchTable} from './EditableMatchTable';
 import {MatchTable} from './MatchTable';
 import {TeamName} from './TeamName';
 import {submitDeciderMatchScores, submitMatchScores} from '../api';
-import {notify} from 'react-notify-toast';
+import {notify} from './Notifications';
 
 export class MatchModal extends Component {
     constructor(props) {

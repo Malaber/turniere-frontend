@@ -136,10 +136,17 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await keyframe(page, testInfo, 'decider_resolved');
 
+  const finishResponse = page.waitForResponse(response =>
+    response.request().method() === 'PATCH' && /\/stages\/\d+$/.test(response.url())
+  );
   await page.getByTestId('finish-group-stage').click();
-  await page.waitForLoadState('networkidle');
-  await page.reload();
-  await expect(page.locator('.stages')).toContainText(/Finale|Spiel um Platz 3/, { timeout: 30000 });
+  expect((await finishResponse).ok()).toBe(true);
+  await expect.poll(async () => {
+    await page.reload();
+    return page.locator('.stages').textContent();
+  }, {
+    timeout: 30000,
+  }).toMatch(/Finale|Spiel um Platz 3/);
   await keyframe(page, testInfo, 'playoffs_started_after_decider');
 });
 
@@ -168,27 +175,16 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
   await modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' }).click();
 
   await expect(deciderCard).toBeVisible({ timeout: 15000 });
-  await expect.poll(async () => {
-    await deciderCard.click({ force: true });
-    const dialog = page.getByRole('dialog');
-    const runningHeading = dialog.getByRole('heading', { name: 'Entscheidungsmatch läuft' });
-    if (await runningHeading.count() > 0) {
-      return 'running';
-    }
-
-    const startButton = dialog.getByRole('button', { name: 'Spiel starten' });
-    if (await startButton.count() > 0) {
-      await startButton.click();
-      return 'started';
-    }
-
-    return 'waiting';
-  }, {
-    timeout: 20_000,
-    message: 'wait for running decider modal after creating/starting decider'
-  }).toBe('running');
+  await deciderCard.click({ force: true });
+  modal = page.getByRole('dialog');
+  await expect(visibleModal(page)).toBeVisible();
+  await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch kann gestartet werden' })).toBeVisible();
+  await modal.getByRole('button', { name: 'Spiel starten' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15000 });
+  await expect(page.getByText('Entscheidungsmatch läuft')).toBeVisible({ timeout: 15000 });
 
   await expect(page.locator('[data-decider-match="true"]')).toBeVisible({ timeout: 15000 });
+  await deciderCard.click({ force: true });
   modal = page.getByRole('dialog');
   await expect(visibleModal(page)).toBeVisible({ timeout: 15000 });
   await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible();
@@ -197,6 +193,9 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
   await modal.getByRole('spinbutton').nth(1).fill('3');
   await expect(modal.getByText('Dieses Match zählt nur über verdeckte Tie-Breaker Punkte.')).toBeVisible();
   await modal.getByRole('button', { name: 'Tie-Breaker Punkte ändern' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15000 });
+  await expect(deciderCard).toContainText('5');
+  await expect(deciderCard).toContainText('3');
 
   await deciderCard.click({ force: true });
   modal = page.getByRole('dialog');
