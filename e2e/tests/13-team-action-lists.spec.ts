@@ -9,9 +9,9 @@ const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 const TEAM_ACTION_LIST_KEY = 'group_stage_survivor_playoff_tokens';
 const DEFAULT_TEAM_ACTION_LIST_PAYLOAD = {
-  name: 'Playoff token collection',
+  name: 'Playoff-Tokens einsammeln',
   key: TEAM_ACTION_LIST_KEY,
-  action_name: 'Collect playoff token',
+  action_name: 'Token abgegeben',
   source: 'group_stage_survivors'
 };
 
@@ -149,36 +149,42 @@ test('Team action list renders with metadata and item checkboxes', async ({ cont
   const client = await makeOwnerClient();
   const list = await ensureTeamActionList(client, tournament.id);
 
-  await page.goto(`/t/${tournament.id}`);
-  await expect(page.getByRole('button', { name: 'Checklisten' })).toBeVisible();
   await page.goto(`/t/${tournament.id}/checklists`);
+  await expect(page).toHaveURL(new RegExp(`/t/${tournament.id}/mission-control#checklists$`));
   await page.waitForLoadState('networkidle');
 
-  await expect(page.getByRole('heading', { name: 'Team Action Lists' })).toBeVisible();
+  const checklistsPane = page.getByTestId('mission-checklists-control');
+  await expect(checklistsPane).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Checklisten' })).toBeVisible();
   await expect(page.getByText(list.name)).toBeVisible();
   await expect(page.getByText(TEAM_ACTION_LIST_KEY)).toBeVisible();
   await expect(page.getByText(list.action_name)).toBeVisible();
-  await expect(page.locator('.form-check-input[type="checkbox"]')).toHaveCount(list.team_action_items.length);
+  await expect(checklistsPane.locator('.form-check-input[type="checkbox"]')).toHaveCount(list.team_action_items.length);
   await keyframe(page, testInfo, 'team_action_lists_render');
 });
 
-test('Owner can create a new team action list and other viewer receives it live', async ({ context, browser, page }, testInfo) => {
+test('Owner can create a new team action list and other viewer receives it live', async ({
+  context,
+  browser,
+  page
+}, testInfo) => {
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
 
-  await page.goto(`/t/${tournament.id}/checklists`);
+  await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
 
   await expect(page.getByTestId('create-team-action-list-form')).toBeVisible();
 
   const viewerContext = await browser.newContext();
+  await injectAuth(viewerContext, loadAuthState());
   const viewerPage = await viewerContext.newPage();
-  await viewerPage.goto(`/t/${tournament.id}/checklists`);
+  await viewerPage.goto(`/t/${tournament.id}/mission-control#checklists`);
   await viewerPage.waitForLoadState('networkidle');
 
   const listKey = randomKey('owner_created');
-  const listName = `Owner Created ${Date.now()}`;
-  const actionName = 'Collect item';
+  const listName = `Ausgabe ${Date.now()}`;
+  const actionName = 'Token abgegeben';
 
   await page.fill('#team-action-list-name', listName);
   await page.fill('#team-action-list-key', listKey);
@@ -205,22 +211,22 @@ test('Create list form enforces required inputs and duplicate keys', async ({ co
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
 
-  await page.goto(`/t/${tournament.id}/checklists`);
+  await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
 
   await page.getByTestId('create-team-action-list-button').click();
   await expect(page.getByText('Bitte Name, Schlüssel und Aktionsname ausfüllen.')).toBeVisible();
 
   const duplicateKey = randomKey('duplicate_key');
-  await page.fill('#team-action-list-name', 'List One');
+  await page.fill('#team-action-list-name', 'Liste Eins');
   await page.fill('#team-action-list-key', duplicateKey);
-  await page.fill('#team-action-list-action-name', 'Do one');
+  await page.fill('#team-action-list-action-name', 'Token abholen');
   await page.getByTestId('create-team-action-list-button').click();
-  await expect(page.getByText('List One')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Liste Eins')).toBeVisible({ timeout: 20_000 });
 
-  await page.fill('#team-action-list-name', 'List Two');
+  await page.fill('#team-action-list-name', 'Liste Zwei');
   await page.fill('#team-action-list-key', duplicateKey);
-  await page.fill('#team-action-list-action-name', 'Do two');
+  await page.fill('#team-action-list-action-name', 'Token abgeben');
   await page.getByTestId('create-team-action-list-button').click();
   await expect(page.getByText(/Schlüssel bereits vergeben|Eingaben ungültig/)).toBeVisible({ timeout: 20_000 });
 
@@ -234,7 +240,7 @@ test('Owner can toggle item complete/incomplete with idempotent state updates', 
   const list = await ensureTeamActionList(client, tournament.id);
   const item = firstTeamActionItemOrThrow(list);
 
-  await page.goto(`/t/${tournament.id}/checklists`);
+  await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
 
   const checkbox = checkboxByItem(page, item);
@@ -289,10 +295,11 @@ test('Websocket snapshot propagates owner update to another viewer', async ({ co
 
   const ownerPage = await context.newPage();
   const viewerContext = await browser.newContext();
+  await injectAuth(viewerContext, loadAuthState());
   const viewerPage = await viewerContext.newPage();
 
-  await ownerPage.goto(`/t/${tournament.id}/checklists`);
-  await viewerPage.goto(`/t/${tournament.id}/checklists`);
+  await ownerPage.goto(`/t/${tournament.id}/mission-control#checklists`);
+  await viewerPage.goto(`/t/${tournament.id}/mission-control#checklists`);
   await ownerPage.waitForLoadState('networkidle');
   await viewerPage.waitForLoadState('networkidle');
 
@@ -315,20 +322,20 @@ test('Websocket snapshot propagates owner update to another viewer', async ({ co
   await viewerContext.close();
 });
 
-test('Non-owner UI blocked and read-only mode returns 423 on update', async ({ context, page }, testInfo) => {
+test('Non-owner cannot see Mission Control and read-only mode returns 423 on update', async ({
+  context,
+  page
+}, testInfo) => {
   const ownerClient = await makeOwnerClient();
   const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
   const list = await ensureTeamActionList(ownerClient, tournament.id);
   const item = firstTeamActionItemOrThrow(list);
 
   await injectFakeNonOwner(context);
-  await page.goto(`/t/${tournament.id}/checklists`);
+  await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
 
-  const blockedCheckbox = checkboxByItem(page, item);
-  await expect(page.getByText('Nur Turnier-Owner kann Status ändern.')).toBeVisible();
-  await expect(blockedCheckbox).toBeDisabled();
-  await expect(page.getByTestId('create-team-action-list-form')).toHaveCount(0);
+  await expect(page.getByTestId('mission-control')).toHaveCount(0);
   await keyframe(page, testInfo, 'team_action_non_owner_blocked');
 
   const readOnlyToggle = await ownerClient.patch(`/tournaments/${tournament.id}`, { read_only_mode: true });
@@ -346,11 +353,12 @@ test('Owner in read-only tournament cannot use create list form', async ({ conte
   const readOnlyToggle = await ownerClient.patch(`/tournaments/${tournament.id}`, { read_only_mode: true });
   expectStatus(readOnlyToggle, 200, `set tournament ${tournament.id} read only for create form check`);
 
-  await page.goto(`/t/${tournament.id}/checklists`);
+  await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
 
+  await expect(page.getByTestId('mission-checklists-control')).toBeVisible();
   await expect(page.getByTestId('create-team-action-list-form')).toHaveCount(0);
-  await expect(page.getByText('Nur Turnier-Owner kann Status ändern.')).toBeVisible();
+  await expect(page.getByText('Follower-Modus aktiv. Checklisten sind gesperrt.')).toBeVisible();
 });
 
 test('Invalid update usage returns 401 and 404 statuses', async () => {
