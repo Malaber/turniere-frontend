@@ -48,6 +48,7 @@ function errorMessage(errorBody, fallback) {
 const DISPLAY_STATES = [
     {value: 'between_games', label: 'Zwischen den Spielen'},
     {value: 'during_game', label: 'Während dem Spiel'},
+    {value: 'timer_only', label: 'Nur Timer'},
     {value: 'group_tables', label: 'Gruppenstand'},
     {value: 'static_image', label: 'Statisches Bild'}
 ];
@@ -55,6 +56,7 @@ const DISPLAY_STATES = [
 const BEAMER_MODES = [
     {value: 'group_tables', label: 'Group Tables', displayState: 'group_tables'},
     {value: 'during_game', label: 'Matches with Timer', displayState: 'during_game'},
+    {value: 'timer_only', label: 'Timer Only', displayState: 'during_game', configDisplayMode: 'timer_only'},
     {value: 'between_games', label: 'Matches Only', displayState: 'between_games'},
     {value: 'static_image', label: 'Static Image', displayState: 'static_image'}
 ];
@@ -92,13 +94,21 @@ function displayStateLabel(value) {
 }
 
 function beamerModeFor(beamer) {
-    const mode = BEAMER_MODES.find(item => item.displayState === beamer.display_state);
+    if (beamer.config && beamer.config.display_mode === 'timer_only') {
+        return 'timer_only';
+    }
+
+    const mode = BEAMER_MODES.find(item => item.displayState === beamer.display_state && !item.configDisplayMode);
     return mode ? mode.value : 'during_game';
 }
 
 function beamerModeLabel(value) {
     const mode = BEAMER_MODES.find(item => item.value === value);
     return mode ? mode.label : value;
+}
+
+function beamerDisplayStateFor(beamer) {
+    return beamer.config && beamer.config.display_mode === 'timer_only' ? 'timer_only' : beamer.display_state;
 }
 
 function matchFilterValue(filters) {
@@ -517,22 +527,32 @@ class MissionBeamer extends React.Component {
         if (!mode) {
             return;
         }
+        const config = mode.value === 'timer_only' ?
+            {display_mode: 'timer_only'} :
+            Object.assign({}, beamer.config || {});
+        if (mode.value !== 'timer_only') {
+            delete config.display_mode;
+        }
         this.update(beamer, {
             display_state: mode.displayState,
-            config: Object.assign({}, beamer.config || {})
+            config
         });
     }
 
     updateMatchSelection(beamer, value) {
+        const config = Object.assign({}, beamer.config || {}, {match_filter: value});
+        delete config.display_mode;
         this.update(beamer, {
-            config: Object.assign({}, beamer.config || {}, {match_filter: value})
+            config
         });
     }
 
     updateImageSelection(beamer, value) {
+        const config = Object.assign({}, beamer.config || {}, {image_key: value});
+        delete config.display_mode;
         this.update(beamer, {
             display_state: 'static_image',
-            config: Object.assign({}, beamer.config || {}, {image_key: value})
+            config
         });
     }
 
@@ -574,7 +594,7 @@ class MissionBeamer extends React.Component {
                                     <div>
                                         <div className='mission-beamer-name'>{beamer.name}</div>
                                         <div className='mission-beamer-current'>
-                                            {beamerModeLabel(mode)} · {displayStateLabel(beamer.display_state)}
+                                            {beamerModeLabel(mode)} · {displayStateLabel(beamerDisplayStateFor(beamer))}
                                         </div>
                                     </div>
                                     <div className='mission-beamer-actions'>
