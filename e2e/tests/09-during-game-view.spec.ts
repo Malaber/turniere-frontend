@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
+import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
 import {
   LONG_TEAM_NAME_SINGLE_WORD,
   longGroupStageTeamName,
@@ -63,9 +64,9 @@ async function waitForMatchStateCount(
 
 async function setupBeamerAndMatches(
   matchCount: number,
-  opts: { timerSeconds?: number; beamerName?: string } = {},
+  opts: { timerSeconds?: number; beamerName?: string; displayState?: string } = {},
 ) {
-  const { timerSeconds, beamerName = 'e2e-during' } = opts;
+  const { timerSeconds, beamerName = 'e2e-during', displayState = 'during_game' } = opts;
 
   // Use more groups/teams to have enough matches available
   const { tournament } = await seedGroupStageTournament(8, 4, 8, longGroupStageTeamName);
@@ -82,9 +83,13 @@ async function setupBeamerAndMatches(
   }
 
   // Try creating a beamer; fall back to ?display= URL if backend lacks beamer support
+  const beamerPayload = displayState === 'timer_only'
+    ? { name: beamerName, display_state: 'during_game', config: { display_mode: 'timer_only' }, is_default: false }
+    : { name: beamerName, display_state: displayState, is_default: false };
+
   const beamerRes = await client.post(
     `/tournaments/${tournament.id}/beamers`,
-    { name: beamerName, display_state: 'during_game', is_default: false },
+    beamerPayload,
   );
   const hasBeamer = beamerRes.status === 201;
 
@@ -93,7 +98,7 @@ async function setupBeamerAndMatches(
 
   const fullscreenQuery = hasBeamer
     ? `beamer=${beamerName}`
-    : 'display=during_game';
+    : `display=${displayState}`;
 
   return { tournament, client, fullscreenQuery };
 }
@@ -213,6 +218,15 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   // Wait for match cards to confirm the page loaded
   const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
+  await expectFullscreenMatchCardFrame(
+    matchCards.first(),
+    page.getByTestId('fullscreen-match-badge').first(),
+    {
+      state: 'in_progress',
+      cardBackground: 'rgb(255, 243, 205)',
+      badgeBackground: 'rgb(181, 129, 0)',
+    },
+  );
   const longTeamName = page.getByTestId('fullscreen-team-name').filter({ hasText: LONG_TEAM_NAME_SINGLE_WORD }).first();
   await expect(longTeamName).toHaveAttribute('title', new RegExp(LONG_TEAM_NAME_SINGLE_WORD));
   await expect(longTeamName).toHaveCSS('overflow-x', 'hidden');
@@ -397,6 +411,28 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   const confetti = effectEvents.find((event) => event.type === 'confetti');
   expect(finishStop).toBeFalsy();
   expect(confetti).toBeTruthy();
+});
+
+test('Timer-only beamer renders urgent timer without matches and keeps sound active', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await installBeamerEffectSpies(page);
+
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(8, {
+    timerSeconds: 12,
+    beamerName: 'timer-only',
+    displayState: 'timer_only',
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+
+  await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('timer-only-timer')).toBeVisible();
+  await expect(page.locator('[class*="timerUrgent"]')).toBeVisible();
+  await expect(page.getByTestId('fullscreen-match-card')).toHaveCount(0);
+  await expect(page.getByText(/keine laufenden Matches/i)).toHaveCount(0);
+  await waitForBeamerEffect(page, 'sound', 'end-countdown');
+  await keyframe(page, testInfo, 'timer_only_countdown_sound');
 });
 
 // ---------------------------------------------------------------------------

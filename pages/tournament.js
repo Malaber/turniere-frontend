@@ -69,7 +69,11 @@ function StatusBar(props) {
             <EditButton tournamentId={props.tournament.id} isOwner={props.isOwner} isSignedIn={props.isSignedIn}/>
             <StatisticsButton tournamentId={props.tournament.id}/>
             <FullscreenButton tournamentId={props.tournament.id}/>
-            <ChecklistsButton tournamentId={props.tournament.id}/>
+            <ChecklistsButton
+                tournamentId={props.tournament.id}
+                isOwner={props.isOwner}
+                isSignedIn={props.isSignedIn}
+            />
         </ButtonGroup>
     </TournamentStatusBar>);
 }
@@ -87,7 +91,11 @@ function FullscreenButton(props) {
 }
 
 function ChecklistsButton(props) {
-    return (<LinkButton href={'/t/' + props.tournamentId + '/checklists'}>
+    if (!props.isOwner || !props.isSignedIn) {
+        return null;
+    }
+
+    return (<LinkButton href={'/t/' + props.tournamentId + '/mission-control#checklists'}>
         Checklisten
     </LinkButton>);
 }
@@ -156,6 +164,11 @@ class Main extends React.Component {
 
     redirectCodeToId(tournament) {
         if (!tournament || !tournament.id) {
+            return;
+        }
+        if (String(this.props.query.code) !== String(tournament.id) &&
+            String(this.props.query.code) !== String(tournament.code)) {
+            this.redirectCodeFromTournamentLists(true);
             return;
         }
         if (String(this.props.query.code) === String(tournament.id)) {

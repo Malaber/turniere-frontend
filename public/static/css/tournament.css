@@ -164,7 +164,46 @@
 }
 
 .mission-control-group-table {
-    max-width: 42rem;
+    table-layout: fixed;
+    width: auto;
+    max-width: 100%;
+}
+
+.mission-control-group-table th,
+.mission-control-group-table td {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.mission-control-group-table th {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mission-control-group-table td {
+    overflow: hidden;
+}
+
+.mission-control-group-rank-column {
+    width: 2.5rem;
+}
+
+.mission-control-group-team-column {
+    width: clamp(10rem, 38vw, 32rem);
+}
+
+.mission-control-group-stat-column {
+    width: 3.4rem;
+}
+
+@media (max-width: 640px) {
+    .mission-control-group-table {
+        width: 100%;
+    }
+
+    .mission-control-group-team-column {
+        width: auto;
+    }
 }
 
 .mission-control-match {
@@ -347,7 +386,7 @@
 }
 
 .mission-pane-scores .mission-control-group-table {
-    max-width: none;
+    max-width: 100%;
 }
 
 .mission-start-card {
@@ -397,8 +436,7 @@
     margin-bottom: 0.45rem;
 }
 
-.mission-start-row span,
-.mission-start-row label,
+.mission-start-row .mission-match-team-label,
 .mission-start-meta span,
 .mission-start-meta label,
 .mission-status-legend span {
@@ -407,7 +445,23 @@
     gap: 0.45rem;
 }
 
+.mission-start-row .mission-match-team-label {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.mission-start-row .mission-match-team-label svg {
+    flex: 0 0 auto;
+}
+
+.mission-start-row .mission-match-team-name {
+    display: block;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .mission-start-row input {
+    flex: 0 0 auto;
     width: 4.1rem;
     text-align: center;
 }
@@ -464,20 +518,62 @@ i.is-finished {
     margin-top: 0.85rem;
 }
 
-.mission-lock-button {
+.mission-lock-button,
+.mission-lock-status {
     align-items: center;
+    color: #25313f;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 5rem;
+    padding: 0;
+}
+
+.mission-lock-button {
     background: transparent;
     border: 0;
-    color: #25313f;
     cursor: pointer;
-    display: inline-flex;
-    gap: 0.45rem;
-    padding: 0;
+    text-align: left;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.mission-lock-status {
+    cursor: default;
 }
 
 .mission-lock-button:focus-visible {
     outline: 2px solid #006fff;
     outline-offset: 2px;
+}
+
+.mission-lock-label {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.45rem;
+    width: 100%;
+}
+
+.mission-lock-progress {
+    background: rgba(37, 49, 63, 0.16);
+    border-radius: 999px;
+    display: block;
+    height: 0.2rem;
+    opacity: 0;
+    overflow: hidden;
+    width: 100%;
+}
+
+.mission-lock-button.is-holding .mission-lock-progress,
+.mission-lock-button.is-unlocked .mission-lock-progress {
+    opacity: 1;
+}
+
+.mission-lock-progress-bar {
+    background: #0d6efd;
+    display: block;
+    height: 100%;
+    transition: width 40ms linear;
 }
 
 @media (max-width: 400px) {

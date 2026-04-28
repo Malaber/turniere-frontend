@@ -24,13 +24,25 @@
 
 .matchCardBadge {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
     flex-direction: column;
     border-radius: 0 4px 4px 0;
     min-width: 5.5rem;
     padding: 1rem;
-    font-size: 1.5rem;
     line-height: 1.2;
     white-space: normal;
+    gap: 0.35rem;
+}
+
+.matchCardBadgeGroup {
+    font-size: 1.1rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.matchCardBadgeNumber {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
 }

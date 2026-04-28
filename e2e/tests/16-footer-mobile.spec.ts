@@ -1,0 +1,66 @@
+import { test, expect } from '@playwright/test';
+import { keyframe } from '../helpers/screenshot';
+
+test.describe('Mobile footer', () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 3,
+    isMobile: true,
+  });
+
+  test('stacks copyright above links and uses the current year', async ({ page }, testInfo) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const footer = page.locator('footer');
+    const copyright = footer.getByTestId('footer-copyright');
+    const footerLinks = footer.locator('nav[aria-label="Footer"]');
+    await footer.scrollIntoViewIfNeeded();
+
+    await expect(footer).toBeVisible();
+    await expect(footer).toBeInViewport();
+    await expect(copyright).toHaveText(`© ${new Date().getFullYear()} turnie.re`);
+    await expect(footer.getByRole('link', { name: 'Version' })).toHaveAttribute('href', '/version');
+    await expect(footer.getByRole('link', { name: 'Datenschutz' })).toHaveAttribute('href', '/privacy');
+    await expect(footer.getByRole('link', { name: 'Impressum' })).toHaveAttribute('href', '/imprint');
+
+    const copyrightBox = await copyright.boundingBox();
+    const linksBox = await footerLinks.boundingBox();
+    expect(copyrightBox).not.toBeNull();
+    expect(linksBox).not.toBeNull();
+    expect(copyrightBox!.y + copyrightBox!.height).toBeLessThanOrEqual(linksBox!.y);
+    const linkTops = await footer.getByRole('link').evaluateAll(links =>
+      links.map(link => Math.round(link.getBoundingClientRect().top))
+    );
+    expect(Math.max(...linkTops) - Math.min(...linkTops)).toBeLessThanOrEqual(1);
+
+    const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(documentWidth).toBeLessThanOrEqual(390);
+
+    await keyframe(page, testInfo, 'mobile_footer_landing');
+  });
+
+  test('stays below long mobile content without horizontal overflow', async ({ page }, testInfo) => {
+    await page.goto('/faq');
+    await page.waitForLoadState('networkidle');
+
+    const footer = page.locator('footer');
+    const footerLinks = page.locator('footer nav[aria-label="Footer"]');
+    await footer.scrollIntoViewIfNeeded();
+    await expect(footer).toBeInViewport();
+    await expect(footerLinks).toBeVisible();
+
+    const footerBox = await footer.boundingBox();
+    const lastContentBox = await page
+      .getByText('Ja, die in der Gruppenphase dargestellte Tabelle stellt eine Blitztabelle dar.')
+      .boundingBox();
+    expect(footerBox).not.toBeNull();
+    expect(lastContentBox).not.toBeNull();
+    expect(footerBox!.y).toBeGreaterThan(lastContentBox!.y + lastContentBox!.height);
+
+    const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(documentWidth).toBeLessThanOrEqual(390);
+
+    await keyframe(page, testInfo, 'mobile_footer_long_content');
+  });
+});

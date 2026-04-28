@@ -41,6 +41,21 @@ function requestJson(url) {
 
 async function resolveTournamentId(code) {
     const tournament = await requestJson(`${apiUrl.replace(/\/$/, '')}/tournaments/${encodeURIComponent(code)}`);
+    if (!tournament || !tournament.id) {
+        return null;
+    }
+    if (String(tournament.id) === String(code) || String(tournament.code) === String(code)) {
+        return tournament.id;
+    }
+    return null;
+}
+
+async function resolvePublicTournamentIdByCode(code) {
+    const tournaments = await requestJson(`${apiUrl.replace(/\/$/, '')}/tournaments?type=public`);
+    if (!Array.isArray(tournaments)) {
+        return null;
+    }
+    const tournament = tournaments.find(item => String(item.code) === String(code));
     return tournament && tournament.id ? tournament.id : null;
 }
 
@@ -50,7 +65,8 @@ app.prepare()
 
         server.get('/t/:code', async (req, res) => {
             try {
-                const tournamentId = await resolveTournamentId(req.params.code);
+                const tournamentId = await resolvePublicTournamentIdByCode(req.params.code) ||
+                    await resolveTournamentId(req.params.code);
                 if (tournamentId && String(tournamentId) !== req.params.code) {
                     res.redirect(302, `/t/${tournamentId}`);
                     return;
@@ -89,10 +105,18 @@ app.prepare()
             app.render(req, res, actualPage, queryParam);
         });
 
-        server.get('/t/:code/checklists', (req, res) => {
-            const actualPage = '/tournament-checklists';
-            const queryParam = {code: req.params.code};
-            app.render(req, res, actualPage, queryParam);
+        server.get('/t/:code/checklists', async (req, res) => {
+            try {
+                const tournamentId = await resolvePublicTournamentIdByCode(req.params.code) ||
+                    await resolveTournamentId(req.params.code);
+                if (tournamentId) {
+                    res.redirect(302, `/t/${tournamentId}/mission-control#checklists`);
+                    return;
+                }
+            } catch (error) {
+                console.warn(`Could not resolve tournament checklist URL ${req.params.code}: ${error.message}`);
+            }
+            res.redirect(302, `/t/${req.params.code}/mission-control#checklists`);
         });
 
         server.get('*', (req, res) => {

@@ -3,7 +3,7 @@ import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
 import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
 import styles from './DuringGameView.module.css';
-import {TeamName} from '../TeamName';
+import {FullscreenMatchCard} from './FullscreenMatchCard';
 
 
 const MATCHES_PER_PAGE = 16;
@@ -37,7 +37,7 @@ function AnimatedDigit({value}) {
 }
 
 
-class AnimatedTimer extends React.Component {
+export class AnimatedTimer extends React.Component {
     constructor(props) {
         super(props);
         this.state = {display: getTimerDisplay(props.timerState, Date.now())};
@@ -120,7 +120,8 @@ class AnimatedTimer extends React.Component {
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
-        const isUrgent = display.mode === TIMER_MODE_COUNTDOWN && totalSeconds <= 10;
+        const isUrgent = display.mode === TIMER_MODE_COUNTDOWN &&
+            (totalSeconds <= 10 || this.props.forceUrgent);
 
         const chars = [];
         if (hours > 0) {
@@ -133,10 +134,11 @@ class AnimatedTimer extends React.Component {
             .forEach(c => chars.push(c));
 
         const cls = styles.timer +
-            (isUrgent ? ' ' + styles.timerUrgent : '');
+            (isUrgent ? ' ' + styles.timerUrgent : '') +
+            (this.props.className ? ' ' + this.props.className : '');
 
         return (
-            <div ref={this.timerRef} className={cls}>
+            <div ref={this.timerRef} className={cls} data-testid={this.props.testId}>
                 {chars.map((char, i) => {
                     if (char === ':') {
                         return (
@@ -156,62 +158,6 @@ class AnimatedTimer extends React.Component {
             </div>
         );
     }
-}
-
-
-function FullscreenMatchCard({match, index, animateEntry, isActive}) {
-    const team1 = match.team1;
-    const team2 = match.team2;
-    const score1 = match.decider ?
-        team1.hiddenScore : team1.score;
-    const score2 = match.decider ?
-        team2.hiddenScore : team2.score;
-
-    const finished = match.state === 'finished';
-    const t1Win = finished && match.winnerTeamId === team1.id;
-    const t2Win = finished && match.winnerTeamId === team2.id;
-    const t1Cls = t1Win ? styles.teamNameWinner : styles.teamName;
-    const t2Cls = t2Win ? styles.teamNameWinner : styles.teamName;
-
-    const delay = animateEntry ? (index * 0.06) + 's' : '0s';
-    const badge = match.group ?
-        match.group.number :
-        match.position;
-    const className = styles.matchCard +
-        (animateEntry ? ' ' + styles.matchCardEnter : '');
-
-    return (
-        <div
-            className={className}
-            style={{animationDelay: delay}}
-            data-testid={isActive ? 'fullscreen-match-card' : null}
-        >
-            <div className={styles.matchContent}>
-                <div className={styles.matchTeamRow}>
-                    <TeamName
-                        name={team1.name}
-                        className={t1Cls}
-                        testId={isActive ? 'fullscreen-team-name' : null}
-                    />
-                    <span className={styles.teamScore}>{score1}</span>
-                </div>
-                <div className={styles.matchTeamRow}>
-                    <TeamName
-                        name={team2.name}
-                        className={t2Cls}
-                        testId={isActive ? 'fullscreen-team-name' : null}
-                    />
-                    <span className={styles.teamScore}>{score2}</span>
-                </div>
-            </div>
-            <div
-                className={styles.matchBadge}
-                data-testid={isActive ? 'fullscreen-match-badge' : null}
-            >
-                {badge}
-            </div>
-        </div>
-    );
 }
 
 
@@ -353,6 +299,7 @@ export class DuringGameView extends React.Component {
                                                 index={i}
                                                 animateEntry={animateCards}
                                                 isActive={active}
+                                                showScores
                                             />
                                         )}
                                     </div>

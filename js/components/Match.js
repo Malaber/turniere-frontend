@@ -4,6 +4,7 @@ import {endMatch, startMatch} from '../api';
 import {notify} from 'react-notify-toast';
 import {MatchModal} from './MatchModal';
 import {MatchTable} from './MatchTable';
+import {MatchPositionBadge} from './MatchPositionBadge';
 import {TeamName} from './TeamName';
 
 import styles from './Match.module.css';
@@ -141,12 +142,6 @@ export class Match extends React.Component {
             break;
         }
 
-        const groupInformation = this.state.match.group ?
-            <div className="mb-2 mt-2">Gr. {this.state.match.group.number}</div> :
-            '';
-        const deciderInformation = this.state.match.decider ?
-            <div className="mb-2 mt-2" data-decider-label={this.state.match.id}>Entscheidung</div> :
-            '';
         let team1Id; let team2Id;
         if (this.props.stageLevel !== undefined) {
             team1Id = `${this.props.stageLevel}-${this.props.match.team1.id}`;
@@ -174,11 +169,12 @@ export class Match extends React.Component {
                             borderColor={borderClass}
                         />
                     </CardBody>
-                    <span className={'badge bg-secondary ' + styles.matchCardBadge}>
-                        {groupInformation}
-                        {deciderInformation}
-                        <div className="mb-2 mt-2">Sp. {this.state.match.position}</div>
-                    </span>
+                    <MatchPositionBadge
+                        match={this.state.match}
+                        className={'badge bg-secondary ' + styles.matchCardBadge}
+                        groupClassName={styles.matchCardBadgeGroup}
+                        positionClassName={styles.matchCardBadgeNumber}
+                    />
                 </div>
             </Card>
             <small className='text-muted'>{smallMessage}</small>

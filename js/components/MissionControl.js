@@ -48,6 +48,7 @@ function errorMessage(errorBody, fallback) {
 const DISPLAY_STATES = [
     {value: 'between_games', label: 'Zwischen den Spielen'},
     {value: 'during_game', label: 'Während dem Spiel'},
+    {value: 'timer_only', label: 'Nur Timer'},
     {value: 'group_tables', label: 'Gruppenstand'},
     {value: 'static_image', label: 'Statisches Bild'}
 ];
@@ -55,6 +56,7 @@ const DISPLAY_STATES = [
 const BEAMER_MODES = [
     {value: 'group_tables', label: 'Group Tables', displayState: 'group_tables'},
     {value: 'during_game', label: 'Matches with Timer', displayState: 'during_game'},
+    {value: 'timer_only', label: 'Timer Only', displayState: 'during_game', configDisplayMode: 'timer_only'},
     {value: 'between_games', label: 'Matches Only', displayState: 'between_games'},
     {value: 'static_image', label: 'Static Image', displayState: 'static_image'}
 ];
@@ -72,7 +74,7 @@ const STATIC_IMAGE_OPTIONS = [
     {value: 'turniere_logo', label: 'Turnie Logo'}
 ];
 
-const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'teams', 'settings'];
+const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'checklists', 'teams', 'settings'];
 const SEARCH_TAB_IDS = ['scores', 'teams'];
 
 function tabFromLocation() {
@@ -92,13 +94,21 @@ function displayStateLabel(value) {
 }
 
 function beamerModeFor(beamer) {
-    const mode = BEAMER_MODES.find(item => item.displayState === beamer.display_state);
+    if (beamer.config && beamer.config.display_mode === 'timer_only') {
+        return 'timer_only';
+    }
+
+    const mode = BEAMER_MODES.find(item => item.displayState === beamer.display_state && !item.configDisplayMode);
     return mode ? mode.value : 'during_game';
 }
 
 function beamerModeLabel(value) {
     const mode = BEAMER_MODES.find(item => item.value === value);
     return mode ? mode.label : value;
+}
+
+function beamerDisplayStateFor(beamer) {
+    return beamer.config && beamer.config.display_mode === 'timer_only' ? 'timer_only' : beamer.display_state;
 }
 
 function matchFilterValue(filters) {
@@ -167,6 +177,9 @@ function matchStateClass(state) {
     }
     return 'is-live';
 }
+
+const UNLOCK_HOLD_DURATION_MS = 600;
+const UNLOCK_RESET_MS = 6000;
 
 function nextPlayoffTable(match) {
     return Math.ceil(match.position / 2);
@@ -362,6 +375,15 @@ export class MissionControl extends React.Component {
                                 </NavLink>
                             </NavItem>
                             <NavItem>
+                                <NavLink href='#checklists' active={this.state.activeTab === 'checklists'}
+                                    onClick={event => {
+                                        event.preventDefault();
+                                        this.setActiveTab('checklists');
+                                    }}>
+                                    Checklisten
+                                </NavLink>
+                            </NavItem>
+                            <NavItem>
                                 <NavLink href='#settings' active={this.state.activeTab === 'settings'}
                                     onClick={event => {
                                         event.preventDefault();
@@ -428,6 +450,16 @@ export class MissionControl extends React.Component {
                                     search={this.state.search}
                                     disabled={!canControl}
                                     onTournamentChange={this.props.onTournamentChange}
+                                />
+                            </TabPane>
+
+                            <TabPane tabId='checklists'>
+                                <MissionChecklists
+                                    tournamentId={tournament.id}
+                                    teamActionLists={tournament.teamActionLists}
+                                    disabled={!canControl}
+                                    onSetTeamActionItemState={this.props.onSetTeamActionItemState}
+                                    onCreateTeamActionList={this.props.onCreateTeamActionList}
                                 />
                             </TabPane>
 
@@ -514,22 +546,32 @@ class MissionBeamer extends React.Component {
         if (!mode) {
             return;
         }
+        const config = mode.value === 'timer_only' ?
+            {display_mode: 'timer_only'} :
+            Object.assign({}, beamer.config || {});
+        if (mode.value !== 'timer_only') {
+            delete config.display_mode;
+        }
         this.update(beamer, {
             display_state: mode.displayState,
-            config: Object.assign({}, beamer.config || {})
+            config
         });
     }
 
     updateMatchSelection(beamer, value) {
+        const config = Object.assign({}, beamer.config || {}, {match_filter: value});
+        delete config.display_mode;
         this.update(beamer, {
-            config: Object.assign({}, beamer.config || {}, {match_filter: value})
+            config
         });
     }
 
     updateImageSelection(beamer, value) {
+        const config = Object.assign({}, beamer.config || {}, {image_key: value});
+        delete config.display_mode;
         this.update(beamer, {
             display_state: 'static_image',
-            config: Object.assign({}, beamer.config || {}, {image_key: value})
+            config
         });
     }
 
@@ -571,7 +613,7 @@ class MissionBeamer extends React.Component {
                                     <div>
                                         <div className='mission-beamer-name'>{beamer.name}</div>
                                         <div className='mission-beamer-current'>
-                                            {beamerModeLabel(mode)} · {displayStateLabel(beamer.display_state)}
+                                            {beamerModeLabel(mode)} · {displayStateLabel(beamerDisplayStateFor(beamer))}
                                         </div>
                                     </div>
                                     <div className='mission-beamer-actions'>
@@ -688,6 +730,265 @@ function MissionTournamentSettings(props) {
             />
         </section>
     );
+}
+
+class MissionChecklists extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+            pendingByItemKey: {},
+            errorMessage: ''
+        };
+        this.onChange = this.onChange.bind(this);
+    }
+
+    onChange(list, item, event) {
+        if (this.props.disabled || typeof this.props.onSetTeamActionItemState !== 'function') {
+            return;
+        }
+
+        const nextCompleted = event.target.checked === true;
+        const pendingKey = buildTeamActionItemPendingKey(list.key, item);
+
+        this.setState(prevState => ({
+            pendingByItemKey: Object.assign({}, prevState.pendingByItemKey, {[pendingKey]: true}),
+            errorMessage: ''
+        }));
+
+        this.props.onSetTeamActionItemState({
+            tournamentId: this.props.tournamentId,
+            listKey: list.key,
+            teamId: item.team ? item.team.id : null,
+            itemId: item.id,
+            completed: nextCompleted,
+            onSuccess: () => {
+                this.setState(prevState => ({
+                    pendingByItemKey: Object.assign({}, prevState.pendingByItemKey, {[pendingKey]: false})
+                }));
+            },
+            onError: status => {
+                this.setState(prevState => ({
+                    pendingByItemKey: Object.assign({}, prevState.pendingByItemKey, {[pendingKey]: false}),
+                    errorMessage: buildTeamActionListsErrorMessage(status)
+                }));
+            }
+        });
+    }
+
+    render() {
+        const teamActionLists = Array.isArray(this.props.teamActionLists) ? this.props.teamActionLists : [];
+        const canMutate = !this.props.disabled;
+
+        return (<section className='mission-control-section' data-testid='mission-checklists-control'>
+            <h3 className='h5'>Checklisten</h3>
+            <p className='text-muted mb-3'>
+                Team-Checklisten werden live synchronisiert, zum Beispiel für Token, Unterlagen oder Material.
+            </p>
+            {canMutate &&
+                <CreateTeamActionListForm
+                    tournamentId={this.props.tournamentId}
+                    onCreateTeamActionList={this.props.onCreateTeamActionList}
+                />}
+            {!canMutate &&
+                <Alert color='secondary' className='mb-3'>
+                    Follower-Modus aktiv. Checklisten sind gesperrt.
+                </Alert>}
+            {this.state.errorMessage &&
+                <Alert color='danger' className='mb-3'>
+                    {this.state.errorMessage}
+                </Alert>}
+            {teamActionLists.length === 0 &&
+                <Alert color='light' className='mb-0'>
+                    Keine Checklisten verfügbar.
+                </Alert>}
+            {teamActionLists.map(list => (
+                <div key={list.id} className='mission-control-panel mb-3' data-testid='team-action-list-card'>
+                    <div className='d-flex align-items-center gap-2 flex-wrap mb-2'>
+                        <h4 className='h6 mb-0'>{list.name}</h4>
+                        <Badge color='info' pill>{list.key}</Badge>
+                    </div>
+                    <div className='text-muted small mb-2'>{list.actionName}</div>
+                    {list.teamActionItems.map(item => {
+                        const pendingKey = buildTeamActionItemPendingKey(list.key, item);
+                        const disabled = !canMutate || this.state.pendingByItemKey[pendingKey] === true;
+                        return (
+                            <div key={item.id || pendingKey} className='form-check mb-2'>
+                                <input
+                                    id={'team-action-item-' + pendingKey}
+                                    className='form-check-input'
+                                    type='checkbox'
+                                    checked={item.completed === true}
+                                    disabled={disabled}
+                                    onChange={event => this.onChange(list, item, event)}
+                                />
+                                <label className='form-check-label' htmlFor={'team-action-item-' + pendingKey}>
+                                    {item.team ? <TeamName name={item.team.name} inline /> : 'Unbekanntes Team'}
+                                    {item.completedAt &&
+                                        <span className='text-muted ms-2'>
+                                            ({formatTeamActionCompletedAt(item.completedAt)})
+                                        </span>}
+                                </label>
+                            </div>
+                        );
+                    })}
+                </div>
+            ))}
+        </section>);
+    }
+}
+
+class CreateTeamActionListForm extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+            name: '',
+            key: '',
+            actionName: '',
+            source: 'group_stage_survivors',
+            creating: false,
+            errorMessage: ''
+        };
+        this.onCreate = this.onCreate.bind(this);
+    }
+
+    onCreate(event) {
+        event.preventDefault();
+        if (!this.state.name.trim() || !this.state.key.trim() || !this.state.actionName.trim()) {
+            this.setState({errorMessage: 'Bitte Name, Schlüssel und Aktionsname ausfüllen.'});
+            return;
+        }
+
+        this.setState({creating: true, errorMessage: ''});
+        this.props.onCreateTeamActionList({
+            tournamentId: this.props.tournamentId,
+            payload: {
+                name: this.state.name.trim(),
+                key: this.state.key.trim(),
+                action_name: this.state.actionName.trim(),
+                source: this.state.source
+            },
+            onSuccess: () => {
+                this.setState({
+                    name: '',
+                    key: '',
+                    actionName: '',
+                    creating: false,
+                    errorMessage: ''
+                });
+            },
+            onError: status => {
+                this.setState({
+                    creating: false,
+                    errorMessage: buildTeamActionListCreateErrorMessage(status)
+                });
+            }
+        });
+    }
+
+    render() {
+        return (<form className='mission-control-panel mb-3' onSubmit={this.onCreate}
+            data-testid='create-team-action-list-form'>
+            <h4 className='h6 mb-3'>Neue Checkliste anlegen</h4>
+            {this.state.errorMessage &&
+                <Alert color='danger' className='mb-3'>
+                    {this.state.errorMessage}
+                </Alert>}
+            <Row className='g-2'>
+                <Col xs='12' md='4'>
+                    <Label className='mb-1' for='team-action-list-name'>Name</Label>
+                    <Input id='team-action-list-name'
+                        value={this.state.name}
+                        onChange={event => this.setState({name: event.target.value})}
+                        placeholder='Playoff-Tokens einsammeln' />
+                </Col>
+                <Col xs='12' md='4'>
+                    <Label className='mb-1' for='team-action-list-key'>Schlüssel</Label>
+                    <Input id='team-action-list-key'
+                        value={this.state.key}
+                        onChange={event => this.setState({key: event.target.value})}
+                        placeholder='playoff_tokens_einsammeln' />
+                </Col>
+                <Col xs='12' md='4'>
+                    <Label className='mb-1' for='team-action-list-action-name'>Aktionsname</Label>
+                    <Input id='team-action-list-action-name'
+                        value={this.state.actionName}
+                        onChange={event => this.setState({actionName: event.target.value})}
+                        placeholder='Token abgegeben' />
+                </Col>
+                <Col xs='12' md='6'>
+                    <Label className='mb-1' for='team-action-list-source'>Quelle</Label>
+                    <Input id='team-action-list-source' type='select'
+                        value={this.state.source}
+                        onChange={event => this.setState({source: event.target.value})}>
+                        <option value='group_stage_survivors'>Teams aus der Gruppenphase (Playoff-Teilnehmer)</option>
+                    </Input>
+                </Col>
+                <Col xs='12' md='6' className='d-flex align-items-end'>
+                    <Button type='submit' color='primary' className='w-100'
+                        disabled={this.state.creating}
+                        data-testid='create-team-action-list-button'>
+                        {this.state.creating ? 'Erstellt...' : 'Checkliste anlegen'}
+                    </Button>
+                </Col>
+            </Row>
+        </form>);
+    }
+}
+
+function buildTeamActionItemPendingKey(listKey, item) {
+    const teamId = item.team ? item.team.id : 'unknown-team';
+    return listKey + '-' + teamId;
+}
+
+function formatTeamActionCompletedAt(value) {
+    if (!(value instanceof Date)) {
+        return '';
+    }
+    return value.toLocaleString('de-DE', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function buildTeamActionListsErrorMessage(status) {
+    if (status === 401) {
+        return 'Nicht eingeloggt.';
+    }
+    if (status === 403) {
+        return 'Nur Turnier-Owner darf Team-Action-Items ändern.';
+    }
+    if (status === 404) {
+        return 'Team-Action-Item nicht gefunden.';
+    }
+    if (status === 423) {
+        return 'Follower-Modus: Änderungen gesperrt.';
+    }
+    return 'Änderung fehlgeschlagen. Bitte erneut versuchen.';
+}
+
+function buildTeamActionListCreateErrorMessage(status) {
+    if (status === 401) {
+        return 'Nicht eingeloggt.';
+    }
+    if (status === 403) {
+        return 'Nur Turnier-Owner darf Checklisten anlegen.';
+    }
+    if (status === 404) {
+        return 'Erstellen nicht verfügbar.';
+    }
+    if (status === 409) {
+        return 'Schlüssel bereits vergeben.';
+    }
+    if (status === 422) {
+        return 'Eingaben ungültig oder Schlüssel bereits vergeben.';
+    }
+    if (status === 423) {
+        return 'Follower-Modus: Erstellen gesperrt.';
+    }
+    return 'Checkliste konnte nicht angelegt werden.';
 }
 
 class MissionTimer extends React.Component {
@@ -1039,14 +1340,21 @@ function MissionStageBlock(props) {
 
 function MissionGroupTable(props) {
     return (
-        <Table size='sm' bordered responsive className='mission-control-group-table'
-            style={{tableLayout: 'fixed', width: '100%'}}>
+        <Table size='sm' bordered className='mission-control-group-table' data-testid='mission-group-table'>
+            <colgroup>
+                <col className='mission-control-group-rank-column' />
+                <col className='mission-control-group-team-column' />
+                <col className='mission-control-group-stat-column' />
+                <col className='mission-control-group-stat-column' />
+                <col className='mission-control-group-stat-column' />
+            </colgroup>
             <thead>
                 <tr>
-                    <th style={{width: '3rem'}}>#</th>
+                    <th>#</th>
                     <th>Team</th>
-                    <th style={{width: '5rem'}}>Punkte</th>
-                    <th style={{width: '5rem'}}>Differenz</th>
+                    <th><span title='Punkte'>Pkt.</span></th>
+                    <th><span title='Becherdifferenz'>Dif.</span></th>
+                    <th><span title='Getroffene Becher (Geworfen)'>Gew.</span></th>
                 </tr>
             </thead>
             <tbody>
@@ -1056,6 +1364,7 @@ function MissionGroupTable(props) {
                         <td><TeamName name={score.team.name}/></td>
                         <td>{score.group_points}</td>
                         <td>{score.difference_in_points}</td>
+                        <td>{score.scored_points}</td>
                     </tr>
                 ))}
             </tbody>
@@ -1075,6 +1384,11 @@ class MissionMatchCard extends React.Component {
         this.onFormKeyDown = this.onFormKeyDown.bind(this);
         this.startUnlockHold = this.startUnlockHold.bind(this);
         this.cancelUnlockHold = this.cancelUnlockHold.bind(this);
+        this.updateUnlockHoldProgress = this.updateUnlockHoldProgress.bind(this);
+        this.cancelUnlockReset = this.cancelUnlockReset.bind(this);
+        this.updateUnlockResetProgress = this.updateUnlockResetProgress.bind(this);
+        this.onUnlockKeyDown = this.onUnlockKeyDown.bind(this);
+        this.onUnlockKeyUp = this.onUnlockKeyUp.bind(this);
         this.unlockTemporarily = this.unlockTemporarily.bind(this);
         this.onStartSuccess = this.onStartSuccess.bind(this);
         this.onStartError = this.onStartError.bind(this);
@@ -1089,21 +1403,23 @@ class MissionMatchCard extends React.Component {
             score2: scoreFor(props.match, 'team2'),
             live: props.match.state === 'in_progress',
             temporaryUnlocked: false,
+            unlockHolding: false,
+            unlockHoldProgress: 0,
             running: false
         };
     }
 
     componentWillUnmount() {
-        this.cancelUnlockHold();
-        if (this.unlockResetTimer) {
-            window.clearTimeout(this.unlockResetTimer);
-        }
+        this.cancelUnlockHold(false);
+        this.cancelUnlockReset(false);
     }
 
     componentDidUpdate(prevProps) {
         const scoreChanged = scoreFor(prevProps.match, 'team1') !== scoreFor(this.props.match, 'team1') ||
             scoreFor(prevProps.match, 'team2') !== scoreFor(this.props.match, 'team2');
         if (prevProps.match.id !== this.props.match.id || prevProps.match.state !== this.props.match.state) {
+            this.cancelUnlockHold(false);
+            this.cancelUnlockReset(false);
             this.setState(this.scoreStateFromProps(this.props));
         } else if (scoreChanged) {
             this.setState({
@@ -1169,33 +1485,121 @@ class MissionMatchCard extends React.Component {
         event.currentTarget.dispatchEvent(new Event('submit', {cancelable: true, bubbles: true}));
     }
 
+    canUnlockFinishedMatch() {
+        return !this.props.disabled && this.props.match.state === 'finished' && !this.state.temporaryUnlocked;
+    }
+
     startUnlockHold(event) {
-        if (this.props.disabled || this.props.match.state !== 'finished') {
+        if (!this.canUnlockFinishedMatch()) {
             return;
         }
 
         event.preventDefault();
         this.cancelUnlockHold();
-        this.unlockHoldTimer = window.setTimeout(this.unlockTemporarily, 600);
+        this.unlockHoldStartedAt = window.performance.now();
+        this.setState({unlockHolding: true, unlockHoldProgress: 0});
+        this.unlockHoldTimer = window.setTimeout(this.unlockTemporarily, UNLOCK_HOLD_DURATION_MS);
+        this.unlockHoldFrame = window.requestAnimationFrame(this.updateUnlockHoldProgress);
     }
 
-    cancelUnlockHold() {
+    cancelUnlockHold(resetState = true) {
         if (this.unlockHoldTimer) {
             window.clearTimeout(this.unlockHoldTimer);
             this.unlockHoldTimer = null;
         }
+        if (this.unlockHoldFrame) {
+            window.cancelAnimationFrame(this.unlockHoldFrame);
+            this.unlockHoldFrame = null;
+        }
+        this.unlockHoldStartedAt = null;
+        if (resetState !== false && this.state.temporaryUnlocked && this.state.unlockHolding) {
+            this.setState({unlockHolding: false});
+        } else if (resetState !== false && !this.state.temporaryUnlocked &&
+            (this.state.unlockHolding || this.state.unlockHoldProgress !== 0)) {
+            this.setState({unlockHolding: false, unlockHoldProgress: 0});
+        }
+    }
+
+    updateUnlockHoldProgress(timestamp) {
+        if (!this.unlockHoldTimer || !this.unlockHoldStartedAt) {
+            return;
+        }
+
+        const elapsed = timestamp - this.unlockHoldStartedAt;
+        const progress = Math.min(1, elapsed / UNLOCK_HOLD_DURATION_MS);
+        this.setState({unlockHoldProgress: progress});
+        if (progress < 1) {
+            this.unlockHoldFrame = window.requestAnimationFrame(this.updateUnlockHoldProgress);
+        }
+    }
+
+    cancelUnlockReset(resetState = true) {
+        if (this.unlockResetTimer) {
+            window.clearTimeout(this.unlockResetTimer);
+            this.unlockResetTimer = null;
+        }
+        if (this.unlockResetFrame) {
+            window.cancelAnimationFrame(this.unlockResetFrame);
+            this.unlockResetFrame = null;
+        }
+        this.unlockResetStartedAt = null;
+        if (resetState !== false && (this.state.temporaryUnlocked || this.state.unlockHoldProgress !== 0)) {
+            this.setState({temporaryUnlocked: false, unlockHoldProgress: 0});
+        }
+    }
+
+    updateUnlockResetProgress(timestamp) {
+        if (!this.unlockResetTimer || !this.unlockResetStartedAt) {
+            return;
+        }
+
+        const elapsed = timestamp - this.unlockResetStartedAt;
+        const progress = Math.max(0, 1 - (elapsed / UNLOCK_RESET_MS));
+        this.setState({unlockHoldProgress: progress});
+        if (progress > 0) {
+            this.unlockResetFrame = window.requestAnimationFrame(this.updateUnlockResetProgress);
+        }
+    }
+
+    onUnlockKeyDown(event) {
+        if (event.key !== ' ' && event.key !== 'Spacebar' && event.code !== 'Space') {
+            return;
+        }
+        if (event.repeat || this.unlockHoldTimer) {
+            event.preventDefault();
+            return;
+        }
+        this.startUnlockHold(event);
+    }
+
+    onUnlockKeyUp(event) {
+        if (event.key !== ' ' && event.key !== 'Spacebar' && event.code !== 'Space') {
+            return;
+        }
+        event.preventDefault();
+        this.cancelUnlockHold();
     }
 
     unlockTemporarily() {
         this.unlockHoldTimer = null;
-        this.setState({temporaryUnlocked: true});
-        if (this.unlockResetTimer) {
-            window.clearTimeout(this.unlockResetTimer);
+        if (this.unlockHoldFrame) {
+            window.cancelAnimationFrame(this.unlockHoldFrame);
+            this.unlockHoldFrame = null;
         }
+        this.unlockHoldStartedAt = null;
+        this.cancelUnlockReset(false);
+        this.unlockResetStartedAt = window.performance.now();
+        this.setState({temporaryUnlocked: true, unlockHolding: false, unlockHoldProgress: 1});
         this.unlockResetTimer = window.setTimeout(() => {
             this.unlockResetTimer = null;
-            this.setState({temporaryUnlocked: false});
-        }, 6000);
+            if (this.unlockResetFrame) {
+                window.cancelAnimationFrame(this.unlockResetFrame);
+                this.unlockResetFrame = null;
+            }
+            this.unlockResetStartedAt = null;
+            this.setState({temporaryUnlocked: false, unlockHoldProgress: 0});
+        }, UNLOCK_RESET_MS);
+        this.unlockResetFrame = window.requestAnimationFrame(this.updateUnlockResetProgress);
     }
 
     onStartSuccess() {
@@ -1212,7 +1616,8 @@ class MissionMatchCard extends React.Component {
     onScoresSuccess() {
         if (this.submittedLive || this.state.temporaryUnlocked) {
             notify.show('Score wurde gespeichert.', 'success', 2000);
-            this.setState({temporaryUnlocked: false, running: false});
+            this.cancelUnlockReset(false);
+            this.setState({temporaryUnlocked: false, unlockHoldProgress: 0, running: false});
             this.props.onTournamentChange();
             return;
         }
@@ -1235,6 +1640,10 @@ class MissionMatchCard extends React.Component {
         const match = this.props.match;
         const editable = (match.state === 'in_progress' || this.state.temporaryUnlocked) && !this.props.disabled;
         const canStart = match.state === 'not_started' && !this.props.disabled;
+        const showUnlockButton = match.state === 'finished' && !this.props.disabled;
+        const showStaticLock = match.state === 'not_started' || match.state === 'not_ready' ||
+            (match.state === 'finished' && this.props.disabled);
+        const unlockProgress = Math.round(this.state.unlockHoldProgress * 100);
         const stateClass = matchStateClass(match.state);
         const stateLabel = match.state === 'in_progress' ? 'Live' : matchStateLabel(match.state);
         return (
@@ -1246,18 +1655,20 @@ class MissionMatchCard extends React.Component {
                         <Badge color='warning'>Entscheidung</Badge>
                     </div>}
                 <div className='mission-start-row'>
-                    <Label className='mb-0'>
+                    <Label className='mission-match-team-label mb-0'>
                         <FaUsers aria-hidden='true' />
-                        <TeamName name={match.team1.name}/>
+                        <TeamName name={match.team1.name} className='mission-match-team-name'
+                            testId='mission-match-team-name'/>
                     </Label>
                     <Input type='number' name='score1' data-score-field='score1'
                         value={this.state.score1} onChange={this.setScore1}
                         disabled={!editable} aria-label={match.team1.name + ' score'} />
                 </div>
                 <div className='mission-start-row'>
-                    <Label className='mb-0'>
+                    <Label className='mission-match-team-label mb-0'>
                         <FaUsers aria-hidden='true' />
-                        <TeamName name={match.team2.name}/>
+                        <TeamName name={match.team2.name} className='mission-match-team-name'
+                            testId='mission-match-team-name'/>
                     </Label>
                     <Input type='number' name='score2' data-score-field='score2'
                         value={this.state.score2} onChange={this.setScore2}
@@ -1278,19 +1689,42 @@ class MissionMatchCard extends React.Component {
                             <i className={stateClass}></i>{stateLabel}
                         </Label>
                     </FormGroup>
-                    <button type='button'
-                        className='mission-lock-button'
-                        data-testid='mission-match-lock'
-                        onMouseDown={this.startUnlockHold}
-                        onMouseUp={this.cancelUnlockHold}
-                        onMouseLeave={this.cancelUnlockHold}
-                        onTouchStart={this.startUnlockHold}
-                        onTouchEnd={this.cancelUnlockHold}
-                        onTouchCancel={this.cancelUnlockHold}
-                        title='Gedrückt halten, um Ergebnis kurz zu entsperren'>
-                        <FaLock aria-hidden='true' />
-                        {this.state.temporaryUnlocked ? 'Kurz entsperrt' : 'Locked'}
-                    </button>
+                    {showStaticLock &&
+                        <span className='mission-lock-status' data-testid='mission-match-lock' aria-label='Locked'>
+                            <span className='mission-lock-label'>
+                                <FaLock aria-hidden='true' />
+                                Locked
+                            </span>
+                        </span>}
+                    {showUnlockButton &&
+                        <button type='button'
+                            className={'mission-lock-button' +
+                                (this.state.unlockHolding ? ' is-holding' : '') +
+                                (this.state.temporaryUnlocked ? ' is-unlocked' : '')}
+                            data-testid='mission-match-lock'
+                            onPointerDown={this.startUnlockHold}
+                            onPointerUp={this.cancelUnlockHold}
+                            onPointerLeave={this.cancelUnlockHold}
+                            onPointerCancel={this.cancelUnlockHold}
+                            onKeyDown={this.onUnlockKeyDown}
+                            onKeyUp={this.onUnlockKeyUp}
+                            onBlur={this.cancelUnlockHold}
+                            aria-pressed={this.state.temporaryUnlocked}
+                            title='Gedrückt halten, um Ergebnis kurz zu entsperren'>
+                            <span className='mission-lock-label'>
+                                <FaLock aria-hidden='true' />
+                                {this.state.temporaryUnlocked ? 'Kurz entsperrt' : 'Locked'}
+                            </span>
+                            <span
+                                className='mission-lock-progress'
+                                data-testid='mission-match-unlock-progress'
+                                role='progressbar'
+                                aria-valuemin='0'
+                                aria-valuemax='100'
+                                aria-valuenow={unlockProgress}>
+                                <span className='mission-lock-progress-bar' style={{width: `${unlockProgress}%`}} />
+                            </span>
+                        </button>}
                 </div>
                 {this.props.playoff &&
                     <div className='mission-next-table'>

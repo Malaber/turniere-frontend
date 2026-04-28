@@ -1,7 +1,12 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { injectAuth } from '../helpers/auth';
 import { keyframe } from '../helpers/screenshot';
-import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
+import {
+  LONG_TEAM_NAME_SINGLE_WORD,
+  longGroupStageTeamName,
+  seedAndPlayGroupStage,
+  seedGroupStageTournament,
+} from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
@@ -50,6 +55,65 @@ async function expectMatchStateCountAtLeast(
   }, { timeout: 20_000 }).toBeGreaterThanOrEqual(minimum);
 }
 
+async function expectUnlockProgressStarted(card: Locator) {
+  const progress = card.getByTestId('mission-match-unlock-progress');
+  await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow')), {
+    timeout: 2_000,
+  }).toBeGreaterThan(0);
+}
+
+async function holdMouseUntilUnlocked(page: Page, card: Locator) {
+  const lock = card.getByTestId('mission-match-lock');
+  await lock.hover();
+  await page.mouse.down();
+  await expectUnlockProgressStarted(card);
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+}
+
+async function holdTouchUntilUnlocked(page: Page, card: Locator) {
+  const lock = card.getByTestId('mission-match-lock');
+  await lock.dispatchEvent('pointerdown', {
+    pointerId: 41,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    buttons: 1,
+  });
+  await expectUnlockProgressStarted(card);
+  await page.waitForTimeout(700);
+  await lock.dispatchEvent('pointerup', {
+    pointerId: 41,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    buttons: 0,
+  });
+}
+
+async function holdSpaceUntilUnlocked(page: Page, card: Locator) {
+  const lock = card.getByTestId('mission-match-lock');
+  await lock.focus();
+  await expect(lock).toBeFocused();
+  await page.keyboard.down('Space');
+  await expectUnlockProgressStarted(card);
+  await page.waitForTimeout(700);
+  await page.keyboard.up('Space');
+}
+
+async function expectUnlockProgressDrainsAndLocks(card: Locator, score: Locator) {
+  const progress = card.getByTestId('mission-match-unlock-progress');
+  await expect(card.getByRole('button', { name: /Kurz entsperrt/ })).toBeVisible();
+  const initialValue = Number(await progress.getAttribute('aria-valuenow'));
+  expect(initialValue).toBeGreaterThan(0);
+  await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow')), {
+    timeout: 2_000,
+  }).toBeLessThan(initialValue);
+  await expect(score).toBeDisabled({ timeout: 8_000 });
+  await expect(progress).toHaveAttribute('aria-valuenow', '0');
+  await expect(card.getByRole('button', { name: /Locked/ })).toBeVisible();
+}
+
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
@@ -61,6 +125,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.getByRole('heading', { name: 'Timer' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Checklisten' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Turnier-Einstellungen' })).toBeVisible();
   await expect(page.getByTestId('mission-tournament-link')).toHaveAttribute('href', `/t/${tournament.id}`);
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
@@ -84,6 +149,27 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await scoresPane.getByTestId('mission-control-search').fill('gruppe 1');
   await expect(scoresPane.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).toBeVisible();
   await expect(scoresPane.getByRole('heading', { name: 'Gruppe 2 0 Matches' })).toHaveCount(0);
+  const notStartedCard = scoresPane.getByTestId('mission-match-card').filter({ hasText: 'Not Started' }).first();
+  const notStartedScore = notStartedCard.locator('input[type="number"]').first();
+  await expect(notStartedCard.getByTestId('mission-match-lock')).toBeVisible();
+  await expect(notStartedCard.getByRole('button', { name: /Locked/ })).toHaveCount(0);
+  await expect(notStartedScore).toBeDisabled();
+  await notStartedCard.getByTestId('mission-match-lock').dispatchEvent('pointerdown', {
+    pointerId: 42,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    buttons: 1,
+  });
+  await page.waitForTimeout(700);
+  await notStartedCard.getByTestId('mission-match-lock').dispatchEvent('pointerup', {
+    pointerId: 42,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    buttons: 0,
+  });
+  await expect(notStartedScore).toBeDisabled();
 
   await scoresPane.getByTestId('mission-control-search').fill('G1-S1');
   const activeCard = scoresPane
@@ -110,6 +196,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
 
   await expect(activeCard.getByLabel('Live')).toBeVisible({ timeout: 20_000 });
   await expect(activeCard.getByLabel('Live')).toBeChecked();
+  await expect(activeCard.getByTestId('mission-match-lock')).toHaveCount(0);
   await activeCard.getByLabel('Live').uncheck();
   await expect(activeCard.getByLabel('Live')).not.toBeChecked();
   await activeCard.getByTestId('mission-match-save').click();
@@ -120,10 +207,11 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await keyframe(page, testInfo, 'mission_control_finished_match');
 
   await expect(g1s1Score).toBeDisabled();
-  await activeCard.getByTestId('mission-match-lock').hover();
-  await page.mouse.down();
-  await page.waitForTimeout(700);
-  await page.mouse.up();
+  await expect(activeCard.getByTestId('mission-match-lock')).toHaveAttribute(
+    'title',
+    'Gedrückt halten, um Ergebnis kurz zu entsperren',
+  );
+  await holdMouseUntilUnlocked(page, activeCard);
   await expect(g1s1Score).toBeEnabled();
   await g1s1Score.fill('8');
   await g1s2Score.fill('5');
@@ -132,6 +220,21 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(g1s1Score).toHaveValue('8', { timeout: 20_000 });
   await expect(g1s2Score).toHaveValue('5', { timeout: 20_000 });
   await keyframe(page, testInfo, 'mission_control_unlocked_finished_score');
+
+  await expect(g1s1Score).toBeDisabled({ timeout: 20_000 });
+  await holdTouchUntilUnlocked(page, activeCard);
+  await expect(g1s1Score).toBeEnabled();
+  await g1s1Score.fill('9');
+  await g1s2Score.fill('6');
+  await g1s2Score.press(submitShortcut);
+  await expectMatchStateCount(client, tournament.id, 'finished', 1);
+  await expect(g1s1Score).toHaveValue('9', { timeout: 20_000 });
+  await expect(g1s2Score).toHaveValue('6', { timeout: 20_000 });
+
+  await expect(g1s1Score).toBeDisabled({ timeout: 20_000 });
+  await holdSpaceUntilUnlocked(page, activeCard);
+  await expect(g1s1Score).toBeEnabled();
+  await expectUnlockProgressDrainsAndLocks(activeCard, g1s1Score);
 
   await page.getByRole('link', { name: 'Teams' }).click();
   await expect(page).toHaveURL(/#teams$/);
@@ -155,6 +258,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
 
   await page.goto(`/t/${tournament.id}/mission-control#scores`);
   await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  await injectAuth(context);
   await page.goto(`/t/${tournament.id}/mission-control?tab=teams`);
   await expect(page.locator('.tab-pane.active').getByRole('heading', { name: 'Teams' })).toBeVisible({
     timeout: 20_000,
@@ -234,6 +338,20 @@ test('Mission Control saves independent beamer display controls instantly', asyn
     expectStatus(updated, 200, 'fetch beamers after image update');
     return updated.json.find((beamer) => beamer.id === main.json.id)?.config?.image_key;
   }, { timeout: 20_000 }).toBe('bpwstr_logo');
+
+  await page.getByTestId(`mission-beamer-mode-${main.json.id}`).selectOption('timer_only');
+  await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('timer_only');
+  await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toHaveCount(0);
+  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveCount(0);
+  await expect(page.getByText('Timer Only · Nur Timer')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(async () => {
+    const updated = await client.get<Array<{ id: number; display_state: string; config?: { display_mode?: string } }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(updated, 200, 'fetch beamers after timer-only update');
+    const beamer = updated.json.find((candidate) => candidate.id === main.json.id);
+    return `${beamer?.display_state}:${beamer?.config?.display_mode}`;
+  }, { timeout: 20_000 }).toBe('during_game:timer_only');
 });
 
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({
@@ -323,6 +441,98 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   await scoresPane.getByTestId('mission-control-search').fill('G2-S1');
   await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G2-S1' }).first()).toBeVisible();
   await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G1-S4' })).toHaveCount(0);
+});
+
+test('Mission Control score cards keep long generated team names inside card bounds', async ({
+  context,
+  page,
+}, testInfo) => {
+  await injectAuth(context);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { tournament } = await seedGroupStageTournament(2, 4, 4, longGroupStageTeamName);
+
+  await page.goto(`/t/${tournament.id}/mission-control#scores`);
+  await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  const scoresPane = page.locator('.tab-pane.active');
+  const card = scoresPane.getByTestId('mission-match-card').filter({
+    hasText: LONG_TEAM_NAME_SINGLE_WORD,
+  }).first();
+  await expect(card).toBeVisible();
+
+  const longName = card.getByTestId('mission-match-team-name').filter({
+    hasText: LONG_TEAM_NAME_SINGLE_WORD,
+  }).first();
+  await expect(longName).toHaveAttribute('title', new RegExp(LONG_TEAM_NAME_SINGLE_WORD));
+  await expect(longName).toHaveCSS('overflow-x', 'hidden');
+  expect(await longName.evaluate((el) => getComputedStyle(el).textOverflow)).toMatch(/ellipsis|"\.\.\."/);
+
+  const geometry = await card.evaluate((el) => {
+    const longTeamName = el.querySelector('[data-testid="mission-match-team-name"]');
+    return {
+      cardClientWidth: el.clientWidth,
+      cardScrollWidth: el.scrollWidth,
+      longNameClientWidth: longTeamName?.clientWidth ?? 0,
+      longNameScrollWidth: longTeamName?.scrollWidth ?? 0,
+    };
+  });
+
+  expect(geometry.cardScrollWidth).toBeLessThanOrEqual(geometry.cardClientWidth + 1);
+  expect(geometry.longNameScrollWidth).toBeGreaterThan(geometry.longNameClientWidth);
+  await keyframe(page, testInfo, 'mission_control_long_team_names_scores');
+});
+
+test('Mission Control group tables match compact tournament standings columns', async ({
+  context,
+  page,
+}, testInfo) => {
+  await injectAuth(context);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const { tournament } = await seedGroupStageTournament(1, 4, 2, longGroupStageTeamName);
+
+  await page.goto(`/t/${tournament.id}/mission-control#scores`);
+  await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  const scoresPane = page.locator('.tab-pane.active');
+  await expect(scoresPane.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).toBeVisible();
+  const table = scoresPane.getByRole('table').filter({
+    hasText: LONG_TEAM_NAME_SINGLE_WORD,
+  }).first();
+  await expect(table).toBeVisible();
+  await expect(table.locator('thead th')).toHaveText(['#', 'Team', 'Pkt.', 'Dif.', 'Gew.']);
+  await expect(table.locator('thead')).not.toContainText('Differenz');
+  await expect(table.locator('tbody tr').first().locator('td')).toHaveCount(5);
+  await expect(table.locator('tbody tr').first().locator('td').nth(4)).toHaveText('0');
+
+  const wideGeometry = await table.evaluate((el) => {
+    const stage = el.closest('.mission-match-stage');
+    return {
+      stageWidth: stage?.clientWidth ?? 0,
+      tableWidth: el.clientWidth,
+    };
+  });
+  expect(wideGeometry.tableWidth).toBeLessThan(wideGeometry.stageWidth - 100);
+
+  await page.setViewportSize({ width: 520, height: 900 });
+  const longName = table.getByTestId('team-name').filter({
+    hasText: LONG_TEAM_NAME_SINGLE_WORD,
+  }).first();
+  await expect(longName).toHaveCSS('overflow-x', 'hidden');
+  expect(await longName.evaluate((el) => getComputedStyle(el).textOverflow)).toMatch(/ellipsis|"\.\.\."/);
+
+  const narrowGeometry = await table.evaluate((el) => {
+    const stage = el.closest('.mission-match-stage');
+    const longTeamName = el.querySelector('[data-testid="team-name"]');
+    return {
+      stageWidth: stage?.clientWidth ?? 0,
+      tableWidth: el.clientWidth,
+      tableScrollWidth: el.scrollWidth,
+      longNameClientWidth: longTeamName?.clientWidth ?? 0,
+      longNameScrollWidth: longTeamName?.scrollWidth ?? 0,
+    };
+  });
+  expect(narrowGeometry.tableWidth).toBeLessThanOrEqual(narrowGeometry.stageWidth);
+  expect(narrowGeometry.tableScrollWidth).toBeLessThanOrEqual(narrowGeometry.tableWidth + 1);
+  expect(narrowGeometry.longNameScrollWidth).toBeGreaterThan(narrowGeometry.longNameClientWidth);
+  await keyframe(page, testInfo, 'mission_control_group_table_compact');
 });
 
 test('Mission Control hidden for anonymous viewers', async ({ page }, testInfo) => {
