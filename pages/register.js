@@ -2,7 +2,7 @@ import Head from 'next/head';
 import React from 'react';
 import PropTypes from 'prop-types';
 import {connect} from 'react-redux';
-import {notify} from 'react-notify-toast';
+import {notify} from '../js/components/Notifications';
 import Router from 'next/router';
 import {
     Button, Card, CardBody, Container, Form, FormGroup, FormText, Input, Label,

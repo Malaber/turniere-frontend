@@ -34,7 +34,7 @@ services:
       - -lc
       - |
         set -e
-        bundle exec rails db:prepare
+        bundle exec rails db:migrate
         bundle exec rails runner "user = User.find_or_initialize_by(email: ENV.fetch('TURNIERE_E2E_EMAIL', 'e2e@example.com')); user.username = ENV.fetch('TURNIERE_E2E_USERNAME', 'e2e-user'); user.password = ENV.fetch('TURNIERE_E2E_PASSWORD', 'password123'); user.password_confirmation = ENV.fetch('TURNIERE_E2E_PASSWORD', 'password123'); user.confirmed_at = Time.current; user.uid = user.email; user.provider = 'email'; user.save!"
         exec bundle exec rails s -p 3000 -b 0.0.0.0
     healthcheck:
@@ -49,7 +49,7 @@ services:
       context: .
       dockerfile: docker/production/Dockerfile
       args:
-        TURNIERE_FRONTEND_VERSION: e2e
+        base_commit: e2e
     depends_on:
       backend:
         condition: service_healthy
