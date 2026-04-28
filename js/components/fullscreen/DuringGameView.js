@@ -240,7 +240,7 @@ export class DuringGameView extends React.Component {
                     className={styles.matchGrid}
                     key={pageIndex}
                     style={{
-                        gridTemplateColumns: 'repeat(' + cols + ', 1fr)'
+                        '--match-grid-columns': cols
                     }}
                 >
                     {page.map((m, i) =>

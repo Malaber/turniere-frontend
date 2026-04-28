@@ -24,9 +24,9 @@
     display: flex;
     align-items: baseline;
     font-family: Halt, sans-serif;
-    font-size: clamp(9rem, 75cqh, 20rem);
+    font-size: clamp(4rem, min(25cqw, 75cqh), 20rem);
     color: #1a1a1a;
-    letter-spacing: 0.02em;
+    letter-spacing: 0;
     line-height: 1;
 }
 
@@ -87,9 +87,10 @@
 
 .timerFinished {
     font-family: Halt, sans-serif;
-    font-size: clamp(3rem, 7vw, 7rem);
+    font-size: clamp(3rem, min(18cqw, 70cqh), 7rem);
     color: #cc0000;
     animation: finishedPulse 2s ease-in-out infinite;
+    text-align: center;
 }
 
 @keyframes finishedPulse {
@@ -99,7 +100,7 @@
 
 .noTimer {
     font-family: Halt, sans-serif;
-    font-size: clamp(2rem, 4vw, 4rem);
+    font-size: clamp(2rem, min(10cqw, 45cqh), 4rem);
     color: rgba(0, 0, 0, 0.25);
 }
 
@@ -110,6 +111,7 @@
     align-items: center;
     justify-content: center;
     flex: 1;
+    container-type: size;
 }
 
 /* === Match Grid === */
@@ -122,6 +124,7 @@
 
 .matchGrid {
     display: grid;
+    grid-template-columns: repeat(var(--match-grid-columns, 4), minmax(0, 1fr));
     gap: 0.75rem;
     max-width: 100%;
     margin: 0 auto;
@@ -164,4 +167,40 @@
     height: 8px;
     border-radius: 50%;
     background: #1b7a2b;
+}
+
+@supports (height: 100dvh) {
+    .duringGameRoot {
+        height: 100dvh;
+    }
+}
+
+@media (max-aspect-ratio: 3 / 4) {
+    .timerContainer {
+        flex: 0 0 clamp(8rem, 24dvh, 16rem);
+        min-height: 0;
+    }
+
+    .timerTakeover {
+        min-height: 100dvh;
+    }
+
+    .noTimer {
+        font-size: clamp(1.8rem, min(11cqw, 38cqh), 3.5rem);
+        text-align: center;
+    }
+
+    .matchesArea {
+        padding: 0 0.75rem 0.75rem;
+    }
+
+    .matchGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .pageIndicator {
+        padding: 0.2rem 0 0.5rem;
+    }
 }

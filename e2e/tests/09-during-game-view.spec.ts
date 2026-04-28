@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, devices } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
 import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
 import {
@@ -412,6 +412,107 @@ test('Timer-only beamer renders urgent timer without matches and keeps sound act
   await expect(page.getByText(/keine laufenden Matches/i)).toHaveCount(0);
   await waitForBeamerEffect(page, 'sound', 'end-countdown');
   await keyframe(page, testInfo, 'timer_only_countdown_sound');
+});
+
+test.describe('Fullscreen mobile viewport', () => {
+  const mobileDevice = devices['iPhone 13'];
+
+  test.use({
+    viewport: mobileDevice.viewport,
+    userAgent: mobileDevice.userAgent,
+    deviceScaleFactor: mobileDevice.deviceScaleFactor,
+    isMobile: mobileDevice.isMobile,
+    hasTouch: mobileDevice.hasTouch,
+  });
+
+  test('Audio unlock responds to mobile tap', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    await installBeamerEffectSpies(page);
+    await page.addInitScript(() => {
+      (window as any).__blockBeamerAudioOnce = true;
+    });
+
+    const { tournament, fullscreenQuery } = await setupBeamerAndMatches(8, {
+      timerSeconds: 20 * 60 + 5,
+      beamerName: 'mobile-audio',
+    });
+
+    await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+
+    await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 15_000 });
+    await waitForBeamerEffect(page, 'audio-permission-blocked');
+
+    const unlockButton = page.getByTestId('beamer-sound-unlock');
+    await expect(unlockButton).toBeVisible();
+    await keyframe(page, testInfo, 'mobile_audio_blocked');
+
+    await unlockButton.tap();
+    await page.waitForFunction(
+      () => {
+        const events = (window as any).__beamerTimerEffects?.events || [];
+        return events.some(
+          (event) => event.type === 'audio-permission-allowed' && event.reason === 'manual-unlock',
+        );
+      },
+      undefined,
+      { timeout: 8_000 },
+    );
+    await expect(unlockButton).toHaveCount(0);
+    await keyframe(page, testInfo, 'mobile_audio_unlocked');
+  });
+
+  test('During-game match grid stays readable in portrait', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+
+    const { tournament, fullscreenQuery } = await setupBeamerAndMatches(16, {
+      beamerName: 'mobile-layout',
+    });
+
+    await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+
+    await expect(page.getByText('Kein Timer gesetzt')).toBeVisible({ timeout: 15_000 });
+    const matchCards = page.getByTestId('fullscreen-match-card');
+    await expect(matchCards).toHaveCount(16);
+    await keyframe(page, testInfo, 'mobile_portrait_matches');
+
+    const layout = await matchCards.evaluateAll((cards) =>
+      cards.map((card) => {
+        const rect = card.getBoundingClientRect();
+        return {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          right: rect.right,
+          bottom: rect.bottom,
+        };
+      }),
+    );
+    const viewport = page.viewportSize();
+    expect(viewport).not.toBeNull();
+
+    const columns = new Set(layout.map((box) => Math.round(box.x / 10) * 10));
+    expect(columns.size).toBeLessThanOrEqual(2);
+    expect(Math.min(...layout.map((box) => box.width))).toBeGreaterThan(150);
+    expect(Math.min(...layout.map((box) => box.height))).toBeGreaterThan(48);
+    expect(Math.max(...layout.map((box) => box.right))).toBeLessThanOrEqual(viewport!.width + 1);
+    expect(Math.max(...layout.map((box) => box.bottom))).toBeLessThanOrEqual(viewport!.height + 1);
+
+    const firstTeamName = page.getByTestId('fullscreen-team-name').first();
+    await expect(firstTeamName).toBeVisible();
+    const firstNameBox = await firstTeamName.boundingBox();
+    expect(firstNameBox).not.toBeNull();
+    expect(firstNameBox!.height).toBeGreaterThan(10);
+
+    const scrollSize = await page.evaluate(() => ({
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+    }));
+    expect(scrollSize.width).toBeLessThanOrEqual(scrollSize.innerWidth + 1);
+    expect(scrollSize.height).toBeLessThanOrEqual(scrollSize.innerHeight + 1);
+  });
 });
 
 // ---------------------------------------------------------------------------
