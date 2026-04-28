@@ -36,10 +36,17 @@ body {
 }
 
 footer {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    flex-shrink: 0;
+}
+
+#__next {
+    min-height: 100vh;
+}
+
+#__next > div {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 
 .border-fix {
@@ -48,7 +55,77 @@ footer {
 }
 
 .main {
-    padding-bottom: 5em;
+    flex: 1 0 auto;
+}
+
+.turniere-footer__content {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.65rem;
+    justify-content: center;
+    line-height: 1.5;
+    padding: 1rem;
+}
+
+.turniere-footer__links {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.65rem;
+    justify-content: center;
+}
+
+.scroll-to-top-button {
+    align-items: center;
+    border-radius: 50%;
+    bottom: 20px;
+    display: flex;
+    height: 50px;
+    justify-content: center;
+    position: fixed;
+    right: 20px;
+    transition: opacity 0.5s ease-in-out;
+    width: 50px;
+    z-index: 999;
+}
+
+.scroll-to-top-button svg {
+    font-size: 30px;
+}
+
+@media (max-width: 575.98px) {
+    .turniere-footer__content {
+        flex-direction: column;
+        gap: 0.7rem;
+        padding: 1.35rem 5rem 1.35rem 1.25rem;
+    }
+
+    .turniere-footer__content > .turniere-footer__separator {
+        display: none;
+    }
+
+    .turniere-footer__copyright,
+    .turniere-footer__links {
+        font-size: 1rem;
+    }
+
+    .turniere-footer__links {
+        gap: 0.35rem 0.45rem;
+    }
+
+    .scroll-to-top-button {
+        bottom: 22px;
+        height: 56px;
+        right: 16px;
+        width: 56px;
+    }
+}
+
+@media (max-width: 359.98px) {
+    .turniere-footer__content {
+        padding-right: 1.25rem;
+    }
 }
 
 .running-text h1, .running-text h2, .running-text h3, .running-text h4 {
