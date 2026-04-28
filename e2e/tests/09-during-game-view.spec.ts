@@ -472,7 +472,8 @@ test.describe('Fullscreen mobile viewport', () => {
 
     await expect(page.getByText('Kein Timer gesetzt')).toBeVisible({ timeout: 15_000 });
     const matchCards = page.getByTestId('fullscreen-match-card');
-    await expect(matchCards).toHaveCount(16);
+    await expect(matchCards).toHaveCount(8);
+    await expect(page.getByTestId('fullscreen-page-dot')).toHaveCount(2);
     await keyframe(page, testInfo, 'mobile_portrait_matches');
 
     const layout = await matchCards.evaluateAll((cards) =>

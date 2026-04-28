@@ -3,8 +3,12 @@
 .duringGameRoot {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: var(--fullscreen-height, 100vh);
+    inset: 0;
+    max-height: var(--fullscreen-height, 100vh);
     overflow: hidden;
+    position: fixed;
+    width: 100vw;
 }
 
 /* === Timer Container — fills remaining space above matches === */
@@ -169,20 +173,14 @@
     background: #1b7a2b;
 }
 
-@supports (height: 100dvh) {
-    .duringGameRoot {
-        height: 100dvh;
-    }
-}
-
 @media (max-aspect-ratio: 3 / 4) {
     .timerContainer {
-        flex: 0 0 clamp(8rem, 24dvh, 16rem);
+        flex: 0 0 clamp(8rem, calc(var(--fullscreen-height, 100vh) * 0.24), 16rem);
         min-height: 0;
     }
 
     .timerTakeover {
-        min-height: 100dvh;
+        min-height: var(--fullscreen-height, 100vh);
     }
 
     .noTimer {

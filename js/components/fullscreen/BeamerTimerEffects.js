@@ -76,6 +76,7 @@ export class BeamerTimerEffects extends React.Component {
         this.pendingCue = null;
         this.pendingAudio = null;
         this.playbackAttemptId = 0;
+        this.audioPermissionStatus = 'unknown';
         this.previousSecondsRemaining = null;
         this.timerSessionKey = null;
         this.finishedTriggered = false;
@@ -260,6 +261,9 @@ export class BeamerTimerEffects extends React.Component {
             return Promise.resolve();
         }
 
+        this.audioPermissionStatus = 'checking';
+        this.setState({audioPermissionStatus: 'checking'});
+
         const audio = new Audio(AUDIO_PERMISSION_PROBE_SRC);
         audio.preload = 'auto';
         audio.muted = false;
@@ -272,10 +276,11 @@ export class BeamerTimerEffects extends React.Component {
             if (!playResult || !playResult.catch) {
                 audio.pause();
                 audio.currentTime = 0;
+                this.audioPermissionStatus = 'allowed';
                 this.setState({
                     audioPermissionStatus: 'allowed',
                     soundBlocked: false
-                });
+                }, () => this.retryPendingCue(reason));
                 emitDebugEvent('audio-permission-allowed', {reason, sync: true});
                 return Promise.resolve();
             }
@@ -284,13 +289,15 @@ export class BeamerTimerEffects extends React.Component {
                 .then(() => {
                     audio.pause();
                     audio.currentTime = 0;
+                    this.audioPermissionStatus = 'allowed';
                     this.setState({
                         audioPermissionStatus: 'allowed',
                         soundBlocked: false
-                    });
+                    }, () => this.retryPendingCue(reason));
                     emitDebugEvent('audio-permission-allowed', {reason});
                 })
                 .catch(error => {
+                    this.audioPermissionStatus = 'blocked';
                     this.setState({
                         audioPermissionStatus: 'blocked',
                         soundBlocked: true
@@ -303,6 +310,7 @@ export class BeamerTimerEffects extends React.Component {
                     throw error;
                 });
         } catch (error) {
+            this.audioPermissionStatus = 'blocked';
             this.setState({
                 audioPermissionStatus: 'blocked',
                 soundBlocked: true
@@ -321,6 +329,7 @@ export class BeamerTimerEffects extends React.Component {
             if (attemptId !== this.playbackAttemptId) return;
             this.pendingCue = null;
             this.pendingAudio = null;
+            this.audioPermissionStatus = 'allowed';
             this.setState({
                 audioPermissionStatus: 'allowed',
                 soundBlocked: false
@@ -334,6 +343,7 @@ export class BeamerTimerEffects extends React.Component {
             if (attemptId !== this.playbackAttemptId) return;
             this.pendingCue = cue;
             this.pendingAudio = audio;
+            this.audioPermissionStatus = 'blocked';
             emitDebugEvent('sound-unavailable', {
                 reason: 'play-blocked',
                 message: error.message,
@@ -407,7 +417,20 @@ export class BeamerTimerEffects extends React.Component {
 
         audio.addEventListener('ended', removeAudio, {once: true});
 
-        const startPlayback = () => this.attemptAudioPlayback(audio, cue, 'normal', attemptId);
+        const startPlayback = () => {
+            if (this.audioPermissionStatus !== 'allowed') {
+                emitDebugEvent('sound-waiting-for-permission', {
+                    cue: cue.key,
+                    status: this.audioPermissionStatus,
+                    src: cue.src
+                });
+                if (this.audioPermissionStatus === 'blocked') {
+                    this.setState({soundBlocked: true});
+                }
+                return;
+            }
+            this.attemptAudioPlayback(audio, cue, 'normal', attemptId);
+        };
 
         const seekThenPlay = () => {
             let fallbackId = null;

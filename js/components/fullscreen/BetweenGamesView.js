@@ -74,7 +74,21 @@ export class BetweenGamesView extends React.Component {
                         {' '}lade Daten
                     </div>
                     <style global jsx>{`
-                        body { background: #ffffff; }
+                        html,
+                        body {
+                            background: #ffffff;
+                            height: 100%;
+                            margin: 0;
+                            min-height: 0 !important;
+                            overflow: hidden;
+                        }
+
+                        #__next,
+                        #__next > div {
+                            height: 100%;
+                            min-height: 0 !important;
+                            overflow: hidden;
+                        }
                     `}</style>
                 </div>
             );
@@ -127,8 +141,20 @@ export class BetweenGamesView extends React.Component {
                 />
 
                 <style global jsx>{`
+                    html,
                     body {
                         background: #ffffff;
+                        height: 100%;
+                        margin: 0;
+                        min-height: 0 !important;
+                        overflow: hidden;
+                    }
+
+                    #__next,
+                    #__next > div {
+                        height: 100%;
+                        min-height: 0 !important;
+                        overflow: hidden;
                     }
                 `}</style>
             </div>
