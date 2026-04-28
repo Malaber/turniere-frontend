@@ -241,6 +241,34 @@
     gap: 1rem;
 }
 
+.mission-hold-start-button {
+    align-items: center;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 13.5rem;
+    touch-action: manipulation;
+    user-select: none;
+}
+
+.mission-hold-start-button span:first-child {
+    line-height: 1.2;
+}
+
+.mission-hold-start-button .mission-lock-progress {
+    background: rgba(255, 255, 255, 0.45);
+    height: 0.25rem;
+    width: 100%;
+}
+
+.mission-hold-start-button.btn-outline-success .mission-lock-progress {
+    background: rgba(25, 135, 84, 0.18);
+}
+
+.mission-hold-start-button.is-holding .mission-lock-progress {
+    opacity: 1;
+}
+
 .mission-quick-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

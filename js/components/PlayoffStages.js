@@ -1,7 +1,7 @@
 import {Stage} from './Stage';
 import React, {Component} from 'react';
 import {getStage} from '../redux/tournamentApi';
-import {notify} from 'react-notify-toast';
+import {notify} from './Notifications';
 
 export class PlayoffStages extends Component {
     constructor(props) {

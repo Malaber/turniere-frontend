@@ -10,6 +10,13 @@ const apiUrl = process.env.TURNIERE_API_URL || 'https://api.turnie.re';
 const app = next({dev});
 const handle = app.getRequestHandler();
 
+function runtimeConfigScript() {
+    const runtimeConfig = JSON.stringify({
+        apiUrl
+    }).replace(/</g, '\\u003c');
+    return `window.__TURNIERE_RUNTIME_CONFIG__=${runtimeConfig};`;
+}
+
 function requestJson(url) {
     return new Promise((resolve, reject) => {
         const parsedUrl = new URL(url);
@@ -41,6 +48,21 @@ function requestJson(url) {
 
 async function resolveTournamentId(code) {
     const tournament = await requestJson(`${apiUrl.replace(/\/$/, '')}/tournaments/${encodeURIComponent(code)}`);
+    if (!tournament || !tournament.id) {
+        return null;
+    }
+    if (String(tournament.id) === String(code) || String(tournament.code) === String(code)) {
+        return tournament.id;
+    }
+    return null;
+}
+
+async function resolvePublicTournamentIdByCode(code) {
+    const tournaments = await requestJson(`${apiUrl.replace(/\/$/, '')}/tournaments?type=public`);
+    if (!Array.isArray(tournaments)) {
+        return null;
+    }
+    const tournament = tournaments.find(item => String(item.code) === String(code));
     return tournament && tournament.id ? tournament.id : null;
 }
 
@@ -48,9 +70,16 @@ app.prepare()
     .then(() => {
         const server = express();
 
+        server.get('/turniere-runtime-config.js', (req, res) => {
+            res.setHeader('Cache-Control', 'no-store');
+            res.type('application/javascript');
+            res.send(runtimeConfigScript());
+        });
+
         server.get('/t/:code', async (req, res) => {
             try {
-                const tournamentId = await resolveTournamentId(req.params.code);
+                const tournamentId = await resolvePublicTournamentIdByCode(req.params.code) ||
+                    await resolveTournamentId(req.params.code);
                 if (tournamentId && String(tournamentId) !== req.params.code) {
                     res.redirect(302, `/t/${tournamentId}`);
                     return;
@@ -73,13 +102,13 @@ app.prepare()
             app.render(req, res, actualPage, queryParam);
         });
 
-        server.get('/t/:id(\\d+)/edit', (req, res) => {
-            res.redirect(`/t/${req.params.id}/mission-control`);
+        server.get(/^\/t\/(\d+)\/edit$/, (req, res) => {
+            res.redirect(`/t/${req.params[0]}/mission-control`);
         });
 
-        server.get('/t/:id(\\d+)/mission-control', (req, res) => {
+        server.get(/^\/t\/(\d+)\/mission-control$/, (req, res) => {
             const actualPage = '/tournament-mission-control';
-            const queryParam = {id: req.params.id};
+            const queryParam = {id: req.params[0]};
             app.render(req, res, actualPage, queryParam);
         });
 
@@ -91,7 +120,8 @@ app.prepare()
 
         server.get('/t/:code/checklists', async (req, res) => {
             try {
-                const tournamentId = await resolveTournamentId(req.params.code);
+                const tournamentId = await resolvePublicTournamentIdByCode(req.params.code) ||
+                    await resolveTournamentId(req.params.code);
                 if (tournamentId) {
                     res.redirect(302, `/t/${tournamentId}/mission-control#checklists`);
                     return;
@@ -102,7 +132,7 @@ app.prepare()
             res.redirect(302, `/t/${req.params.code}/mission-control#checklists`);
         });
 
-        server.get('*', (req, res) => {
+        server.use((req, res) => {
             return handle(req, res);
         });
 

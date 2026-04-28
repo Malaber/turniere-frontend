@@ -76,7 +76,6 @@ export function transformTournamentStatsToStatistics(data) {
 }
 
 function statisticsUnavailable(data) {
-    return data === {} || data.most_dominant_score === null ||
-        data.least_dominant_score === null || data.group_scores === [];
+    return !data || Object.keys(data).length === 0 || data.most_dominant_score === null ||
+        data.least_dominant_score === null || !Array.isArray(data.group_scores) || data.group_scores.length === 0;
 }
-

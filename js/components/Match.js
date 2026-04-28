@@ -1,7 +1,7 @@
 import {Card, CardBody} from 'reactstrap';
 import React from 'react';
 import {endMatch, startMatch} from '../api';
-import {notify} from 'react-notify-toast';
+import {notify} from './Notifications';
 import {MatchModal} from './MatchModal';
 import {MatchTable} from './MatchTable';
 import {MatchPositionBadge} from './MatchPositionBadge';
