@@ -20,7 +20,13 @@ import {
     updateTeamName
 } from '../api';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
-import {TIMER_MODE_COUNTDOWN, TIMER_MODE_COUNTUP} from '../utils/timerState';
+import {
+    getTimerReasonLabel,
+    TIMER_MODE_COUNTDOWN,
+    TIMER_MODE_COUNTUP,
+    TIMER_REASON_CUSTOM,
+    TIMER_REASON_OPTIONS
+} from '../utils/timerState';
 import {TournamentSettingsForm} from './TournamentSettingsForm';
 import {TeamName} from './TeamName';
 import {Timer} from './Timer';
@@ -489,6 +495,7 @@ class MissionBeamer extends React.Component {
         this.updateMode = this.updateMode.bind(this);
         this.updateMatchSelection = this.updateMatchSelection.bind(this);
         this.updateImageSelection = this.updateImageSelection.bind(this);
+        this.updateTimerOnlyReason = this.updateTimerOnlyReason.bind(this);
         this.onError = this.onError.bind(this);
     }
 
@@ -546,11 +553,16 @@ class MissionBeamer extends React.Component {
         if (!mode) {
             return;
         }
+        const currentConfig = beamer.config || {};
         const config = mode.value === 'timer_only' ?
-            {display_mode: 'timer_only'} :
-            Object.assign({}, beamer.config || {});
+            {
+                display_mode: 'timer_only',
+                show_timer_reason: currentConfig.show_timer_reason !== false
+            } :
+            Object.assign({}, currentConfig);
         if (mode.value !== 'timer_only') {
             delete config.display_mode;
+            delete config.show_timer_reason;
         }
         this.update(beamer, {
             display_state: mode.displayState,
@@ -561,6 +573,7 @@ class MissionBeamer extends React.Component {
     updateMatchSelection(beamer, value) {
         const config = Object.assign({}, beamer.config || {}, {match_filter: value});
         delete config.display_mode;
+        delete config.show_timer_reason;
         this.update(beamer, {
             config
         });
@@ -569,8 +582,20 @@ class MissionBeamer extends React.Component {
     updateImageSelection(beamer, value) {
         const config = Object.assign({}, beamer.config || {}, {image_key: value});
         delete config.display_mode;
+        delete config.show_timer_reason;
         this.update(beamer, {
             display_state: 'static_image',
+            config
+        });
+    }
+
+    updateTimerOnlyReason(beamer, checked) {
+        const config = Object.assign({}, beamer.config || {}, {
+            display_mode: 'timer_only',
+            show_timer_reason: checked
+        });
+        this.update(beamer, {
+            display_state: 'during_game',
             config
         });
     }
@@ -605,6 +630,7 @@ class MissionBeamer extends React.Component {
                         const disabled = saving || this.props.disabled;
                         const matchSelection = config.match_filter || '';
                         const imageSelection = config.image_key || STATIC_IMAGE_OPTIONS[0].value;
+                        const showTimerReason = config.show_timer_reason !== false;
 
                         return (
                             <div className='mission-beamer-card' key={beamer.id}
@@ -688,6 +714,24 @@ class MissionBeamer extends React.Component {
                                                     </option>
                                                 ))}
                                             </Input>
+                                        </FormGroup>}
+
+                                    {mode === 'timer_only' &&
+                                        <FormGroup check>
+                                            <Input
+                                                id={'missionBeamerTimerReason' + beamer.id}
+                                                type='checkbox'
+                                                checked={showTimerReason}
+                                                disabled={disabled}
+                                                data-testid={'mission-beamer-timer-reason-' + beamer.id}
+                                                onChange={event => this.updateTimerOnlyReason(
+                                                    beamer,
+                                                    event.target.checked
+                                                )}
+                                            />
+                                            <Label check for={'missionBeamerTimerReason' + beamer.id}>
+                                                Timer-Grund anzeigen
+                                            </Label>
                                         </FormGroup>}
                                 </div>
                             </div>
@@ -994,10 +1038,19 @@ function buildTeamActionListCreateErrorMessage(status) {
 class MissionTimer extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {minutes: 20, seconds: '00', timestamp: '', running: false};
+        this.state = {
+            minutes: 20,
+            seconds: '00',
+            timestamp: '',
+            timerReason: '',
+            timerReasonText: '',
+            running: false
+        };
         this.setMinutes = this.setMinutes.bind(this);
         this.setSeconds = this.setSeconds.bind(this);
         this.setTimestamp = this.setTimestamp.bind(this);
+        this.setTimerReason = this.setTimerReason.bind(this);
+        this.setTimerReasonText = this.setTimerReasonText.bind(this);
         this.setCountdownMinutes = this.setCountdownMinutes.bind(this);
         this.setCountdownTimestamp = this.setCountdownTimestamp.bind(this);
         this.startCountup = this.startCountup.bind(this);
@@ -1018,8 +1071,40 @@ class MissionTimer extends React.Component {
         this.setState({timestamp: event.target.value});
     }
 
+    setTimerReason(event) {
+        this.setState({timerReason: event.target.value});
+    }
+
+    setTimerReasonText(event) {
+        this.setState({timerReasonText: event.target.value});
+    }
+
+    reasonTextMissing() {
+        return this.state.timerReason === TIMER_REASON_CUSTOM &&
+            !this.state.timerReasonText.trim();
+    }
+
+    canStartTimer() {
+        return !this.props.disabled && !this.state.running && !this.reasonTextMissing();
+    }
+
+    timerReasonPayload() {
+        if (!this.state.timerReason) {
+            return {};
+        }
+
+        if (this.state.timerReason === TIMER_REASON_CUSTOM) {
+            return {
+                timer_reason: TIMER_REASON_CUSTOM,
+                timer_reason_text: this.state.timerReasonText.trim()
+            };
+        }
+
+        return {timer_reason: this.state.timerReason};
+    }
+
     setCountdownMinutes() {
-        if (this.props.disabled || this.state.running) {
+        if (!this.canStartTimer()) {
             return;
         }
         const minutes = parseInt(this.state.minutes || 0, 10);
@@ -1029,30 +1114,39 @@ class MissionTimer extends React.Component {
     }
 
     setQuickCountdown(seconds) {
-        if (this.props.disabled || this.state.running) {
+        if (!this.canStartTimer()) {
             return;
         }
         this.patchTimer({timestamp_seconds: seconds, timer_mode: TIMER_MODE_COUNTDOWN});
     }
 
     setCountdownTimestamp() {
-        if (this.props.disabled || this.state.running || !this.state.timestamp) {
+        if (!this.canStartTimer() || !this.state.timestamp) {
             return;
         }
         this.patchTimer({timestamp: this.state.timestamp, timer_mode: TIMER_MODE_COUNTDOWN});
     }
 
     startCountup() {
+        if (!this.canStartTimer()) {
+            return;
+        }
         this.patchTimer({timer_mode: TIMER_MODE_COUNTUP});
     }
 
     clearTimer() {
+        if (this.props.disabled || this.state.running) {
+            return;
+        }
         this.patchTimer({clear_timer: true});
     }
 
     patchTimer(payload) {
         this.setState({running: true});
-        setTournamentTimer(this.props.tournamentId, payload, this.onSuccess, this.onError);
+        const requestPayload = payload.clear_timer ?
+            payload :
+            Object.assign({}, payload, this.timerReasonPayload());
+        setTournamentTimer(this.props.tournamentId, requestPayload, this.onSuccess, this.onError);
     }
 
     onSuccess() {
@@ -1070,16 +1164,54 @@ class MissionTimer extends React.Component {
         const currentTimer = this.props.timerState && this.props.timerState.mode ?
             this.props.timerState.mode + ' ' + this.props.timerState.timestampIso :
             'kein Timer';
+        const currentTimerReason = this.props.timerState && this.props.timerState.mode ?
+            getTimerReasonLabel(this.props.timerState) :
+            null;
+        const reasonTextMissing = this.reasonTextMissing();
+        const canStart = this.canStartTimer();
         return (
             <section className='mission-control-section mission-pane-timer' data-testid='mission-timer-control'>
                 <div className='mission-current-timer mb-3'>
                     <div>
                         <h3 className='h5 mission-pane-heading mb-1'>Countdown starten</h3>
                         <span className='text-muted small'>{currentTimer}</span>
+                        {currentTimerReason &&
+                            <div className='text-muted small' data-testid='mission-current-timer-reason'>
+                                {currentTimerReason}
+                            </div>}
                     </div>
                     <div className='mission-current-timer-display' data-testid='mission-current-timer-display'>
                         <Timer timerState={this.props.timerState} />
                     </div>
+                </div>
+                <div className='mission-control-panel mb-3' data-testid='mission-timer-reason-control'>
+                    <h4>Timer-Grund</h4>
+                    <p>Optional. Ohne Auswahl bleibt der Standard Spielende.</p>
+                    <Row className='g-2'>
+                        <Col md='4'>
+                            <Label for='missionTimerReason'>Grund</Label>
+                            <Input id='missionTimerReason' type='select'
+                                value={this.state.timerReason}
+                                data-testid='mission-timer-reason-select'
+                                disabled={this.props.disabled || this.state.running}
+                                onChange={this.setTimerReason}>
+                                <option value=''>Standard</option>
+                                {TIMER_REASON_OPTIONS.map(option => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </Input>
+                        </Col>
+                        {this.state.timerReason === TIMER_REASON_CUSTOM &&
+                            <Col md='8'>
+                                <Label for='missionTimerReasonText'>Eigener Text</Label>
+                                <Input id='missionTimerReasonText' type='text'
+                                    value={this.state.timerReasonText}
+                                    invalid={reasonTextMissing}
+                                    data-testid='mission-timer-reason-text'
+                                    disabled={this.props.disabled || this.state.running}
+                                    onChange={this.setTimerReasonText}/>
+                            </Col>}
+                    </Row>
                 </div>
                 <Row className='g-3'>
                     <Col lg='4'>
@@ -1088,14 +1220,14 @@ class MissionTimer extends React.Component {
                             <p>Starte einen Countdown mit vordefinierter Dauer.</p>
                             <div className='mission-quick-grid'>
                                 <button type='button' className='mission-quick-button'
-                                    disabled={this.props.disabled || this.state.running}
+                                    disabled={!canStart}
                                     data-testid='mission-timer-quick-20s'
                                     onClick={() => this.setQuickCountdown(20)}>
                                     <strong>00:20</strong>
                                     <span>20 Sekunden</span>
                                 </button>
                                 <button type='button' className='mission-quick-button'
-                                    disabled={this.props.disabled || this.state.running}
+                                    disabled={!canStart}
                                     data-testid='mission-timer-quick-2015'
                                     onClick={() => this.setQuickCountdown((20 * 60) + 15)}>
                                     <strong>20:15</strong>
@@ -1126,7 +1258,7 @@ class MissionTimer extends React.Component {
                             <Button color='primary' className='w-100 mt-3'
                                 type='submit'
                                 data-testid='mission-timer-countdown-minutes'
-                                disabled={this.props.disabled || this.state.running}>
+                                disabled={!canStart}>
                                 Countdown starten
                             </Button>
                         </form>
@@ -1143,7 +1275,7 @@ class MissionTimer extends React.Component {
                             <Button color='primary' className='w-100 mt-3'
                                 type='submit'
                                 data-testid='mission-timer-countdown-timestamp'
-                                disabled={this.props.disabled || this.state.running || !this.state.timestamp}>
+                                disabled={!canStart || !this.state.timestamp}>
                                 Countdown bis Zeitpunkt starten
                             </Button>
                         </form>
@@ -1154,7 +1286,7 @@ class MissionTimer extends React.Component {
                     <h3 className='h5 mission-pane-heading'>Countup starten</h3>
                     <p>Starte einen aufwärtszählenden Timer.</p>
                     <Button color='info' className='mission-countup-button'
-                        disabled={this.props.disabled || this.state.running}
+                        disabled={!canStart}
                         data-testid='mission-timer-countup'
                         onClick={this.startCountup}>
                         Countup starten

@@ -252,7 +252,7 @@ test('Matches-only beamer displays backend-returned matches without client state
   await keyframe(page, testInfo, 'matches_only_finished_match');
 });
 
-test('Fullscreen timer updates live for countup mode', async ({ page }) => {
+test('Fullscreen timer updates live for countup mode', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
@@ -267,12 +267,19 @@ test('Fullscreen timer updates live for countup mode', async ({ page }) => {
   const anchor = new Date(Date.now() - 3 * 60 * 1000 - 15 * 1000).toISOString();
   const timerRes = await client.patch(
     `/tournaments/${tournament.id}/timer`,
-    { timestamp: anchor, timer_mode: 'countup' },
+    {
+      timestamp: anchor,
+      timer_mode: 'countup',
+      timer_reason: 'custom',
+      timer_reason_text: 'Overtime',
+    },
   );
   expectStatus(timerRes, 200, 'start countup timer');
 
-  await expect(page.getByText(/Spielzeit:/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
+  await expect(page.getByText(/Overtime:/i)).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('.timer-container')).toContainText(/3:[1-5][0-9]|4:0[0-9]/, {
     timeout: 10_000,
   });
+  await keyframe(page, testInfo, 'fullscreen_timer_reason_countup');
 });

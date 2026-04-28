@@ -100,6 +100,10 @@ function displayStateForBeamer(beamer) {
         beamer.display_state;
 }
 
+function showTimerReasonForBeamerConfig(config) {
+    return !config || config.show_timer_reason !== false;
+}
+
 
 class Main extends React.Component {
     static async getInitialProps({query}) {
@@ -441,7 +445,10 @@ class Main extends React.Component {
                 matches={matches}
                 timerState={timerState}/>;
         case 'timer_only':
-            return <TimerOnlyView timerState={timerState}/>;
+            return <TimerOnlyView
+                timerState={timerState}
+                showReason={showTimerReasonForBeamerConfig(this.state.beamerConfig)}
+            />;
         case 'between_games':
             return <BetweenGamesView
                 tournamentMeta={tournamentMeta}

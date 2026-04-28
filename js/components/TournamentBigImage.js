@@ -1,6 +1,7 @@
 import {Container, ListGroup, ListGroupItem} from 'reactstrap';
 import React from 'react';
 import {Timer} from './Timer';
+import {getTimerReasonLabel} from '../utils/timerState';
 
 export function TournamentBigImage(props) {
     return (
@@ -23,7 +24,9 @@ function TournamentProperties(props) {
             <ListGroupItem>Turnier-Code: <b>{props.code}</b></ListGroupItem>
             <ListGroupItem>von <b>{props.ownerUsername}</b></ListGroupItem>
             {props.timerState && props.timerState.mode &&
-                <ListGroupItem>Spielzeit: <Timer timerState={props.timerState} /></ListGroupItem>
+                <ListGroupItem>
+                    {getTimerReasonLabel(props.timerState)}: <Timer timerState={props.timerState} />
+                </ListGroupItem>
             }
         </ListGroup>
     );

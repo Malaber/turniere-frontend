@@ -343,15 +343,37 @@ test('Mission Control saves independent beamer display controls instantly', asyn
   await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('timer_only');
   await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toHaveCount(0);
   await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveCount(0);
+  await expect(page.getByTestId(`mission-beamer-timer-reason-${main.json.id}`)).toBeChecked({ timeout: 20_000 });
   await expect(page.getByText('Timer Only · Nur Timer')).toBeVisible({ timeout: 20_000 });
+  await keyframe(page, testInfo, 'beamer_timer_only_reason_setting');
   await expect.poll(async () => {
-    const updated = await client.get<Array<{ id: number; display_state: string; config?: { display_mode?: string } }>>(
+    const updated = await client.get<Array<{
+      id: number;
+      display_state: string;
+      config?: { display_mode?: string; show_timer_reason?: boolean };
+    }>>(
       `/tournaments/${tournament.id}/beamers`,
     );
     expectStatus(updated, 200, 'fetch beamers after timer-only update');
     const beamer = updated.json.find((candidate) => candidate.id === main.json.id);
-    return `${beamer?.display_state}:${beamer?.config?.display_mode}`;
-  }, { timeout: 20_000 }).toBe('during_game:timer_only');
+    return `${beamer?.display_state}:${beamer?.config?.display_mode}:${beamer?.config?.show_timer_reason}`;
+  }, { timeout: 20_000 }).toBe('during_game:timer_only:true');
+
+  await page.getByTestId(`mission-beamer-timer-reason-${main.json.id}`).uncheck();
+  await expect(page.getByTestId(`mission-beamer-timer-reason-${main.json.id}`)).not.toBeChecked();
+  await keyframe(page, testInfo, 'beamer_timer_only_without_reason_setting');
+  await expect.poll(async () => {
+    const updated = await client.get<Array<{
+      id: number;
+      display_state: string;
+      config?: { display_mode?: string; show_timer_reason?: boolean };
+    }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(updated, 200, 'fetch beamers after timer-only reason toggle');
+    const beamer = updated.json.find((candidate) => candidate.id === main.json.id);
+    return `${beamer?.display_state}:${beamer?.config?.display_mode}:${beamer?.config?.show_timer_reason}`;
+  }, { timeout: 20_000 }).toBe('during_game:timer_only:false');
 });
 
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({
@@ -381,6 +403,9 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   await expect(page.getByTestId('mission-tournament-link')).toHaveText(/Turnier öffnen/);
   await expect(page.getByRole('heading', { name: 'Countdown starten' })).toBeVisible();
   await expect(page.getByTestId('mission-current-timer-display')).toBeVisible();
+  await expect(page.getByTestId('mission-timer-reason-control')).toBeVisible();
+  await page.getByTestId('mission-timer-reason-select').selectOption('custom');
+  await page.getByTestId('mission-timer-reason-text').fill('Final-Call');
   await expect(page.getByTestId('mission-timer-quick-20s')).toContainText('00:20');
   await expect(page.getByTestId('mission-timer-quick-2015')).toContainText('20:15');
   await expect(page.getByRole('heading', { name: 'Countup starten' })).toBeVisible();
@@ -389,10 +414,20 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   await page.locator('#missionTimerSeconds').fill('05');
   await page.locator('#missionTimerSeconds').press('Enter');
   await expect.poll(async () => {
-    const timer = await client.get<{ mode?: string; timer_mode?: string }>(`/tournaments/${tournament.id}/timer`);
+    const timer = await client.get<{
+      mode?: string;
+      timer_mode?: string;
+      timer_reason?: string;
+      timer_reason_text?: string;
+    }>(`/tournaments/${tournament.id}/timer`);
     expectStatus(timer, 200, 'fetch timer after enter submit');
-    return timer.json.mode ?? timer.json.timer_mode;
-  }, { timeout: 20_000 }).toBe('countdown');
+    return [
+      timer.json.mode ?? timer.json.timer_mode,
+      timer.json.timer_reason,
+      timer.json.timer_reason_text,
+    ].join(':');
+  }, { timeout: 20_000 }).toBe('countdown:custom:Final-Call');
+  await expect(page.getByTestId('mission-current-timer-reason')).toHaveText('Final-Call', { timeout: 20_000 });
   await keyframe(page, testInfo, 'timer_control_mockup');
 
   await page.getByRole('link', { name: 'Beamer' }).click();
