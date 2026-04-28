@@ -7,8 +7,16 @@ import {Footer} from '../js/components/Footer';
 import {TurniereNavigation} from '../js/components/Navigation';
 import {LoadingPage} from '../js/components/LoadingPage';
 import {MissionControl} from '../js/components/MissionControl';
-import {getTournament, convertTournamentSnapshot} from '../js/redux/tournamentApi';
+import {
+    convertTeamActionListsSnapshot,
+    convertTournamentSnapshot,
+    createTeamActionList as createTeamActionListRequest,
+    getTournament,
+    updateTeamActionItem,
+    updateTeamActionItemByKeyAndTeam
+} from '../js/redux/tournamentApi';
 import {connectToTimerSocket} from '../js/utils/beamerSocket';
+import {connectToTeamActionListsSocket} from '../js/utils/teamActionListsSocket';
 import {normalizeTimerState} from '../js/utils/timerState';
 import {connectToTournamentSocket} from '../js/utils/tournamentLiveSocket';
 
@@ -26,6 +34,8 @@ class MissionControlContent extends React.Component {
                     isOwner={isOwner}
                     defaultOpen={true}
                     onTournamentChange={this.props.onTournamentChange}
+                    onSetTeamActionItemState={this.props.onSetTeamActionItemState}
+                    onCreateTeamActionList={this.props.onCreateTeamActionList}
                 />
             </div>
         );
@@ -55,6 +65,11 @@ class MissionControlPage extends React.Component {
         this.reloadTournament = this.reloadTournament.bind(this);
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
+        this.ensureTeamActionListsSocketConnection = this.ensureTeamActionListsSocketConnection.bind(this);
+        this.replaceTeamActionListsFromSnapshot = this.replaceTeamActionListsFromSnapshot.bind(this);
+        this.setTeamActionItemState = this.setTeamActionItemState.bind(this);
+        this.setTeamActionItemStateByResponse = this.setTeamActionItemStateByResponse.bind(this);
+        this.createTeamActionList = this.createTeamActionList.bind(this);
         this.onTimerMessage = this.onTimerMessage.bind(this);
         this.onTournamentMessage = this.onTournamentMessage.bind(this);
     }
@@ -70,6 +85,11 @@ class MissionControlPage extends React.Component {
         if (this.tournamentSocket) {
             this.tournamentSocket.disconnect();
         }
+        if (this.teamActionListsSocketConnection) {
+            this.teamActionListsSocketConnection.disconnect();
+        }
+        this.teamActionListsSocketConnection = null;
+        this.teamActionListsSocketTournamentId = null;
     }
 
     reloadTournament() {
@@ -91,6 +111,10 @@ class MissionControlPage extends React.Component {
                 tournamentId: tournament.id,
                 onMessage: this.onTournamentMessage
             });
+        }
+
+        if (tournament.id) {
+            this.ensureTeamActionListsSocketConnection(tournament.id);
         }
     }
 
@@ -120,6 +144,183 @@ class MissionControlPage extends React.Component {
         });
     }
 
+    ensureTeamActionListsSocketConnection(tournamentId) {
+        if (this.teamActionListsSocketTournamentId === tournamentId && this.teamActionListsSocketConnection) {
+            return;
+        }
+
+        if (this.teamActionListsSocketConnection) {
+            this.teamActionListsSocketConnection.disconnect();
+        }
+
+        this.teamActionListsSocketTournamentId = tournamentId;
+        this.teamActionListsSocketConnection = connectToTeamActionListsSocket({
+            tournamentId: tournamentId,
+            onMessage: payload => {
+                if (!payload || payload.type !== 'team_action_lists.updated') {
+                    return;
+                }
+                if (payload.tournament_id !== tournamentId) {
+                    return;
+                }
+                this.replaceTeamActionListsFromSnapshot(payload.team_action_lists);
+            }
+        });
+    }
+
+    replaceTeamActionListsFromSnapshot(teamActionListsSnapshot) {
+        const teamActionLists = convertTeamActionListsSnapshot(teamActionListsSnapshot);
+        this.setState(prevState => {
+            if (!prevState.tournament) {
+                return null;
+            }
+            return {
+                tournament: Object.assign({}, prevState.tournament, {
+                    teamActionLists: teamActionLists
+                })
+            };
+        });
+    }
+
+    setTeamActionItemStateByResponse(updatedTeamActionItem, listKey, teamId) {
+        this.setState(prevState => {
+            if (!prevState.tournament || !Array.isArray(prevState.tournament.teamActionLists)) {
+                return null;
+            }
+
+            let foundById = false;
+            const nextLists = prevState.tournament.teamActionLists.map(list => ({
+                ...list,
+                teamActionItems: list.teamActionItems.map(item => {
+                    if (item.id === updatedTeamActionItem.id) {
+                        foundById = true;
+                        return updatedTeamActionItem;
+                    }
+                    return item;
+                })
+            }));
+
+            if (!foundById) {
+                const fallbackLists = nextLists.map(list => ({
+                    ...list,
+                    teamActionItems: list.teamActionItems.map(item => {
+                        const itemTeamId = item.team ? item.team.id : null;
+                        if (list.key === listKey && itemTeamId === teamId) {
+                            return updatedTeamActionItem;
+                        }
+                        return item;
+                    })
+                }));
+                return {
+                    tournament: Object.assign({}, prevState.tournament, {
+                        teamActionLists: fallbackLists
+                    })
+                };
+            }
+
+            return {
+                tournament: Object.assign({}, prevState.tournament, {
+                    teamActionLists: nextLists
+                })
+            };
+        });
+    }
+
+    setTeamActionItemState({tournamentId, listKey, teamId, itemId, completed, onSuccess, onError}) {
+        let previousCompleted = false;
+        let previousCompletedAt = null;
+
+        this.setState(prevState => {
+            if (!prevState.tournament || !Array.isArray(prevState.tournament.teamActionLists)) {
+                return null;
+            }
+            const nextLists = prevState.tournament.teamActionLists.map(list => ({
+                ...list,
+                teamActionItems: list.teamActionItems.map(item => {
+                    const itemTeamId = item.team ? item.team.id : null;
+                    if (list.key === listKey && itemTeamId === teamId) {
+                        previousCompleted = item.completed === true;
+                        previousCompletedAt = item.completedAt;
+                        return {
+                            ...item,
+                            completed: completed,
+                            completedAt: completed ? item.completedAt : null
+                        };
+                    }
+                    return item;
+                })
+            }));
+            return {
+                tournament: Object.assign({}, prevState.tournament, {teamActionLists: nextLists})
+            };
+        });
+
+        const onPatchSuccess = (status, updatedTeamActionItem) => {
+            this.setTeamActionItemStateByResponse(updatedTeamActionItem, listKey, teamId);
+            onSuccess(status, updatedTeamActionItem);
+        };
+
+        const onPatchError = error => {
+            const status = error && error.response ? error.response.status : -1;
+            this.setState(prevState => {
+                if (!prevState.tournament || !Array.isArray(prevState.tournament.teamActionLists)) {
+                    return null;
+                }
+                const rolledBackLists = prevState.tournament.teamActionLists.map(list => ({
+                    ...list,
+                    teamActionItems: list.teamActionItems.map(item => {
+                        const itemTeamId = item.team ? item.team.id : null;
+                        if (list.key === listKey && itemTeamId === teamId) {
+                            return {
+                                ...item,
+                                completed: previousCompleted,
+                                completedAt: previousCompletedAt
+                            };
+                        }
+                        return item;
+                    })
+                }));
+                return {
+                    tournament: Object.assign({}, prevState.tournament, {teamActionLists: rolledBackLists})
+                };
+            });
+            onError(status, error);
+        };
+
+        if (itemId) {
+            updateTeamActionItem(itemId, completed, onPatchSuccess, onPatchError);
+            return;
+        }
+
+        if (!teamId) {
+            onPatchError(null);
+            return;
+        }
+
+        updateTeamActionItemByKeyAndTeam(tournamentId, listKey, teamId, completed, onPatchSuccess, onPatchError);
+    }
+
+    createTeamActionList({tournamentId, payload, onSuccess, onError}) {
+        createTeamActionListRequest(tournamentId, payload, (status, createdTeamActionList) => {
+            this.setState(prevState => {
+                if (!prevState.tournament || !Array.isArray(prevState.tournament.teamActionLists)) {
+                    return null;
+                }
+                const withoutExisting = prevState.tournament.teamActionLists
+                    .filter(list => list.id !== createdTeamActionList.id);
+                return {
+                    tournament: Object.assign({}, prevState.tournament, {
+                        teamActionLists: [...withoutExisting, createdTeamActionList]
+                    })
+                };
+            });
+            onSuccess(status, createdTeamActionList);
+        }, error => {
+            const status = error && error.response ? error.response.status : -1;
+            onError(status, error);
+        });
+    }
+
     onTournamentMessage(message) {
         if (message.type && message.type !== 'tournament.updated') {
             return;
@@ -136,10 +337,14 @@ class MissionControlPage extends React.Component {
                 syncLastPushedAt: prev.tournament.syncLastPushedAt,
                 syncLastPushError: prev.tournament.syncLastPushError
             } : null;
+            const tournament = convertTournamentSnapshot(message.tournament, cachedMetadata);
+            if (!Array.isArray(message.tournament.team_action_lists) && prev.tournament) {
+                tournament.teamActionLists = prev.tournament.teamActionLists;
+            }
 
             return {
                 status: 200,
-                tournament: convertTournamentSnapshot(message.tournament, cachedMetadata),
+                tournament: tournament,
                 loaded: true
             };
         });
@@ -159,6 +364,8 @@ class MissionControlPage extends React.Component {
                     <ConnectedMissionControlContent
                         tournament={tournament}
                         onTournamentChange={this.reloadTournament}
+                        onSetTeamActionItemState={this.setTeamActionItemState}
+                        onCreateTeamActionList={this.createTeamActionList}
                     />
                     <Footer />
                 </div>

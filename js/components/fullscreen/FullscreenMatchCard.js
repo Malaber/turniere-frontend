@@ -1,4 +1,5 @@
 import React from 'react';
+import {MatchPositionBadge} from '../MatchPositionBadge';
 import {TeamName} from '../TeamName';
 import styles from './FullscreenMatchCard.module.css';
 
@@ -27,12 +28,6 @@ function scoreFor(match, team) {
     return match.decider ?
         team.hiddenScore :
         team.score;
-}
-
-function badgeFor(match) {
-    return match.group ?
-        match.group.number :
-        match.position;
 }
 
 export function FullscreenMatchCard({
@@ -77,9 +72,13 @@ export function FullscreenMatchCard({
                     )}
                 </div>
             </div>
-            <div className={styles.matchBadge} data-testid="fullscreen-match-badge">
-                {badgeFor(match)}
-            </div>
+            <MatchPositionBadge
+                match={match}
+                as="div"
+                className={styles.matchBadge}
+                testId="fullscreen-match-badge"
+                showGroup={false}
+            />
         </div>
     );
 }

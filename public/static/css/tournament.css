@@ -164,7 +164,46 @@
 }
 
 .mission-control-group-table {
-    max-width: 42rem;
+    table-layout: fixed;
+    width: auto;
+    max-width: 100%;
+}
+
+.mission-control-group-table th,
+.mission-control-group-table td {
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.mission-control-group-table th {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mission-control-group-table td {
+    overflow: hidden;
+}
+
+.mission-control-group-rank-column {
+    width: 2.5rem;
+}
+
+.mission-control-group-team-column {
+    width: clamp(10rem, 38vw, 32rem);
+}
+
+.mission-control-group-stat-column {
+    width: 3.4rem;
+}
+
+@media (max-width: 640px) {
+    .mission-control-group-table {
+        width: 100%;
+    }
+
+    .mission-control-group-team-column {
+        width: auto;
+    }
 }
 
 .mission-control-match {
@@ -375,7 +414,7 @@
 }
 
 .mission-pane-scores .mission-control-group-table {
-    max-width: none;
+    max-width: 100%;
 }
 
 .mission-start-card {
@@ -553,7 +592,8 @@ i.is-finished {
     width: 100%;
 }
 
-.mission-lock-button.is-holding .mission-lock-progress {
+.mission-lock-button.is-holding .mission-lock-progress,
+.mission-lock-button.is-unlocked .mission-lock-progress {
     opacity: 1;
 }
 

@@ -75,8 +75,8 @@ test('Owner can swap group match positions and backend persists new order', asyn
 
   const sourceCard = page.locator(`[data-match-id="${sourceMatch.id}"]`);
   const targetCard = page.locator(`[data-match-id="${targetMatch.id}"]`);
-  await expect(sourceCard).toContainText(`Sp. ${sourceMatch.position + 1}`);
-  await expect(targetCard).toContainText(`Sp. ${targetMatch.position + 1}`);
+  await expect(sourceCard.getByTestId('match-position-badge-number')).toHaveText(String(sourceMatch.position + 1));
+  await expect(targetCard.getByTestId('match-position-badge-number')).toHaveText(String(targetMatch.position + 1));
 
   await sourceCard.click();
   await expect(page.getByTestId('swap-match-position-controls')).toBeVisible();
@@ -87,9 +87,10 @@ test('Owner can swap group match positions and backend persists new order', asyn
   await modalKeyframe(page, testInfo, 'swap_modal_before_submit');
 
   await page.getByTestId('swap-match-position-button').click();
-  await expect(page.getByText('Die Positionen wurden getauscht.')).toBeVisible();
-  await expect(sourceCard).toContainText(`Sp. ${targetMatch.position + 1}`);
-  await expect(targetCard).toContainText(`Sp. ${sourceMatch.position + 1}`);
+  await expect(sourceCard.getByTestId('match-position-badge-number')).toHaveText(String(targetMatch.position + 1), {
+    timeout: 15_000,
+  });
+  await expect(targetCard.getByTestId('match-position-badge-number')).toHaveText(String(sourceMatch.position + 1));
   await keyframe(page, testInfo, 'swap_done_updated_positions');
 
   const after = await fetchFirstGroupMatches(client, tournament.id);

@@ -31,7 +31,7 @@ function AnimatedDigit({value}) {
 }
 
 
-class AnimatedTimer extends React.Component {
+export class AnimatedTimer extends React.Component {
     constructor(props) {
         super(props);
         this.state = {display: getTimerDisplay(props.timerState, Date.now())};
@@ -114,7 +114,8 @@ class AnimatedTimer extends React.Component {
         const hours = Math.floor(totalSeconds / 3600);
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = totalSeconds % 60;
-        const isUrgent = display.mode === TIMER_MODE_COUNTDOWN && totalSeconds <= 10;
+        const isUrgent = display.mode === TIMER_MODE_COUNTDOWN &&
+            (totalSeconds <= 10 || this.props.forceUrgent);
 
         const chars = [];
         if (hours > 0) {
@@ -127,10 +128,11 @@ class AnimatedTimer extends React.Component {
             .forEach(c => chars.push(c));
 
         const cls = styles.timer +
-            (isUrgent ? ' ' + styles.timerUrgent : '');
+            (isUrgent ? ' ' + styles.timerUrgent : '') +
+            (this.props.className ? ' ' + this.props.className : '');
 
         return (
-            <div ref={this.timerRef} className={cls}>
+            <div ref={this.timerRef} className={cls} data-testid={this.props.testId}>
                 {chars.map((char, i) => {
                     if (char === ':') {
                         return (

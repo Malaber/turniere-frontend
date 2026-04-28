@@ -1,6 +1,6 @@
 import React, {useState, useEffect} from 'react';
 import {Button} from 'reactstrap';
-import {FaCircleArrowUp} from 'react-icons/fa6';
+import {FaArrowUp} from 'react-icons/fa6';
 
 export function ScrollToTopButton() {
     const [isVisible, setIsVisible] = useState(false);
@@ -23,24 +23,16 @@ export function ScrollToTopButton() {
 
     return (
         <Button
+            aria-label="Nach oben"
+            className="scroll-to-top-button"
+            color="secondary"
             onClick={scrollToTop}
             style={{
-                position: 'fixed',
-                bottom: '20px',
-                right: '20px',
-                borderRadius: '50%',
-                width: '50px',
-                height: '50px',
-                zIndex: 999,
-                transition: 'opacity 0.5s ease-in-out',
                 opacity: isVisible ? 0.7 : 0,
-                pointerEvents: isVisible ? 'auto' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
+                pointerEvents: isVisible ? 'auto' : 'none'
             }}
         >
-            <FaCircleArrowUp style={{fontSize: '36px'}}/>
+            <FaArrowUp aria-hidden="true"/>
         </Button>
     );
 }
