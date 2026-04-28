@@ -23,20 +23,26 @@ async function loggedInClient() {
   return client;
 }
 
+async function matchStateCount(
+  client: ApiClient,
+  tournamentId: number,
+  state: string,
+) {
+  const matches = await client.get<Array<{ state: string }>>(
+    `/tournaments/${tournamentId}/matches`,
+    { state },
+  );
+  expectStatus(matches, 200, `fetch ${state} matches`);
+  return matches.json.length;
+}
+
 async function expectMatchStateCount(
   client: ApiClient,
   tournamentId: number,
   state: string,
   expected: number,
 ) {
-  await expect.poll(async () => {
-    const matches = await client.get<Array<{ state: string }>>(
-      `/tournaments/${tournamentId}/matches`,
-      { state },
-    );
-    expectStatus(matches, 200, `fetch ${state} matches`);
-    return matches.json.length;
-  }, { timeout: 20_000 }).toBe(expected);
+  await expect.poll(async () => matchStateCount(client, tournamentId, state), { timeout: 20_000 }).toBe(expected);
 }
 
 async function expectMatchStateCountAtLeast(
@@ -60,6 +66,22 @@ async function expectUnlockProgressStarted(card: Locator) {
   await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow')), {
     timeout: 2_000,
   }).toBeGreaterThan(0);
+}
+
+async function expectStartHoldProgressStarted(button: Locator) {
+  const progress = button.getByTestId('mission-start-hold-progress');
+  await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow')), {
+    timeout: 500,
+  }).toBeGreaterThan(0);
+}
+
+async function holdStartUntilConfirmOpen(page: Page, button: Locator) {
+  await button.hover();
+  await page.mouse.down();
+  await expectStartHoldProgressStarted(button);
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  await expect(page.getByTestId('mission-start-confirm-modal')).toBeVisible();
 }
 
 async function holdMouseUntilUnlocked(page: Page, card: Locator) {
@@ -136,7 +158,22 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await page.getByRole('link', { name: 'Match-Starts' }).click();
   await expect(page).toHaveURL(/#starts$/);
   const startsPane = page.locator('.tab-pane.active');
-  await page.getByTestId('mission-start-next-groups').click();
+  const groupStart = page.getByTestId('mission-start-next-groups');
+  await expectMatchStateCount(client, tournament.id, 'in_progress', 0);
+  await groupStart.click();
+  await page.waitForTimeout(250);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expectMatchStateCount(client, tournament.id, 'in_progress', 0);
+  await holdStartUntilConfirmOpen(page, groupStart);
+  const groupDialog = page.getByTestId('mission-start-confirm-modal');
+  await expect(groupDialog.getByRole('heading', { name: 'Match-Starts bestätigen' })).toBeVisible();
+  await expect(groupDialog).toContainText('Nächste offene Gruppenmatches');
+  await expectMatchStateCount(client, tournament.id, 'in_progress', 0);
+  await groupDialog.getByRole('button', { name: 'Abbrechen' }).click();
+  await expect(groupDialog).toHaveCount(0);
+  await expectMatchStateCount(client, tournament.id, 'in_progress', 0);
+  await holdStartUntilConfirmOpen(page, groupStart);
+  await page.getByTestId('mission-start-confirm-ok').click();
   await expectMatchStateCountAtLeast(client, tournament.id, 'in_progress', firstGroupStartCount);
   await expect(startsPane.getByTestId('mission-match-card')).toHaveCount(0);
   await keyframe(page, testInfo, 'mission_control_bulk_start_only');
@@ -459,9 +496,25 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   const startsPane = page.locator('.tab-pane.active');
   await expect(startsPane.getByTestId('mission-match-control')).toBeVisible();
   await expect(startsPane.getByRole('heading', { name: 'Bulk Match-Starts' })).toBeVisible();
-  await expect(startsPane.getByRole('button', { name: 'Halbfinale starten' })).toBeVisible();
+  const semifinalStart = startsPane.getByRole('button', { name: 'Halbfinale starten' });
+  await expect(semifinalStart).toBeVisible();
   await expect(startsPane.getByTestId('mission-match-card')).toHaveCount(0);
   await keyframe(page, testInfo, 'match_starts_bulk_only');
+  const runningBeforeSemifinalStart = await matchStateCount(client, tournament.id, 'in_progress');
+  await semifinalStart.click();
+  await page.waitForTimeout(250);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await matchStateCount(client, tournament.id, 'in_progress')).toBe(runningBeforeSemifinalStart);
+  await holdStartUntilConfirmOpen(page, semifinalStart);
+  const semifinalDialog = page.getByTestId('mission-start-confirm-modal');
+  await expect(semifinalDialog.getByRole('heading', { name: 'Match-Starts bestätigen' })).toBeVisible();
+  await expect(semifinalDialog).toContainText('Halbfinale');
+  expect(await matchStateCount(client, tournament.id, 'in_progress')).toBe(runningBeforeSemifinalStart);
+  await semifinalDialog.getByRole('button', { name: 'OK' }).click();
+  await expect.poll(
+    async () => matchStateCount(client, tournament.id, 'in_progress'),
+    { timeout: 20_000 },
+  ).toBeGreaterThan(runningBeforeSemifinalStart);
 
   await page.getByRole('link', { name: 'Ergebnisse' }).click();
   const scoresPane = page.locator('.tab-pane.active');

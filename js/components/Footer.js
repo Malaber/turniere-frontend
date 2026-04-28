@@ -1,17 +1,30 @@
 export function Footer() {
     return (
-        <footer className="footer mt-5 p-3 bg-dark text-light text-center">
-            <Copyright/> &middot; <Version/> &middot; <Privacy/> &middot; <Imprint/>
+        <footer className="footer mt-5 bg-dark text-light text-center">
+            <div className="turniere-footer__content">
+                <Copyright/>
+                <span className="turniere-footer__separator" aria-hidden="true">&middot;</span>
+                <nav className="turniere-footer__links" aria-label="Footer">
+                    <Version/>
+                    <span className="turniere-footer__separator" aria-hidden="true">&middot;</span>
+                    <Privacy/>
+                    <span className="turniere-footer__separator" aria-hidden="true">&middot;</span>
+                    <Imprint/>
+                </nav>
+            </div>
         </footer>
     );
 }
 
 function Copyright() {
-    return <span>&copy; 2025 turnie.re</span>;
+    const currentYear = new Date().getFullYear();
+    return <span className="turniere-footer__copyright" data-testid="footer-copyright">
+        &copy; {currentYear} turnie.re
+    </span>;
 }
 
 function Privacy() {
-    return <a className="text-white" href="/privacy">Datenschutzerklärung</a>;
+    return <a className="text-white" href="/privacy">Datenschutz</a>;
 }
 
 function Version() {
