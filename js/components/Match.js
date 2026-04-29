@@ -168,6 +168,8 @@ export class Match extends React.Component {
                             match={this.state.match}
                             stageLevel={this.props.stageLevel}
                             borderColor={borderClass}
+                            plain
+                            className={styles.matchTable}
                         />
                     </CardBody>
                     <MatchPositionBadge
