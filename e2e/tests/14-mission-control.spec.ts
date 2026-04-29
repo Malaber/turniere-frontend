@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { countBeamerEffects, installBeamerEffectSpies, waitForBeamerEffect } from '../helpers/beamer-audio';
 import { injectAuth } from '../helpers/auth';
 import { keyframe } from '../helpers/screenshot';
 import {
@@ -389,6 +390,91 @@ test('Mission Control saves independent beamer display controls instantly', asyn
     const beamer = updated.json.find((candidate) => candidate.id === main.json.id);
     return `${beamer?.display_state}:${beamer?.config?.display_mode}`;
   }, { timeout: 20_000 }).toBe('during_game:timer_only');
+});
+
+test('Mission Control soundboard controls beamer audio with timer priority', async ({ context, page }, testInfo) => {
+  test.setTimeout(180_000);
+  await injectAuth(context);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = await loggedInClient();
+
+  const beamer = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
+    name: 'Soundboard',
+    display_state: 'static_image',
+    config: { image_key: 'bpwstr_logo' },
+  });
+  expectStatus(beamer, 201, 'create soundboard beamer');
+
+  const beamerPage = await context.newPage();
+  await installBeamerEffectSpies(beamerPage);
+  await beamerPage.goto(`/t/${tournament.id}/fullscreen?beamer=${encodeURIComponent('Soundboard')}`);
+  await waitForBeamerEffect(beamerPage, 'audio-permission-allowed');
+
+  await page.goto(`/t/${tournament.id}/mission-control#beamer`);
+  await expect(page.getByTestId('mission-beamer-control')).toBeVisible({ timeout: 20_000 });
+  const card = page.getByTestId(`mission-beamer-card-${beamer.json.id}`);
+  await expect(card.getByTestId(`mission-beamer-soundboard-${beamer.json.id}`)).toBeVisible();
+  await expect(card.getByTestId(`mission-sound-play-${beamer.json.id}-start-countdown`)).toBeVisible();
+  await expect(card.getByTestId(`mission-sound-play-${beamer.json.id}-mid-game-warning`)).toBeVisible();
+  await expect(card.getByTestId(`mission-sound-play-${beamer.json.id}-end-countdown`)).toBeVisible();
+
+  const startCount = await countBeamerEffects(beamerPage, 'sound-effect', 'start-countdown');
+  const startButton = card.getByTestId(`mission-sound-play-${beamer.json.id}-start-countdown`);
+  await expect(startButton).toBeEnabled();
+  await startButton.click();
+  await waitForBeamerEffect(beamerPage, 'sound-effect', 'start-countdown', startCount + 1);
+  await waitForBeamerEffect(beamerPage, 'sound-started', 'start-countdown');
+
+  const warningCount = await countBeamerEffects(beamerPage, 'sound-effect', 'mid-game-warning');
+  const warningButton = card.getByTestId(`mission-sound-play-${beamer.json.id}-mid-game-warning`);
+  await expect(warningButton).toBeEnabled();
+  await warningButton.click();
+  await waitForBeamerEffect(beamerPage, 'sound-effect', 'mid-game-warning', warningCount + 1);
+  await expect.poll(async () => {
+    const events = await beamerPage.evaluate(() => (window as any).__beamerAudioEvents || []);
+    return events.some((event) => event.type === 'audio-pause' && event.src.includes('start_countdown.mp3'));
+  }, { timeout: 8_000 }).toBe(true);
+
+  const stopButton = card.getByTestId(`mission-sound-stop-${beamer.json.id}`);
+  await expect(stopButton).toBeEnabled();
+  await stopButton.click();
+  await expect.poll(async () => {
+    const events = await beamerPage.evaluate(() => (window as any).__beamerTimerEffects?.events || []);
+    return events.some((event) => (
+      event.type === 'sound-stop' &&
+      event.reason === 'soundboard-stop' &&
+      event.scope === 'soundboard' &&
+      event.stopped === true
+    ));
+  }, { timeout: 8_000 }).toBe(true);
+
+  const replayCount = await countBeamerEffects(beamerPage, 'sound-effect', 'start-countdown');
+  await expect(startButton).toBeEnabled();
+  await startButton.click();
+  await waitForBeamerEffect(beamerPage, 'sound-effect', 'start-countdown', replayCount + 1);
+
+  const timerCount = await countBeamerEffects(beamerPage, 'sound', 'end-countdown');
+  const timerRes = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 12,
+  });
+  expectStatus(timerRes, 200, 'start timer cue');
+  await waitForBeamerEffect(beamerPage, 'sound', 'end-countdown', timerCount + 1);
+
+  const skipCount = await countBeamerEffects(beamerPage, 'sound-effect-skip', 'mid-game-warning');
+  await expect(warningButton).toBeEnabled();
+  await warningButton.click();
+  await waitForBeamerEffect(beamerPage, 'sound-effect-skip', 'mid-game-warning', skipCount + 1);
+  await expect.poll(async () => {
+    const events = await beamerPage.evaluate(() => (window as any).__beamerTimerEffects?.events || []);
+    return events.some((event) => (
+      event.type === 'sound-effect-skip' &&
+      event.cue === 'mid-game-warning' &&
+      event.reason === 'timer-sound-active'
+    ));
+  }, { timeout: 8_000 }).toBe(true);
+
+  await keyframe(page, testInfo, 'beamer_soundboard');
 });
 
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({

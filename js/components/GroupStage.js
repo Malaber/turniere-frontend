@@ -141,6 +141,7 @@ export class Group extends Component {
         this.swapMatchPositions = this.swapMatchPositions.bind(this);
         this.onSwapMatchPositionsSuccess = this.onSwapMatchPositionsSuccess.bind(this);
         this.onSwapMatchPositionsError = this.onSwapMatchPositionsError.bind(this);
+        this.latestReloadRequestId = 0;
     }
 
     handleToggle() {
@@ -162,15 +163,27 @@ export class Group extends Component {
     }
 
     reload() {
-        getGroup(this.state.id, this.onReloadSuccess, this.onReloadError);
+        const reloadRequestId = this.latestReloadRequestId + 1;
+        this.latestReloadRequestId = reloadRequestId;
+        getGroup(
+            this.state.id,
+            (status, updatedGroup) => this.onReloadSuccess(reloadRequestId, status, updatedGroup),
+            () => this.onReloadError(reloadRequestId)
+        );
     }
 
-    onReloadSuccess(status, updatedGroup) {
+    onReloadSuccess(reloadRequestId, status, updatedGroup) {
+        if (reloadRequestId !== this.latestReloadRequestId) {
+            return;
+        }
         this.setState(updatedGroup);
         this.props.onGroupReload !== undefined && this.props.onGroupReload(updatedGroup);
     }
 
-    onReloadError() {
+    onReloadError(reloadRequestId) {
+        if (reloadRequestId !== this.latestReloadRequestId) {
+            return;
+        }
         notify.show('Die Gruppe konnte nicht aktualisiert werden.', 'warning', 2000);
     }
 

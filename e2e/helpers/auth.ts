@@ -39,13 +39,12 @@ export function loadAuthState(): AuthState {
   return JSON.parse(fs.readFileSync(file, 'utf-8')) as AuthState;
 }
 
-/** Perform a fresh login to get a valid token. */
-async function freshLogin(): Promise<AuthState> {
+async function freshLoginAttempt(): Promise<AuthState> {
   const res = await fetch(`${backendUrl}/users/sign_in`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({ email: e2eEmail, password: e2ePassword }),
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {
@@ -60,6 +59,22 @@ async function freshLogin(): Promise<AuthState> {
     uid: res.headers.get('uid')!,
     expiry: res.headers.get('expiry') ?? '',
   };
+}
+
+/** Perform a fresh login to get a valid token. */
+async function freshLogin(): Promise<AuthState> {
+  const loginDeadline = Date.now() + 60_000;
+
+  while (true) {
+    try {
+      return await freshLoginAttempt();
+    } catch (err) {
+      if (Date.now() >= loginDeadline) {
+        throw new Error(`Fresh login did not succeed within 60s. Last error: ${err}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    }
+  }
 }
 
 /**
