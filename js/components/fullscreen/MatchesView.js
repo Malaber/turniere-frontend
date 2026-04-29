@@ -18,7 +18,9 @@ function Matches(props) {
     } else {
         matches = (<Row>
             {props.matches.sort(sortMatchesByPositionAscending()).map(
-                match => <Col md="auto" key={match.id}><Match match={match}/></Col>
+                match => <Col md="auto" key={match.id}>
+                    <Match match={match} positionBadgeMode="group-for-group-matches"/>
+                </Col>
             )}
         </Row>);
     }

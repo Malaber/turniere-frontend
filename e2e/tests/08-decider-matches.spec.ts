@@ -330,11 +330,12 @@ test('Fullscreen groups view keeps decider tables compact', async ({ page }, tes
   await keyframe(page, testInfo, 'fullscreen_decider_groups');
 });
 
-test('Fullscreen match cards render deciders with the normal match number badge', async ({ page }) => {
+test('Fullscreen match cards render group-stage deciders with the group number badge', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   const { tournament } = await seedResolvedDeciderScenario();
   const groupStage = tournament.stages.find((stage) => stage.level === -1);
-  const deciderMatch = groupStage?.groups[0]?.matches.find((match) => match.decider);
+  const deciderGroup = groupStage?.groups[0];
+  const deciderMatch = deciderGroup?.matches.find((match) => match.decider);
   expect(deciderMatch).toBeTruthy();
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=between_games`);
@@ -343,7 +344,8 @@ test('Fullscreen match cards render deciders with the normal match number badge'
   const card = page.locator(`[data-match-id="${deciderMatch!.id}"]`);
   await expect(card).toBeVisible({ timeout: 20000 });
   const badge = card.getByTestId('fullscreen-match-badge');
-  await expect(badge).toHaveText(String(deciderMatch!.position + 1));
+  await expect(badge).toHaveText(String(deciderGroup!.number));
+  await expect(badge).toHaveAttribute('data-match-badge-kind', 'group');
   await expect(card).not.toContainText('Sp.');
   await expect(card).not.toContainText('Entscheidung');
 });

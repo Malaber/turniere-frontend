@@ -73,7 +73,7 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
   // --- Step 1: fresh tournament page ---
   await page.goto(`/t/${tournament.id}`);
   await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
-  await expect(page.locator('.big-image')).toContainText(/Final-Call:/);
+  await expect(page.locator('.big-image')).toContainText(/(Final-Call|Spielende):/);
   await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
 
   await keyframe(page, testInfo, 'tournament_created');
@@ -121,6 +121,38 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
   await keyframe(page, testInfo, 'tournament_final_match');
   await scrollToLocator(thirdPlaceHeading);
   await keyframe(page, testInfo, 'tournament_third_place_match');
+});
+
+test('Tournament view match badges show group-local positions', async ({ page }) => {
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const groupStage = tournament.stages.find((stage) => stage.level === -1);
+  const firstGroup = groupStage?.groups[0];
+  const groupMatch = firstGroup?.matches.slice().sort((a, b) => a.position - b.position)[0];
+  expect(groupMatch).toBeTruthy();
+
+  await page.goto(`/t/${tournament.id}`);
+  await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
+  await page.getByTitle('Matches einblenden').first().click();
+
+  const groupCard = page.locator(`[data-match-id="${groupMatch!.id}"]`);
+  const groupBadge = groupCard.getByTestId('match-position-badge');
+  await expect(groupBadge).toHaveText(String(groupMatch!.position + 1));
+  await expect(groupBadge).toHaveAttribute('data-match-badge-kind', 'position');
+  await expect(groupCard.getByTestId('match-position-badge-group')).toHaveCount(0);
+
+  const { tournament: playoffTournament } = await seedAndPlayGroupStage(2, 4, 4);
+  const playoffStage = playoffTournament.stages.find((stage) => stage.level !== -1);
+  const playoffMatch = playoffStage?.matches.slice().sort((a, b) => a.position - b.position)[0];
+  expect(playoffMatch).toBeTruthy();
+
+  await page.goto(`/t/${playoffTournament.id}`);
+  await expect(page.locator('.stages').first()).toBeVisible({ timeout: 120000 });
+
+  const playoffBadge = page
+    .locator(`[data-match-id="${playoffMatch!.id}"]`)
+    .getByTestId('match-position-badge');
+  await expect(playoffBadge).toHaveText(String(playoffMatch!.position + 1));
+  await expect(playoffBadge).toHaveAttribute('data-match-badge-kind', 'position');
 });
 
 test('Tournament match cards render all visible states as solid cards', async ({ page }, testInfo) => {

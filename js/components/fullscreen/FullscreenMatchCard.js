@@ -88,7 +88,7 @@ export function FullscreenMatchCard({
                 as="div"
                 className={styles.matchBadge}
                 testId={isActive ? 'fullscreen-match-badge' : 'fullscreen-match-badge-inactive'}
-                showGroup={false}
+                mode="group-for-group-matches"
             />
         </div>
     );
