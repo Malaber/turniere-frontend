@@ -126,6 +126,27 @@ async function setupBeamerAndMatches(
   return { tournament, client, fullscreenQuery };
 }
 
+async function activeCardAnimationName(page: Page): Promise<string> {
+  return page
+    .getByTestId('fullscreen-match-card')
+    .first()
+    .evaluate((el) => getComputedStyle(el).animationName);
+}
+
+async function carouselTranslateX(page: Page): Promise<number> {
+  return page
+    .getByTestId('fullscreen-match-carousel-track')
+    .evaluate((el) => {
+      const transform = getComputedStyle(el).transform;
+      const matrix = transform.match(/^matrix\((.+)\)$/);
+
+      if (!matrix) return 0;
+
+      const values = matrix[1].split(',').map((value) => Number(value.trim()));
+      return values[4] || 0;
+    });
+}
+
 async function readAnimatedTimerText(page: Page, testId: string): Promise<string> {
   return page.getByTestId(testId).evaluate((el) => {
     return Array.from(el.children)
@@ -635,7 +656,7 @@ test('During-game view rotates match pages', async ({ page }, testInfo) => {
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   const matchCards = page.getByTestId('fullscreen-match-card');
-  await expect(matchCards.first()).toBeVisible();
+  await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'rotation_page1');
 
   // First page should show 16 matches (MATCHES_PER_PAGE)
@@ -650,6 +671,9 @@ test('During-game view rotates match pages', async ({ page }, testInfo) => {
   expect(dotCount).toBe(2); // ceil(30/16) = 2
 
   const firstPageTexts = await matchCards.allInnerTexts();
+  const firstPageTranslateX = await carouselTranslateX(page);
+  expect(Math.abs(firstPageTranslateX)).toBeLessThan(1);
+  expect(await activeCardAnimationName(page)).toContain('cardEnter');
 
   // Wait for the 10s page rotation cycle plus buffer
   await page.waitForTimeout(11_000);
@@ -657,12 +681,23 @@ test('During-game view rotates match pages', async ({ page }, testInfo) => {
   // Second page must show different matches
   const secondPageTexts = await matchCards.allInnerTexts();
   expect(firstPageTexts).not.toEqual(secondPageTexts);
+  expect(await activeCardAnimationName(page)).toBe('none');
+
+  // The whole batch slides left instead of re-playing per-card fly-in animations
+  const secondPageTranslateX = await carouselTranslateX(page);
+  expect(secondPageTranslateX).toBeLessThan(firstPageTranslateX - 100);
 
   // Second page should show the remaining 14 matches
   const secondPageCount = await matchCards.count();
   expect(secondPageCount).toBe(14);
 
   await keyframe(page, testInfo, 'rotation_page2');
+
+  // End of the cycle slides back to the first batch without card fatigue
+  await page.waitForTimeout(11_000);
+  expect(await matchCards.allInnerTexts()).toEqual(firstPageTexts);
+  expect(Math.abs(await carouselTranslateX(page))).toBeLessThan(1);
+  expect(await activeCardAnimationName(page)).toBe('none');
 });
 
 // ---------------------------------------------------------------------------
