@@ -4,6 +4,7 @@ import {
   seedGroupStageTournament,
   seedAndPlayGroupStage,
   seedGroupStageAndRunToBeforeFinal,
+  finishGroupStageForTournament,
 } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
@@ -275,4 +276,22 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
     timeout: 10_000,
   });
   await keyframe(page, testInfo, 'live_tournament_finished');
+});
+
+test('Tournament view loads playoff bracket from live tournament snapshot', async ({ page }) => {
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+
+  await page.goto(`/t/${tournament.id}`);
+  await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
+  await expect(page.getByText(/Gruppe/i).first()).toBeVisible({ timeout: 120000 });
+  await expect(page.getByRole('heading', { name: 'Halbfinale', exact: true })).toHaveCount(0);
+
+  const { tournament: updatedTournament } = await finishGroupStageForTournament(tournament.id);
+  expect(updatedTournament.stages.some((stage) => stage.level !== -1)).toBe(true);
+
+  await expect(page.getByRole('heading', { name: 'Halbfinale', exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.locator('[data-match-state="not_started"]').first())
+    .toBeVisible();
 });

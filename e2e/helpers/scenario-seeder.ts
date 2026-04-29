@@ -350,6 +350,22 @@ export async function seedAndPlayGroupStage(
 }
 
 /**
+ * Finish an already-created group-stage tournament and return it with playoffs populated.
+ */
+export async function finishGroupStageForTournament(tournamentId: number): Promise<SeededTournament> {
+  const client = await makeClient();
+  let tournament = await fetchTournament(client, tournamentId);
+
+  await finishGroupStageMatches(client, tournament);
+
+  const gs = groupStageOf(await fetchTournament(client, tournament.id));
+  await finishStage(client, gs.id);
+
+  tournament = await fetchTournament(client, tournament.id);
+  return { tournament, code: tournament.code };
+}
+
+/**
  * Create a playoff-only tournament and return it — no matches played yet.
  */
 export async function seedPlayoffTournament(teamCount = 8): Promise<SeededTournament> {
