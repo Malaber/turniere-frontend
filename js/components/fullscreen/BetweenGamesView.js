@@ -1,8 +1,10 @@
 import React from 'react';
 import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
+import {getTimerReasonLabel} from '../../utils/timerState';
 import styles from './BetweenGamesView.module.css';
 import {FullscreenMatchCard} from './FullscreenMatchCard';
+import {Timer} from '../Timer';
 
 
 const MATCHES_PER_PAGE = 32;
@@ -22,6 +24,25 @@ function ChunkDots({total, active}) {
                     data-testid="fullscreen-page-dot"
                 />
             )}
+        </div>
+    );
+}
+
+
+function HeaderTimer({timerState}) {
+    if (!timerState || !timerState.mode) return null;
+
+    return (
+        <div
+            className={styles.headerTimer}
+            data-testid="between-games-timer"
+        >
+            <span className={styles.timerReason}>
+                {getTimerReasonLabel(timerState)}
+            </span>
+            <span className={styles.timerValue}>
+                <Timer timerState={timerState}/>
+            </span>
         </div>
     );
 }
@@ -106,12 +127,18 @@ export class BetweenGamesView extends React.Component {
         return (
             <div className={styles.page}>
                 <div className={styles.columnHeader}>
-                    <span className={styles.columnIcon}>
-                        &#9654;
-                    </span>
-                    <span className={styles.columnTitle}>
-                        Nächste Spiele
-                    </span>
+                    <div className={styles.headerTitleGroup}>
+                        <span className={styles.columnIcon}>
+                            &#9654;
+                        </span>
+                        <span
+                            className={styles.columnTitle}
+                            data-testid="between-games-title"
+                        >
+                            Nächste Spiele
+                        </span>
+                    </div>
+                    <HeaderTimer timerState={this.props.timerState}/>
                 </div>
 
                 {chunk.length === 0 ? (

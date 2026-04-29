@@ -137,6 +137,19 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=between_games`);
   await expect(page.locator('body')).toContainText(/Nächste Spiele/, { timeout: 20_000 });
+  const betweenTitle = page.getByTestId('between-games-title');
+  await expect(betweenTitle).toBeVisible();
+  await expect.poll(async () => (
+    betweenTitle.evaluate((node) => parseFloat(window.getComputedStyle(node).fontSize))
+  ), { timeout: 10_000 }).toBeGreaterThanOrEqual(30);
+  const betweenTimer = page.getByTestId('between-games-timer');
+  await expect(betweenTimer).toBeVisible({ timeout: 10_000 });
+  await expect(betweenTimer).toContainText(/(Spielende|Timer)/i);
+  await expect(betweenTimer).toContainText(/\d{1,2}:[0-5][0-9]/);
+  const timerBox = await betweenTimer.boundingBox();
+  expect(timerBox).toBeTruthy();
+  expect(timerBox!.x).toBeGreaterThan(1920 * 0.6);
+  expect(timerBox!.y).toBeLessThan(120);
   await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'fullscreen_beamer_between_games');
 });
