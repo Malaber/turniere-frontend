@@ -22,6 +22,42 @@ function statusText(page: Page, text: string | RegExp) {
   return page.locator('small.text-muted:visible').filter({ hasText: text }).first();
 }
 
+test('Tournament id view renders basic information while full tournament loads', async ({ page }) => {
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  let sawMetaRequest = false;
+  let sawFullRequest = false;
+  let releaseFullTournament: (() => void) | null = null;
+  const fullTournamentBlocked = new Promise<void>((resolve) => {
+    releaseFullTournament = resolve;
+  });
+
+  await page.route(new RegExp(`/tournaments/${tournament.id}(\\?.*)?$`), async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('simple') === 'true') {
+      sawMetaRequest = true;
+      await route.continue();
+      return;
+    }
+
+    sawFullRequest = true;
+    await fullTournamentBlocked;
+    await route.continue();
+  });
+
+  await page.goto(`/t/${tournament.id}`);
+  await expect(page.locator('.big-image')).toContainText(tournament.name, { timeout: 120000 });
+  await expect(page.getByRole('button', { name: 'Statistiken' })).toBeVisible();
+  await expect(page.getByTestId('tournament-favorites-loading')).toBeVisible();
+  await expect(page.getByTestId('tournament-details-loading')).toBeVisible();
+  expect(sawMetaRequest).toBe(true);
+  await expect.poll(() => sawFullRequest, { timeout: 10000 }).toBe(true);
+
+  releaseFullTournament?.();
+  await expect(page.getByTestId('tournament-details-loading')).toHaveCount(0, { timeout: 120000 });
+  await expect(page.getByTestId('tournament-favorites-loading')).toHaveCount(0);
+  await expect(page.getByText(/Gruppe/i).first()).toBeVisible();
+});
+
 test('Public tournament view renders group-stage and playoff data', async ({ page }, testInfo) => {
   // --- Seed: create group-stage tournament (4 groups × 4 teams, 8 playoff spots) ---
   const { tournament } = await seedGroupStageTournament(4, 4, 8);

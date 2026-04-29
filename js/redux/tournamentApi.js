@@ -31,7 +31,7 @@ export function getStage(stageId, successCallback, errorCallback) {
 export function getTournamentMeta(tournamentId, successCallback, errorCallback) {
     getRequest(getState(), '/tournaments/' + tournamentId + '?simple=true')
         .then(response => {
-            successCallback(response.status, response.data);
+            successCallback(response.status, convertTournamentMeta(response.data));
         })
         .catch(errorCallback);
 }
@@ -137,6 +137,29 @@ export function convertTournamentSnapshot(apiTournament, cachedMetadata = null) 
         playoffStages: playoffStages,
         teamActionLists: convertTeamActionListsSnapshot(apiTournament.team_action_lists),
         teams: apiTournament.teams,
+        timerState: normalizeTournamentTimerState(apiTournament)
+    };
+}
+
+export function convertTournamentMeta(apiTournament, cachedMetadata = null) {
+    apiTournament = mergeTournamentSyncMetadata(apiTournament, cachedMetadata);
+
+    return {
+        id: apiTournament.id,
+        code: apiTournament.code,
+        description: apiTournament.description,
+        name: apiTournament.name,
+        isPublic: typeof apiTournament.public === 'boolean' ? apiTournament.public : null,
+        readOnlyMode: apiTournament.read_only_mode === true,
+        syncTargetUrl: apiTournament.sync_target_url || '',
+        syncAuthToken: apiTournament.sync_auth_token || '',
+        syncLastPushedAt: apiTournament.sync_last_pushed_at ? new Date(apiTournament.sync_last_pushed_at) : null,
+        syncLastPushError: apiTournament.sync_last_push_error || '',
+        ownerUsername: apiTournament.owner_username,
+        groupStage: null,
+        playoffStages: [],
+        teamActionLists: [],
+        teams: [],
         timerState: normalizeTournamentTimerState(apiTournament)
     };
 }
