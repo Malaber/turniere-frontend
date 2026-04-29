@@ -3,7 +3,7 @@ import {
     Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader,
     Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
 } from 'reactstrap';
-import {FaExternalLinkAlt, FaKeyboard, FaLock, FaSearch, FaTrash, FaUsers} from 'react-icons/fa';
+import {FaExternalLinkAlt, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaTrash, FaUsers} from 'react-icons/fa';
 import {notify} from './Notifications';
 import {
     createBeamer,
@@ -20,6 +20,7 @@ import {
     updateTeamName
 } from '../api';
 import {sortMatchesByPositionAscending} from '../utils/sorting';
+import {BEAMER_SOUND_EFFECTS} from '../utils/soundEffects';
 import {
     getTimerReasonLabel,
     TIMER_MODE_COUNTDOWN,
@@ -190,6 +191,17 @@ const START_HOLD_DURATION_MS = 600;
 
 function nextPlayoffTable(match) {
     return Math.ceil(match.position / 2);
+}
+
+function soundEffectCommand(action, soundKey = null) {
+    const command = {
+        action,
+        id: Date.now() + '-' + Math.random().toString(36).slice(2)
+    };
+    if (soundKey) {
+        command.sound_key = soundKey;
+    }
+    return command;
 }
 
 export class MissionControl extends React.Component {
@@ -497,6 +509,8 @@ class MissionBeamer extends React.Component {
         this.updateMatchSelection = this.updateMatchSelection.bind(this);
         this.updateImageSelection = this.updateImageSelection.bind(this);
         this.updateTimerOnlyReason = this.updateTimerOnlyReason.bind(this);
+        this.playSoundEffect = this.playSoundEffect.bind(this);
+        this.stopSoundEffect = this.stopSoundEffect.bind(this);
         this.onError = this.onError.bind(this);
     }
 
@@ -542,10 +556,10 @@ class MissionBeamer extends React.Component {
         }));
     }
 
-    update(beamer, payload) {
+    update(beamer, payload, successMessage = 'Beamer wurde aktualisiert.') {
         this.setBeamerSaving(beamer.id, true);
         updateBeamer(this.props.tournament.id, beamer.id, payload, () => {
-            notify.show('Beamer wurde aktualisiert.', 'success', 2000);
+            notify.show(successMessage, 'success', 2000);
             this.reload();
         }, errorBody => this.onError(errorBody, beamer.id));
     }
@@ -604,6 +618,20 @@ class MissionBeamer extends React.Component {
                 config
             });
         });
+    }
+
+    playSoundEffect(beamer, effect) {
+        const config = Object.assign({}, beamer.config || {}, {
+            sound_effect_command: soundEffectCommand('play', effect.key)
+        });
+        this.update(beamer, {config}, 'Sound wurde gesendet.');
+    }
+
+    stopSoundEffect(beamer) {
+        const config = Object.assign({}, beamer.config || {}, {
+            sound_effect_command: soundEffectCommand('stop')
+        });
+        this.update(beamer, {config}, 'Sound wurde gestoppt.');
     }
 
     remove(beamer) {
@@ -742,6 +770,28 @@ class MissionBeamer extends React.Component {
                                                 Timer-Grund anzeigen
                                             </Label>
                                         </FormGroup>}
+
+                                    <div className='mission-beamer-soundboard'
+                                        data-testid={'mission-beamer-soundboard-' + beamer.id}>
+                                        <div className='mission-beamer-soundboard-label'>Soundboard</div>
+                                        <div className='mission-beamer-sounds'>
+                                            {BEAMER_SOUND_EFFECTS.map(effect => (
+                                                <Button outline color='secondary'
+                                                    key={effect.key}
+                                                    disabled={disabled}
+                                                    data-testid={'mission-sound-play-' + beamer.id + '-' + effect.key}
+                                                    onClick={() => this.playSoundEffect(beamer, effect)}>
+                                                    <FaPlay aria-hidden='true' /> {effect.label}
+                                                </Button>
+                                            ))}
+                                            <Button outline color='danger'
+                                                disabled={disabled}
+                                                data-testid={'mission-sound-stop-' + beamer.id}
+                                                onClick={() => this.stopSoundEffect(beamer)}>
+                                                <FaStop aria-hidden='true' /> Stop
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         );

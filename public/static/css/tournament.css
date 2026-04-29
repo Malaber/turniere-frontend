@@ -349,6 +349,28 @@
     margin-bottom: 0;
 }
 
+.mission-beamer-soundboard {
+    grid-column: 1 / -1;
+}
+
+.mission-beamer-soundboard-label {
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.mission-beamer-sounds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.mission-beamer-sounds .btn {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.35rem;
+    min-height: 2.5rem;
+}
+
 .mission-beamer-empty {
     border: 1px dashed #d9e1ea;
     border-radius: 8px;

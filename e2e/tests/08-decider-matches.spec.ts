@@ -35,6 +35,50 @@ async function closeVisibleModal(page: Page) {
   await expect(dialog).toHaveCount(0);
 }
 
+async function waitForNoModal(page: Page, timeout = 15000) {
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout });
+}
+
+async function expectDeciderCardState(card: Locator, state: string, timeout = 15000) {
+  await expect(card).toHaveAttribute('data-match-state', state, { timeout });
+}
+
+async function openDeciderMatchModal(page: Page, card: Locator, heading: string, timeout = 15000) {
+  const deadline = Date.now() + timeout;
+  let lastError: unknown;
+
+  while (Date.now() < deadline) {
+    const attemptTimeout = Math.min(2000, Math.max(250, deadline - Date.now()));
+    await waitForNoModal(page, attemptTimeout);
+    await expect(card).toBeVisible({ timeout: attemptTimeout });
+
+    try {
+      await card.scrollIntoViewIfNeeded({ timeout: attemptTimeout });
+      const cardBody = card.locator('.card-body').first();
+      if (await cardBody.count() > 0) {
+        await cardBody.click({ force: true, timeout: attemptTimeout });
+      } else {
+        await card.click({ timeout: attemptTimeout });
+      }
+      const modal = page.getByRole('dialog');
+      await expect(visibleModal(page)).toBeVisible({ timeout: attemptTimeout });
+      await expect(modal.getByRole('heading', { name: heading })).toBeVisible({ timeout: attemptTimeout });
+      return modal;
+    } catch (error) {
+      lastError = error;
+      const modal = page.getByRole('dialog');
+      if (await modal.count() > 0) {
+        if (await modal.getByRole('heading', { name: heading }).count() > 0) {
+          return modal;
+        }
+        await closeVisibleModal(page);
+      }
+    }
+  }
+
+  throw lastError ?? new Error(`Could not open decider match modal with heading "${heading}"`);
+}
+
 async function expectNoLineThrough(locator) {
   await expect(locator).toBeVisible();
   const decoration = await locator.evaluate((element) => window.getComputedStyle(element).textDecorationLine);
@@ -103,22 +147,19 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await modalKeyframe(page, testInfo, 'owner_decider_needed_modal');
   await modalKeyframe(page, testInfo, 'decider_decision_modal');
   await modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' }).click();
+  await waitForNoModal(page);
   await expect(deciderCard).toBeVisible({ timeout: 15000 });
+  await expectDeciderCardState(deciderCard, 'not_started');
   await expectCleanMatchPositionBadge(deciderCard, 7);
   await keyframe(page, testInfo, 'decider_match_created');
 
-  await deciderCard.click({ force: true });
-  modal = page.getByRole('dialog');
-  await expect(visibleModal(page)).toBeVisible();
-  await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch kann gestartet werden' })).toBeVisible();
+  modal = await openDeciderMatchModal(page, deciderCard, 'Entscheidungsmatch kann gestartet werden');
   await modal.getByRole('button', { name: 'Spiel starten' }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15000 });
+  await waitForNoModal(page);
+  await expectDeciderCardState(deciderCard, 'in_progress');
   await expect(page.getByText('Entscheidungsmatch läuft')).toBeVisible({ timeout: 15000 });
   await keyframe(page, testInfo, 'decider_match_started');
-  await deciderCard.click({ force: true });
-  modal = page.getByRole('dialog');
-  await expect(visibleModal(page)).toBeVisible({ timeout: 15000 });
-  await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible();
+  modal = await openDeciderMatchModal(page, deciderCard, 'Entscheidungsmatch läuft');
 
   await modal.getByRole('spinbutton').nth(0).fill('5');
   await modal.getByRole('spinbutton').nth(1).fill('3');
@@ -128,13 +169,14 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await modalKeyframe(page, testInfo, 'decider_match_modal');
 
   await modal.getByRole('button', { name: 'Tie-Breaker Punkte ändern' }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15000 });
+  await waitForNoModal(page);
   await expect(deciderCard).toContainText('5');
   await expect(deciderCard).toContainText('3');
-  await deciderCard.click({ force: true });
-  modal = page.getByRole('dialog');
-  await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible({ timeout: 15000 });
+  await expectDeciderCardState(deciderCard, 'in_progress');
+  modal = await openDeciderMatchModal(page, deciderCard, 'Entscheidungsmatch läuft');
   await modal.getByRole('button', { name: 'Spiel beenden' }).click({ force: true });
+  await waitForNoModal(page);
+  await expectDeciderCardState(deciderCard, 'finished');
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20000 });
   await expectResolvedDecisionIconCount(page, 20000);
   await closeVisibleModal(page);
@@ -187,32 +229,31 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
   await expect(modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' })).toBeVisible();
   await modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' }).click();
 
+  await waitForNoModal(page);
   await expect(deciderCard).toBeVisible({ timeout: 15000 });
-  await deciderCard.click({ force: true });
-  modal = page.getByRole('dialog');
-  await expect(visibleModal(page)).toBeVisible();
-  await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch kann gestartet werden' })).toBeVisible();
+  await expectDeciderCardState(deciderCard, 'not_started');
+  modal = await openDeciderMatchModal(page, deciderCard, 'Entscheidungsmatch kann gestartet werden');
   await modal.getByRole('button', { name: 'Spiel starten' }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15000 });
+  await waitForNoModal(page);
+  await expectDeciderCardState(deciderCard, 'in_progress');
   await expect(page.getByText('Entscheidungsmatch läuft')).toBeVisible({ timeout: 15000 });
 
   await expect(page.locator('[data-decider-match="true"]')).toBeVisible({ timeout: 15000 });
-  await deciderCard.click({ force: true });
-  modal = page.getByRole('dialog');
-  await expect(visibleModal(page)).toBeVisible({ timeout: 15000 });
-  await expect(modal.getByRole('heading', { name: 'Entscheidungsmatch läuft' })).toBeVisible();
+  modal = await openDeciderMatchModal(page, deciderCard, 'Entscheidungsmatch läuft');
   await expect(modal.getByRole('spinbutton')).toHaveCount(2);
   await modal.getByRole('spinbutton').nth(0).fill('5');
   await modal.getByRole('spinbutton').nth(1).fill('3');
   await expect(modal.getByText('Dieses Match zählt nur über verdeckte Tie-Breaker Punkte.')).toBeVisible();
   await modal.getByRole('button', { name: 'Tie-Breaker Punkte ändern' }).click();
-  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15000 });
+  await waitForNoModal(page);
   await expect(deciderCard).toContainText('5');
   await expect(deciderCard).toContainText('3');
+  await expectDeciderCardState(deciderCard, 'in_progress');
 
-  await deciderCard.click({ force: true });
-  modal = page.getByRole('dialog');
+  modal = await openDeciderMatchModal(page, deciderCard, 'Entscheidungsmatch läuft');
   await modal.getByRole('button', { name: 'Spiel beenden' }).click({ force: true });
+  await waitForNoModal(page);
+  await expectDeciderCardState(deciderCard, 'finished');
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20000 });
   await expect(page.getByLabel('Tie-Break erklärt')).toHaveCount(2, { timeout: 20000 });
   await expect(teamOneRow).toContainText(relevantTeamNames[0]);

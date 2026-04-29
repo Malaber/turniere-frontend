@@ -512,7 +512,10 @@ class Main extends React.Component {
                 <Head>
                     <title>{tournamentMeta.name}: turnie.re</title>
                 </Head>
-                <BeamerTimerEffects timerState={this.state.timerState}/>
+                <BeamerTimerEffects
+                    timerState={this.state.timerState}
+                    soundEffectCommand={(this.state.beamerConfig || {}).sound_effect_command}
+                />
                 {this.renderView()}
             </div>);
         }
