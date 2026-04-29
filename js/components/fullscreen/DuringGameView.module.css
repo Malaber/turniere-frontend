@@ -28,10 +28,11 @@
     display: flex;
     align-items: baseline;
     font-family: Halt, sans-serif;
-    font-size: clamp(4rem, min(25cqw, 75cqh), 20rem);
+    font-size: clamp(3rem, min(calc(165cqw / var(--timer-slots, 5)), 75cqh), 20rem);
     color: #1a1a1a;
     letter-spacing: 0;
     line-height: 1;
+    max-width: 100%;
 }
 
 .timerUrgent {

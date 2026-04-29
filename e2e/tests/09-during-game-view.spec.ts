@@ -466,8 +466,8 @@ test.describe('Fullscreen mobile viewport', () => {
       (window as any).__blockBeamerAudioUntilInteraction = true;
     });
 
-    const { tournament, fullscreenQuery } = await setupBeamerAndMatches(8, {
-      timerSeconds: 20 * 60 + 5,
+    const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(8, {
+      timerSeconds: 19 * 60 + 43,
       beamerName: 'mobile-audio',
     });
 
@@ -479,6 +479,7 @@ test.describe('Fullscreen mobile viewport', () => {
     const unlockButton = page.getByTestId('beamer-sound-unlock');
     await expect(unlockButton).toBeVisible();
     await keyframe(page, testInfo, 'mobile_audio_blocked');
+    await page.waitForTimeout(3_000);
 
     await unlockButton.tap();
     await page.waitForFunction(
@@ -493,6 +494,38 @@ test.describe('Fullscreen mobile viewport', () => {
     );
     await expect(unlockButton).toHaveCount(0);
     await keyframe(page, testInfo, 'mobile_audio_unlocked');
+
+    const midCue = await client.patch(`/tournaments/${tournament.id}/timer`, {
+      timestamp_seconds: 10 * 60 + 4,
+    });
+    expectStatus(midCue, 200, 'start mobile 10:10 cue timer');
+    await waitForBeamerEffect(page, 'sound-started', 'mid-game-warning');
+    await expect(unlockButton).toHaveCount(0);
+    await keyframe(page, testInfo, 'mobile_audio_next_cue_stays_unlocked');
+  });
+
+  test('Long timer stays readable in portrait', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+
+    const { tournament, fullscreenQuery } = await setupBeamerAndMatches(8, {
+      timerSeconds: 27 * 60 * 60 + 58 * 60 + 8,
+      beamerName: 'mobile-long-timer',
+    });
+
+    await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+
+    await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 15_000 });
+    const timer = page.getByTestId('fullscreen-timer');
+    await expect(timer).toBeVisible();
+    await expectAnimatedTimerText(page, 'fullscreen-timer', /^27:\d{2}:\d{2}$/);
+    await keyframe(page, testInfo, 'mobile_long_timer_fits');
+
+    const timerBox = await timer.boundingBox();
+    const viewport = page.viewportSize();
+    expect(timerBox).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(timerBox!.x).toBeGreaterThanOrEqual(-1);
+    expect(timerBox!.x + timerBox!.width).toBeLessThanOrEqual(viewport!.width + 1);
   });
 
   test('During-game match grid stays readable in portrait', async ({ page }, testInfo) => {

@@ -38,8 +38,9 @@
 }
 
 .timerOnlyTimer {
-    font-size: clamp(8rem, 58cqh, 23rem);
+    font-size: clamp(4rem, min(calc(165cqw / var(--timer-slots, 5)), 58cqh), 23rem);
     letter-spacing: 0;
+    max-width: 100%;
 }
 
 .noTimer {
