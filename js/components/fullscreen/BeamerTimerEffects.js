@@ -1,33 +1,22 @@
 import React from 'react';
 import {confetti} from '@tsparticles/confetti';
+import {beamerSoundEffectForKey} from '../../utils/soundEffects';
 import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
 
 
 const TIMER_EFFECT_CUES = [
-    {
-        key: 'start-countdown',
+    Object.assign({}, beamerSoundEffectForKey('start-countdown'), {
         secondsRemaining: 20 * 60,
-        startOffsetSeconds: 8.5,
-        durationSeconds: 27.214,
-        volume: 1,
-        src: '/static/sounds/start_countdown.mp3'
-    },
-    {
-        key: 'mid-game-warning',
+        startOffsetSeconds: 8.5
+    }),
+    Object.assign({}, beamerSoundEffectForKey('mid-game-warning'), {
         secondsRemaining: 10 * 60,
-        startOffsetSeconds: 2,
-        durationSeconds: 7.601,
-        volume: 1,
-        src: '/static/sounds/10_minute_warning.mp3'
-    },
-    {
-        key: 'end-countdown',
+        startOffsetSeconds: 2
+    }),
+    Object.assign({}, beamerSoundEffectForKey('end-countdown'), {
         secondsRemaining: 10,
-        startOffsetSeconds: 6,
-        durationSeconds: 18.107,
-        volume: 1,
-        src: '/static/sounds/end_countdown.mp3'
-    }
+        startOffsetSeconds: 6
+    })
 ];
 
 const TICK_MS = 250;
@@ -43,6 +32,11 @@ function emitDebugEvent(type, payload) {
     }
     window.__beamerTimerEffects.events.push(event);
     window.dispatchEvent(new CustomEvent('beamer-timer-effect', {detail: event}));
+}
+
+function soundEffectCommandId(command) {
+    if (!command || typeof command !== 'object') return null;
+    return command.id || command.request_id || null;
 }
 
 
@@ -75,8 +69,11 @@ export class BeamerTimerEffects extends React.Component {
         this.firedCueKeys = {};
         this.pendingCue = null;
         this.pendingAudio = null;
+        this.pendingElapsedSeconds = null;
+        this.pendingPriority = null;
         this.playbackAttemptId = 0;
         this.audioPermissionStatus = 'unknown';
+        this.lastSoundEffectCommandId = null;
         this.previousSecondsRemaining = null;
         this.timerSessionKey = null;
         this.finishedTriggered = false;
@@ -87,9 +84,11 @@ export class BeamerTimerEffects extends React.Component {
         this.tick = this.tick.bind(this);
         this.manualUnlock = this.manualUnlock.bind(this);
         this.retryPendingCue = this.retryPendingCue.bind(this);
+        this.handleSoundEffectCommand = this.handleSoundEffectCommand.bind(this);
     }
 
     componentDidMount() {
+        this.lastSoundEffectCommandId = soundEffectCommandId(this.props.soundEffectCommand);
         this.checkAudioPermission('page-load').catch(() => {});
         this.tick();
         this.intervalId = setInterval(this.tick, TICK_MS);
@@ -98,6 +97,10 @@ export class BeamerTimerEffects extends React.Component {
     componentDidUpdate(prevProps) {
         if (prevProps.timerState !== this.props.timerState) {
             this.tick();
+        }
+        if (soundEffectCommandId(prevProps.soundEffectCommand) !==
+            soundEffectCommandId(this.props.soundEffectCommand)) {
+            this.handleSoundEffectCommand(this.props.soundEffectCommand);
         }
     }
 
@@ -116,9 +119,11 @@ export class BeamerTimerEffects extends React.Component {
         this.timerSessionKey = nextKey;
         this.firedCueKeys = {};
         this.pendingCue = null;
+        this.pendingElapsedSeconds = null;
+        this.pendingPriority = null;
         this.previousSecondsRemaining = null;
         this.finishedTriggered = false;
-        this.stopActiveSounds('timer-changed');
+        this.stopTimerSounds('timer-changed');
     }
 
     tick() {
@@ -129,7 +134,7 @@ export class BeamerTimerEffects extends React.Component {
         if (!display.active || display.mode !== TIMER_MODE_COUNTDOWN) {
             this.previousSecondsRemaining = null;
             this.finishedTriggered = false;
-            this.stopActiveSounds('timer-inactive');
+            this.stopTimerSounds('timer-inactive');
             return;
         }
 
@@ -193,10 +198,15 @@ export class BeamerTimerEffects extends React.Component {
         const cue = this.pendingCue;
         if (!cue) return;
 
-        const elapsedSeconds = this.getElapsedSeconds(cue);
+        const priority = this.pendingPriority || 'timer';
+        const elapsedSeconds = priority === 'timer' ?
+            this.getElapsedSeconds(cue) :
+            (this.pendingElapsedSeconds || 0);
         if (elapsedSeconds === null) {
             this.pendingCue = null;
             this.pendingAudio = null;
+            this.pendingElapsedSeconds = null;
+            this.pendingPriority = null;
             this.setState({soundBlocked: false});
             return;
         }
@@ -222,12 +232,13 @@ export class BeamerTimerEffects extends React.Component {
                 this.pendingAudio,
                 cue,
                 reason,
-                this.playbackAttemptId
+                this.playbackAttemptId,
+                priority
             );
             return;
         }
 
-        this.playCue(cue, elapsedSeconds);
+        this.playCue(cue, elapsedSeconds, {priority, source: reason});
     }
 
     manualUnlock(event) {
@@ -326,11 +337,13 @@ export class BeamerTimerEffects extends React.Component {
         }
     }
 
-    attemptAudioPlayback(audio, cue, source, attemptId) {
+    attemptAudioPlayback(audio, cue, source, attemptId, priority) {
         const markStarted = () => {
             if (attemptId !== this.playbackAttemptId) return;
             this.pendingCue = null;
             this.pendingAudio = null;
+            this.pendingElapsedSeconds = null;
+            this.pendingPriority = null;
             this.audioPermissionStatus = 'allowed';
             this.setState({
                 audioPermissionStatus: 'allowed',
@@ -339,17 +352,19 @@ export class BeamerTimerEffects extends React.Component {
             if (source === 'manual-unlock') {
                 emitDebugEvent('audio-permission-allowed', {reason: source});
             }
-            emitDebugEvent('sound-started', {cue: cue.key, source, src: cue.src});
+            emitDebugEvent('sound-started', {cue: cue.key, priority, source, src: cue.src});
         };
         const markBlocked = error => {
             if (attemptId !== this.playbackAttemptId) return;
             this.pendingCue = cue;
             this.pendingAudio = audio;
+            this.pendingPriority = priority;
             this.audioPermissionStatus = 'blocked';
             emitDebugEvent('sound-unavailable', {
                 reason: 'play-blocked',
                 message: error.message,
                 cue: cue.key,
+                priority,
                 source,
                 src: cue.src
             });
@@ -372,10 +387,12 @@ export class BeamerTimerEffects extends React.Component {
             if (attemptId !== this.playbackAttemptId) return;
             this.pendingCue = cue;
             this.pendingAudio = audio;
+            this.pendingPriority = priority;
             emitDebugEvent('sound-unavailable', {
                 reason: 'play-error',
                 message: error.message,
                 cue: cue.key,
+                priority,
                 source,
                 src: cue.src
             });
@@ -386,18 +403,77 @@ export class BeamerTimerEffects extends React.Component {
         }
     }
 
-    playCue(cue, elapsedSeconds) {
+    hasTimerSoundInFlight() {
+        return this.pendingPriority === 'timer' ||
+            this.activeSounds.some(audio => audio.__beamerSoundPriority === 'timer');
+    }
+
+    handleSoundEffectCommand(command) {
+        const commandId = soundEffectCommandId(command);
+        if (!commandId || commandId === this.lastSoundEffectCommandId) {
+            return;
+        }
+        this.lastSoundEffectCommandId = commandId;
+
+        if (command.action === 'stop') {
+            this.stopSoundEffects('soundboard-stop');
+            return;
+        }
+
+        if (command.action !== 'play') {
+            emitDebugEvent('sound-effect-skip', {reason: 'unknown-action', action: command.action});
+            return;
+        }
+
+        const cue = beamerSoundEffectForKey(command.sound_key || command.soundKey);
+        if (!cue) {
+            emitDebugEvent('sound-effect-skip', {
+                reason: 'unknown-sound',
+                soundKey: command.sound_key || command.soundKey
+            });
+            return;
+        }
+
+        if (this.hasTimerSoundInFlight()) {
+            emitDebugEvent('sound-effect-skip', {
+                cue: cue.key,
+                reason: 'timer-sound-active',
+                src: cue.src
+            });
+            return;
+        }
+
+        this.playCue(cue, 0, {priority: 'soundboard', source: 'soundboard'});
+    }
+
+    playCue(cue, elapsedSeconds, options = {}) {
         if (typeof window === 'undefined' || typeof Audio === 'undefined') {
             emitDebugEvent('sound-unavailable', {reason: 'no-audio-element'});
             return;
         }
 
-        this.stopActiveSounds('next-cue');
+        const priority = options.priority || 'timer';
+        const source = options.source || 'normal';
+
+        if (priority !== 'timer' && this.hasTimerSoundInFlight()) {
+            emitDebugEvent('sound-effect-skip', {
+                cue: cue.key,
+                reason: 'timer-sound-active',
+                src: cue.src
+            });
+            return;
+        }
+
+        this.stopActiveSounds(priority === 'timer' ? 'next-cue' : 'sound-effect-next');
         const attemptId = ++this.playbackAttemptId;
         this.pendingCue = cue;
-        emitDebugEvent('sound', {
+        this.pendingElapsedSeconds = elapsedSeconds;
+        this.pendingPriority = priority;
+        emitDebugEvent(priority === 'timer' ? 'sound' : 'sound-effect', {
             cue: cue.key,
             elapsedSeconds,
+            priority,
+            source,
             src: cue.src,
             startOffsetSeconds: cue.startOffsetSeconds
         });
@@ -406,6 +482,8 @@ export class BeamerTimerEffects extends React.Component {
         audio.preload = 'auto';
         audio.volume = cue.volume;
         audio.muted = false;
+        audio.__beamerCueKey = cue.key;
+        audio.__beamerSoundPriority = priority;
         this.activeSounds.push(audio);
         this.pendingAudio = audio;
 
@@ -413,8 +491,10 @@ export class BeamerTimerEffects extends React.Component {
             this.activeSounds = this.activeSounds.filter(activeAudio => activeAudio !== audio);
             if (this.pendingAudio === audio) {
                 this.pendingAudio = null;
+                this.pendingElapsedSeconds = null;
+                this.pendingPriority = null;
             }
-            emitDebugEvent('sound-ended', {cue: cue.key, src: cue.src});
+            emitDebugEvent('sound-ended', {cue: cue.key, priority, src: cue.src});
         };
 
         audio.addEventListener('ended', removeAudio, {once: true});
@@ -423,6 +503,7 @@ export class BeamerTimerEffects extends React.Component {
             if (this.audioPermissionStatus !== 'allowed') {
                 emitDebugEvent('sound-waiting-for-permission', {
                     cue: cue.key,
+                    priority,
                     status: this.audioPermissionStatus,
                     src: cue.src
                 });
@@ -431,7 +512,7 @@ export class BeamerTimerEffects extends React.Component {
                 }
                 return;
             }
-            this.attemptAudioPlayback(audio, cue, 'normal', attemptId);
+            this.attemptAudioPlayback(audio, cue, source, attemptId, priority);
         };
 
         const seekThenPlay = () => {
@@ -474,6 +555,9 @@ export class BeamerTimerEffects extends React.Component {
     stopActiveSounds(reason) {
         this.playbackAttemptId++;
         this.pendingAudio = null;
+        this.pendingCue = null;
+        this.pendingElapsedSeconds = null;
+        this.pendingPriority = null;
         if (this.activeSounds.length === 0) return;
 
         this.activeSounds.forEach(audio => {
@@ -486,6 +570,86 @@ export class BeamerTimerEffects extends React.Component {
         });
         this.activeSounds = [];
         emitDebugEvent('sound-stop', {reason});
+    }
+
+    stopTimerSounds(reason) {
+        let stopped = false;
+
+        if (this.pendingPriority === 'timer') {
+            this.pendingCue = null;
+            this.pendingAudio = null;
+            this.pendingElapsedSeconds = null;
+            this.pendingPriority = null;
+            stopped = true;
+        }
+
+        const remainingSounds = [];
+        this.activeSounds.forEach(audio => {
+            if (audio.__beamerSoundPriority !== 'timer') {
+                remainingSounds.push(audio);
+                return;
+            }
+
+            stopped = true;
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+            } catch (error) {
+                // Stopping detached media can throw. Safe to ignore.
+            }
+            if (this.pendingAudio === audio) {
+                this.pendingCue = null;
+                this.pendingAudio = null;
+                this.pendingElapsedSeconds = null;
+                this.pendingPriority = null;
+            }
+        });
+
+        this.activeSounds = remainingSounds;
+        if (!stopped) return;
+
+        this.playbackAttemptId++;
+        emitDebugEvent('sound-stop', {reason, scope: 'timer', stopped});
+    }
+
+    stopSoundEffects(reason) {
+        let stopped = false;
+
+        if (this.pendingPriority === 'soundboard') {
+            this.pendingCue = null;
+            this.pendingAudio = null;
+            this.pendingElapsedSeconds = null;
+            this.pendingPriority = null;
+            stopped = true;
+        }
+
+        const remainingSounds = [];
+        this.activeSounds.forEach(audio => {
+            if (audio.__beamerSoundPriority !== 'soundboard') {
+                remainingSounds.push(audio);
+                return;
+            }
+
+            stopped = true;
+            try {
+                audio.pause();
+                audio.currentTime = 0;
+            } catch (error) {
+                // Stopping detached media can throw. Safe to ignore.
+            }
+            if (this.pendingAudio === audio) {
+                this.pendingCue = null;
+                this.pendingAudio = null;
+                this.pendingElapsedSeconds = null;
+                this.pendingPriority = null;
+            }
+        });
+
+        this.activeSounds = remainingSounds;
+        if (stopped) {
+            this.playbackAttemptId++;
+        }
+        emitDebugEvent('sound-stop', {reason, scope: 'soundboard', stopped});
     }
 
     render() {
