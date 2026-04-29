@@ -44,13 +44,34 @@ async function expectDeciderCardState(card: Locator, state: string, timeout = 15
 }
 
 async function openDeciderMatchModal(page: Page, card: Locator, heading: string, timeout = 15000) {
-  await waitForNoModal(page, timeout);
-  await expect(card).toBeVisible({ timeout });
-  await card.click({ force: true });
-  const modal = page.getByRole('dialog');
-  await expect(visibleModal(page)).toBeVisible({ timeout });
-  await expect(modal.getByRole('heading', { name: heading })).toBeVisible({ timeout });
-  return modal;
+  const deadline = Date.now() + timeout;
+  let lastError: unknown;
+
+  while (Date.now() < deadline) {
+    const attemptTimeout = Math.min(2000, Math.max(250, deadline - Date.now()));
+    await waitForNoModal(page, attemptTimeout);
+    await expect(card).toBeVisible({ timeout: attemptTimeout });
+
+    try {
+      await card.scrollIntoViewIfNeeded({ timeout: attemptTimeout });
+      await card.click({ timeout: attemptTimeout });
+      const modal = page.getByRole('dialog');
+      await expect(visibleModal(page)).toBeVisible({ timeout: attemptTimeout });
+      await expect(modal.getByRole('heading', { name: heading })).toBeVisible({ timeout: attemptTimeout });
+      return modal;
+    } catch (error) {
+      lastError = error;
+      const modal = page.getByRole('dialog');
+      if (await modal.count() > 0) {
+        if (await modal.getByRole('heading', { name: heading }).count() > 0) {
+          return modal;
+        }
+        await closeVisibleModal(page);
+      }
+    }
+  }
+
+  throw lastError ?? new Error(`Could not open decider match modal with heading "${heading}"`);
 }
 
 async function expectNoLineThrough(locator) {
