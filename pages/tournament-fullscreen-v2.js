@@ -114,6 +114,54 @@ function showTimerReasonForBeamerConfig(config) {
     return !config || config.show_timer_reason !== false;
 }
 
+function matchHasGroup(match) {
+    return match && match.group && match.group.number !== undefined && match.group.number !== null;
+}
+
+function groupLookupForTournament(tournament) {
+    const groups = tournament && tournament.groupStage ? tournament.groupStage.groups : null;
+    if (!Array.isArray(groups)) {
+        return {};
+    }
+
+    return groups.reduce((lookup, group) => {
+        if (!Array.isArray(group.matches)) {
+            return lookup;
+        }
+
+        group.matches.forEach(match => {
+            lookup[match.id] = {id: group.id, number: group.number};
+        });
+        return lookup;
+    }, {});
+}
+
+function withGroupNumbersFromTournament(matches, tournament) {
+    if (!Array.isArray(matches) || matches.length === 0) {
+        return matches;
+    }
+
+    const groupsByMatchId = groupLookupForTournament(tournament);
+    if (Object.keys(groupsByMatchId).length === 0) {
+        return matches;
+    }
+
+    let changed = false;
+    const enrichedMatches = matches.map(match => {
+        if (matchHasGroup(match) || !groupsByMatchId[match.id]) {
+            return match;
+        }
+
+        changed = true;
+        return {
+            ...match,
+            group: groupsByMatchId[match.id]
+        };
+    });
+
+    return changed ? enrichedMatches : matches;
+}
+
 
 class Main extends React.Component {
     static async getInitialProps({query}) {
@@ -370,7 +418,11 @@ class Main extends React.Component {
                 syncLastPushError: prev.tournament.syncLastPushError
             } : null;
 
-            return {tournament: convertTournamentSnapshot(message.tournament, cachedMetadata)};
+            const tournament = convertTournamentSnapshot(message.tournament, cachedMetadata);
+            return {
+                tournament,
+                matches: withGroupNumbersFromTournament(prev.matches, tournament)
+            };
         });
     }
 
@@ -392,11 +444,12 @@ class Main extends React.Component {
             return;
         }
 
-        this.setState({
+        const matches = convertMatchesSnapshot(message.matches);
+        this.setState(prev => ({
             matchesStatus: 200,
-            matches: convertMatchesSnapshot(message.matches),
+            matches: withGroupNumbersFromTournament(matches, prev.tournament),
             loadedMatches: true
-        });
+        }));
     }
 
     updateMatches() {
@@ -409,7 +462,11 @@ class Main extends React.Component {
         const backendFilter = filtersForDisplayState(this.state.displayState, this.state.beamerConfig);
         getTournamentMatches(code,
             (status, matches) => {
-                this.setState({matchesStatus: status, matches: matches, loadedMatches: true});
+                this.setState(prev => ({
+                    matchesStatus: status,
+                    matches: withGroupNumbersFromTournament(matches, prev.tournament),
+                    loadedMatches: true
+                }));
             },
             error => {
                 const s = error.response ? error.response.status : -1;
@@ -430,7 +487,10 @@ class Main extends React.Component {
     updateTournament() {
         const code = this.props.query.code;
         getTournament(code,
-            (status, tournament) => this.setState({tournament}, () => {
+            (status, tournament) => this.setState(prev => ({
+                tournament,
+                matches: withGroupNumbersFromTournament(prev.matches, tournament)
+            }), () => {
                 this.connectTimerSocket(tournament.id);
                 this.connectTournamentSocket(tournament.id);
                 this.connectMatchesSocket(tournament.id);

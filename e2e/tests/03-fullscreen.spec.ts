@@ -53,6 +53,26 @@ async function startMatches(
   }, { timeout: 20_000 }).toBe(count);
 }
 
+async function stripGroupFromMatchesEndpoint(page: Page, tournamentId: number): Promise<void> {
+  await page.route(new RegExp(`/tournaments/${tournamentId}/matches(\\?.*)?$`), async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    const stripGroup = (match: ApiMatchForBadge) => {
+      const withoutGroup = { ...match };
+      delete withoutGroup.group;
+      return withoutGroup;
+    };
+    const payload = Array.isArray(body)
+      ? body.map(stripGroup)
+      : {
+          ...body,
+          matches: Array.isArray(body.matches) ? body.matches.map(stripGroup) : body.matches,
+        };
+
+    await route.fulfill({ response, json: payload });
+  });
+}
+
 test('Fullscreen beamer page renders with default fallback', async ({ page }, testInfo) => {
   // Fullscreen/beamer pages are designed for projectors — use a wide viewport
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -164,13 +184,17 @@ test('Fullscreen beamer badges show group numbers for group matches and position
   const groupMatches = await client.get<ApiMatchForBadge[]>(`/tournaments/${groupTournament.id}/matches`);
   expectStatus(groupMatches, 200, 'fetch group matches for badge labels');
   const groupMatch = groupMatches.json.find((match) =>
-    match.group?.number === 2 && match.state === 'not_started' && match.match_scores.length === 2
+    match.group?.number === 2 &&
+    match.position + 1 !== match.group.number &&
+    match.state === 'not_started' &&
+    match.match_scores.length === 2
   );
   expect(groupMatch).toBeTruthy();
 
   const startedGroup = await client.patch(`/matches/${groupMatch!.id}`, { state: 'in_progress' });
   expectStatus(startedGroup, 200, 'start group match for badge label');
 
+  await stripGroupFromMatchesEndpoint(page, groupTournament.id);
   await page.goto(`/t/${groupTournament.id}/fullscreen?display=during_game`);
   const groupCard = page.locator(`[data-match-id="${groupMatch!.id}"]`);
   await expect(groupCard).toBeVisible({ timeout: 20_000 });
