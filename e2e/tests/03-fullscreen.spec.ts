@@ -334,3 +334,46 @@ test('Fullscreen timer updates live for countup mode', async ({ page }, testInfo
   });
   await keyframe(page, testInfo, 'fullscreen_timer_reason_countup');
 });
+
+test('Werbung beamer rotates selected images and shows timer reason', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(4, 4, 8);
+
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const timerEnd = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+  const timerRes = await client.patch(
+    `/tournaments/${tournament.id}/timer`,
+    {
+      timestamp: timerEnd,
+      timer_mode: 'countdown',
+      timer_reason: 'custom',
+      timer_reason_text: 'Werbepause',
+    },
+  );
+  expectStatus(timerRes, 200, 'set werbung timer');
+
+  const beamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'werbung',
+    display_state: 'static_image',
+    config: {
+      display_mode: 'werbung',
+      werbung_image_keys: ['bpwstr_logo', 'bpwstr_banner'],
+      werbung_rotation_seconds: 1,
+    },
+  });
+  expectStatus(beamer, 201, 'create werbung beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=werbung`);
+  await expect(page.getByTestId('beamer-werbung-view')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('beamer-werbung-reason')).toContainText(/Werbepause|Spielende/);
+  await expect(page.getByTestId('beamer-werbung-timer')).toBeVisible();
+  await expect(page.getByTestId('beamer-werbung-image')).toHaveAttribute('src', /bpwstr_logo/);
+  await expect(page.getByTestId('beamer-werbung-image')).toHaveAttribute('src', /bpwstr_banner/, {
+    timeout: 5_000,
+  });
+  await expect(page.locator('body')).toHaveClass(/hide-cursor/);
+  await keyframe(page, testInfo, 'fullscreen_werbung_beamer');
+});

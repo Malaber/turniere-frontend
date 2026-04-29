@@ -175,6 +175,14 @@ async function main() {
     { name: 'during', display_state: 'during_game' },
     { name: 'timer', display_state: 'during_game', config: { display_mode: 'timer_only' } },
     { name: 'groups', display_state: 'group_tables' },
+    {
+      name: 'werbung',
+      display_state: 'static_image',
+      config: {
+        display_mode: 'werbung',
+        werbung_image_keys: ['bpwstr_banner', 'bpwstr_logo', 'turniere_logo'],
+      },
+    },
   ];
 
   for (const beamer of beamers) {
@@ -202,6 +210,7 @@ async function main() {
   console.log(`  During game:       ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=during`);
   console.log(`  Timer only:        ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=timer`);
   console.log(`  Groups:            ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=groups`);
+  console.log(`  Werbung:           ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=werbung`);
   console.log(`  Statistics:        ${frontendUrl}/t/${tournamentId}/statistics`);
 }
 
