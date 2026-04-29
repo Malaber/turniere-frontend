@@ -79,4 +79,3 @@ The built container exposes port 80.
 # Todo 
 
 showMatches={playoffStages !== null} showmatches in GroupStage mittlerweile vmtl useless weil immer eingeklappt
-
