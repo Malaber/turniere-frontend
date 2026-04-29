@@ -231,10 +231,6 @@ export class BeamerTimerEffects extends React.Component {
     }
 
     manualUnlock(event) {
-        if (event) {
-            event.preventDefault();
-        }
-
         if (
             this.unlockInProgress ||
             (this.audioPermissionStatus === 'allowed' && !this.pendingCue)
@@ -244,12 +240,14 @@ export class BeamerTimerEffects extends React.Component {
 
         this.unlockInProgress = true;
 
-        const hadPendingCue = Boolean(this.pendingCue);
         this.retryPendingCue('manual-unlock');
-        const permissionCheck = hadPendingCue ?
-            Promise.resolve() :
+        const needsPermissionCheck =
+            this.audioPermissionStatus !== 'allowed' &&
+            !this.pendingCue;
+        const permissionCheck = needsPermissionCheck ?
             this.checkAudioPermission('manual-unlock')
-                .then(() => this.retryPendingCue('manual-unlock'));
+                .then(() => this.retryPendingCue('manual-unlock')) :
+            Promise.resolve();
 
         permissionCheck
             .catch(() => {})
@@ -497,9 +495,7 @@ export class BeamerTimerEffects extends React.Component {
                 data-testid="beamer-sound-unlock"
                 aria-label="Audio aktivieren"
                 onClick={this.manualUnlock}
-                onPointerDown={this.manualUnlock}
                 onPointerUp={this.manualUnlock}
-                onTouchStart={this.manualUnlock}
                 onTouchEnd={this.manualUnlock}
                 style={{
                     position: 'fixed',

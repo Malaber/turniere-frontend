@@ -116,13 +116,19 @@ export class AnimatedTimer extends React.Component {
             (totalSeconds <= 10 || this.props.forceUrgent);
 
         const chars = formatTimerMs(display.ms).split('');
+        const timerStyle = {'--timer-slots': String(chars.length)};
 
         const cls = styles.timer +
             (isUrgent ? ' ' + styles.timerUrgent : '') +
             (this.props.className ? ' ' + this.props.className : '');
 
         return (
-            <div ref={this.timerRef} className={cls} data-testid={this.props.testId}>
+            <div
+                ref={this.timerRef}
+                className={cls}
+                data-testid={this.props.testId}
+                style={timerStyle}
+            >
                 {chars.map((char, i) => {
                     if (char === ':') {
                         return (
@@ -317,6 +323,7 @@ export class DuringGameView extends React.Component {
                             <AnimatedTimer
                                 timerState={timerState}
                                 onPhaseChange={this.onTimerPhaseChange}
+                                testId="fullscreen-timer"
                             />
                         ) : (
                             <div className={styles.noTimer}>
@@ -353,6 +360,7 @@ export class DuringGameView extends React.Component {
                         <AnimatedTimer
                             timerState={timerState}
                             onPhaseChange={this.onTimerPhaseChange}
+                            testId="fullscreen-timer"
                         />
                     ) : (
                         <div className={styles.noTimer}>

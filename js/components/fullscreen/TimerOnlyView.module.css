@@ -16,8 +16,9 @@
 }
 
 .timerOnlyTimer {
-    font-size: clamp(10rem, 78cqh, 26rem);
+    font-size: clamp(6rem, min(calc(165cqw / var(--timer-slots, 5)), 78cqh), 26rem);
     letter-spacing: 0;
+    max-width: 100%;
 }
 
 .noTimer {
