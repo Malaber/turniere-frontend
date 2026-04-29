@@ -7,6 +7,7 @@ import {FullscreenMatchCard} from './FullscreenMatchCard';
 
 
 const MATCHES_PER_PAGE = 16;
+const PORTRAIT_MATCHES_PER_PAGE = 8;
 const PAGE_CYCLE_MS = 10000;
 const COUNTDOWN_THRESHOLD_S = 10;
 const FINISHED_DISPLAY_MS = 10000;
@@ -149,14 +150,27 @@ export class DuringGameView extends React.Component {
         super(props);
         this.state = {
             pageIndex: 0,
+            matchesPerPage: MATCHES_PER_PAGE,
+            viewportHeight: null,
             timerPhase: 'normal' // 'normal' | 'countdown' | 'finished'
         };
         this.cyclePage = this.cyclePage.bind(this);
         this.onTimerPhaseChange = this.onTimerPhaseChange.bind(this);
+        this.updateViewportLayout = this.updateViewportLayout.bind(this);
         this._finishedTimeout = null;
     }
 
     componentDidMount() {
+        if (typeof window !== 'undefined' && window.matchMedia) {
+            this.portraitMediaQuery = window.matchMedia('(max-aspect-ratio: 3 / 4)');
+            this.updateViewportLayout();
+            if (this.portraitMediaQuery.addEventListener) {
+                this.portraitMediaQuery.addEventListener('change', this.updateViewportLayout);
+            } else if (this.portraitMediaQuery.addListener) {
+                this.portraitMediaQuery.addListener(this.updateViewportLayout);
+            }
+            window.addEventListener('resize', this.updateViewportLayout);
+        }
         this.intervalId = setInterval(
             this.cyclePage, PAGE_CYCLE_MS
         );
@@ -165,6 +179,22 @@ export class DuringGameView extends React.Component {
     componentWillUnmount() {
         clearInterval(this.intervalId);
         clearTimeout(this._finishedTimeout);
+        if (this.portraitMediaQuery) {
+            if (this.portraitMediaQuery.removeEventListener) {
+                this.portraitMediaQuery.removeEventListener('change', this.updateViewportLayout);
+            } else if (this.portraitMediaQuery.removeListener) {
+                this.portraitMediaQuery.removeListener(this.updateViewportLayout);
+            }
+        }
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('resize', this.updateViewportLayout);
+        }
+    }
+
+    componentDidUpdate(prevProps) {
+        if (prevProps.matches !== this.props.matches) {
+            this.updateViewportLayout();
+        }
     }
 
     onTimerPhaseChange(phase) {
@@ -187,25 +217,57 @@ export class DuringGameView extends React.Component {
     cyclePage() {
         const {matches} = this.props;
         if (!matches || matches.length === 0) return;
-        const total = Math.ceil(matches.length / MATCHES_PER_PAGE);
+        const total = Math.ceil(matches.length / this.state.matchesPerPage);
         if (total <= 1) return;
         this.setState(prev => ({
             pageIndex: (prev.pageIndex + 1) % total
         }));
     }
 
+    updateViewportLayout() {
+        const matchesPerPage = this.portraitMediaQuery && this.portraitMediaQuery.matches ?
+            PORTRAIT_MATCHES_PER_PAGE :
+            MATCHES_PER_PAGE;
+        const viewportHeight = typeof window !== 'undefined' ?
+            window.innerHeight :
+            null;
+
+        this.setState(prev => {
+            const matchCount = this.props.matches ? this.props.matches.length : 0;
+            const totalPages = Math.max(1, Math.ceil(matchCount / matchesPerPage));
+            const pageIndex = Math.min(prev.pageIndex, totalPages - 1);
+
+            if (
+                prev.matchesPerPage === matchesPerPage &&
+                prev.viewportHeight === viewportHeight &&
+                prev.pageIndex === pageIndex
+            ) {
+                return null;
+            }
+
+            return {
+                matchesPerPage,
+                viewportHeight,
+                pageIndex
+            };
+        });
+    }
+
     render() {
         const {matches, timerState} = this.props;
-        const {pageIndex, timerPhase} = this.state;
+        const {pageIndex, timerPhase, matchesPerPage, viewportHeight} = this.state;
         const hasTimer = timerState && timerState.mode;
         const takeover = timerPhase === 'countdown' || timerPhase === 'finished';
+        const rootStyle = viewportHeight ?
+            {'--fullscreen-height': viewportHeight + 'px'} :
+            undefined;
 
         const sorted = matches ?
             [...matches].sort(sortMatchesByPositionAscending()) :
             [];
-        const totalPages = Math.ceil(sorted.length / MATCHES_PER_PAGE);
-        const start = pageIndex * MATCHES_PER_PAGE;
-        const page = sorted.slice(start, start + MATCHES_PER_PAGE);
+        const totalPages = Math.ceil(sorted.length / matchesPerPage);
+        const start = pageIndex * matchesPerPage;
+        const page = sorted.slice(start, start + matchesPerPage);
 
         // Choose grid columns: 4 cols for a full page, fewer when < 4 matches
         const cols = Math.min(4, page.length);
@@ -229,7 +291,7 @@ export class DuringGameView extends React.Component {
                     className={styles.matchGrid}
                     key={pageIndex}
                     style={{
-                        gridTemplateColumns: 'repeat(' + cols + ', 1fr)'
+                        '--match-grid-columns': cols
                     }}
                 >
                     {page.map((m, i) =>
@@ -249,7 +311,7 @@ export class DuringGameView extends React.Component {
         // Fullscreen takeover for countdown / finished
         if (takeover) {
             return (
-                <div className={styles.duringGameRoot}>
+                <div className={styles.duringGameRoot} style={rootStyle}>
                     <div className={styles.timerTakeover}>
                         {hasTimer ? (
                             <AnimatedTimer
@@ -264,8 +326,20 @@ export class DuringGameView extends React.Component {
                     </div>
 
                     <style global jsx>{`
+                        html,
                         body {
                             background: #ffffff;
+                            height: 100%;
+                            margin: 0;
+                            min-height: 0 !important;
+                            overflow: hidden;
+                        }
+
+                        #__next,
+                        #__next > div {
+                            height: 100%;
+                            min-height: 0 !important;
+                            overflow: hidden;
                         }
                     `}</style>
                 </div>
@@ -273,7 +347,7 @@ export class DuringGameView extends React.Component {
         }
 
         return (
-            <div className={styles.duringGameRoot}>
+            <div className={styles.duringGameRoot} style={rootStyle}>
                 <div className={styles.timerContainer}>
                     {hasTimer ? (
                         <AnimatedTimer
@@ -304,8 +378,20 @@ export class DuringGameView extends React.Component {
                 )}
 
                 <style global jsx>{`
+                    html,
                     body {
                         background: #ffffff;
+                        height: 100%;
+                        margin: 0;
+                        min-height: 0 !important;
+                        overflow: hidden;
+                    }
+
+                    #__next,
+                    #__next > div {
+                        height: 100%;
+                        min-height: 0 !important;
+                        overflow: hidden;
                     }
                 `}</style>
             </div>
