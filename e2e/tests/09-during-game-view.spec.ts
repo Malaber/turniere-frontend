@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, devices } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
 import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
 import {
@@ -128,6 +128,14 @@ async function setupBeamerAndMatches(
 async function installBeamerEffectSpies(page: Page) {
   await page.addInitScript(() => {
     (window as any).__beamerAudioEvents = [];
+    (window as any).__beamerAudioUnlocked = false;
+
+    const markAudioUnlocked = () => {
+      (window as any).__beamerAudioUnlocked = true;
+    };
+    window.addEventListener('click', markAudioUnlocked, { capture: true });
+    window.addEventListener('pointerup', markAudioUnlocked, { capture: true });
+    window.addEventListener('touchend', markAudioUnlocked, { capture: true });
 
     class FakeAudio {
       src: string;
@@ -143,8 +151,11 @@ async function installBeamerEffectSpies(page: Page) {
       }
 
       play() {
-        if ((window as any).__blockBeamerAudioOnce && !this.muted) {
-          (window as any).__blockBeamerAudioOnce = false;
+        if (
+          (window as any).__blockBeamerAudioUntilInteraction &&
+          !(window as any).__beamerAudioUnlocked &&
+          !this.muted
+        ) {
           (window as any).__beamerAudioEvents.push({
             type: 'audio-blocked',
             src: this.src,
@@ -200,6 +211,27 @@ async function waitForBeamerEffect(page: Page, type: string, cue?: string) {
     { expectedType: type, expectedCue: cue },
     { timeout: 8_000 },
   );
+}
+
+async function readAnimatedTimerText(page: Page, testId: string): Promise<string> {
+  return page.getByTestId(testId).evaluate((el) => {
+    return Array.from(el.children)
+      .map((child) => {
+        const strip = child.querySelector('[class*="digitStrip"]');
+        if (!strip) return child.textContent ?? '';
+
+        const style = (strip as HTMLElement).style.transform;
+        const match = style.match(/translateY\((-?\d+(?:\.\d+)?)%\)/);
+        return match ? String(Math.abs(parseFloat(match[1])) / 10) : '?';
+      })
+      .join('');
+  });
+}
+
+async function expectAnimatedTimerText(page: Page, testId: string, expected: RegExp): Promise<void> {
+  await expect
+    .poll(() => readAnimatedTimerText(page, testId), { timeout: 10_000 })
+    .toMatch(expected);
 }
 
 // ---------------------------------------------------------------------------
@@ -341,7 +373,7 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   await page.setViewportSize({ width: 1920, height: 1080 });
   await installBeamerEffectSpies(page);
   await page.addInitScript(() => {
-    (window as any).__blockBeamerAudioOnce = true;
+    (window as any).__blockBeamerAudioUntilInteraction = true;
   });
 
   const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(12, {
@@ -456,6 +488,132 @@ test('Timer-only beamer renders urgent timer without matches and keeps sound act
   await expect(page.getByTestId('timer-only-timer')).toBeVisible();
   await expect(page.getByTestId('timer-only-reason')).toHaveCount(0);
   await keyframe(page, testInfo, 'timer_only_without_reason');
+});
+
+test('Animated fullscreen timer pads minutes after hours and days', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(0, {
+    timerSeconds: 5 * 60 * 60 + 3 * 60 + 30,
+    beamerName: 'timer-leading-zero',
+    displayState: 'timer_only',
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+  await expect(page.getByTestId('timer-only-timer')).toBeVisible({ timeout: 20_000 });
+  await expectAnimatedTimerText(page, 'timer-only-timer', /^5:03:\d{2}$/);
+
+  const overDay = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 25 * 60 * 60 + 3 * 60 + 30,
+  });
+  expectStatus(overDay, 200, 'set over-day timer');
+
+  await page.reload();
+  await expect(page.getByTestId('timer-only-timer')).toBeVisible({ timeout: 20_000 });
+  await expectAnimatedTimerText(page, 'timer-only-timer', /^25:03:\d{2}$/);
+});
+
+test.describe('Fullscreen mobile viewport', () => {
+  const mobileDevice = devices['iPhone 13'];
+
+  test.use({
+    viewport: mobileDevice.viewport,
+    userAgent: mobileDevice.userAgent,
+    deviceScaleFactor: mobileDevice.deviceScaleFactor,
+    isMobile: mobileDevice.isMobile,
+    hasTouch: mobileDevice.hasTouch,
+  });
+
+  test('Audio unlock responds to mobile tap', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+    await installBeamerEffectSpies(page);
+    await page.addInitScript(() => {
+      (window as any).__blockBeamerAudioUntilInteraction = true;
+    });
+
+    const { tournament, fullscreenQuery } = await setupBeamerAndMatches(8, {
+      timerSeconds: 20 * 60 + 5,
+      beamerName: 'mobile-audio',
+    });
+
+    await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+
+    await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 15_000 });
+    await waitForBeamerEffect(page, 'audio-permission-blocked');
+
+    const unlockButton = page.getByTestId('beamer-sound-unlock');
+    await expect(unlockButton).toBeVisible();
+    await keyframe(page, testInfo, 'mobile_audio_blocked');
+
+    await unlockButton.tap();
+    await page.waitForFunction(
+      () => {
+        const events = (window as any).__beamerTimerEffects?.events || [];
+        return events.some(
+          (event) => event.type === 'audio-permission-allowed' && event.reason === 'manual-unlock',
+        );
+      },
+      undefined,
+      { timeout: 8_000 },
+    );
+    await expect(unlockButton).toHaveCount(0);
+    await keyframe(page, testInfo, 'mobile_audio_unlocked');
+  });
+
+  test('During-game match grid stays readable in portrait', async ({ page }, testInfo) => {
+    test.setTimeout(180_000);
+
+    const { tournament, fullscreenQuery } = await setupBeamerAndMatches(16, {
+      beamerName: 'mobile-layout',
+    });
+
+    await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+
+    await expect(page.getByText('Kein Timer gesetzt')).toBeVisible({ timeout: 15_000 });
+    const matchCards = page.getByTestId('fullscreen-match-card');
+    await expect(matchCards).toHaveCount(8);
+    await expect(page.getByTestId('fullscreen-page-dot')).toHaveCount(2);
+    await keyframe(page, testInfo, 'mobile_portrait_matches');
+
+    const layout = await matchCards.evaluateAll((cards) =>
+      cards.map((card) => {
+        const rect = card.getBoundingClientRect();
+        return {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          right: rect.right,
+          bottom: rect.bottom,
+        };
+      }),
+    );
+    const viewport = page.viewportSize();
+    expect(viewport).not.toBeNull();
+
+    const columns = new Set(layout.map((box) => Math.round(box.x / 10) * 10));
+    expect(columns.size).toBeLessThanOrEqual(2);
+    expect(Math.min(...layout.map((box) => box.width))).toBeGreaterThan(150);
+    expect(Math.min(...layout.map((box) => box.height))).toBeGreaterThan(48);
+    expect(Math.max(...layout.map((box) => box.right))).toBeLessThanOrEqual(viewport!.width + 1);
+    expect(Math.max(...layout.map((box) => box.bottom))).toBeLessThanOrEqual(viewport!.height + 1);
+
+    const firstTeamName = page.getByTestId('fullscreen-team-name').first();
+    await expect(firstTeamName).toBeVisible();
+    const firstNameBox = await firstTeamName.boundingBox();
+    expect(firstNameBox).not.toBeNull();
+    expect(firstNameBox!.height).toBeGreaterThan(10);
+
+    const scrollSize = await page.evaluate(() => ({
+      width: document.documentElement.scrollWidth,
+      height: document.documentElement.scrollHeight,
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+    }));
+    expect(scrollSize.width).toBeLessThanOrEqual(scrollSize.innerWidth + 1);
+    expect(scrollSize.height).toBeLessThanOrEqual(scrollSize.innerHeight + 1);
+  });
 });
 
 // ---------------------------------------------------------------------------

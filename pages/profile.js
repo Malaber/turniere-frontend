@@ -8,7 +8,7 @@ import {Footer} from '../js/components/Footer';
 
 import {connect} from 'react-redux';
 import {changeMail} from '../js/api';
-import {notify} from 'react-notify-toast';
+import {notify} from '../js/components/Notifications';
 import RequireLogin from '../js/components/RequireLogin';
 
 function ContentContainer(props) {

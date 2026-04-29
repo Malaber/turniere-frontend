@@ -5,7 +5,7 @@ import {connect} from 'react-redux';
 import React from 'react';
 
 import {logout} from '../api';
-import {notify} from 'react-notify-toast';
+import {notify} from './Notifications';
 import {Timer} from './Timer';
 import {getTimerReasonLabel} from '../utils/timerState';
 

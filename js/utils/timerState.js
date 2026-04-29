@@ -95,6 +95,24 @@ export function getTimerDisplay(timerState, nowMs) {
     };
 }
 
+export function formatTimerMs(ms, {labelHours = false} = {}) {
+    const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const formattedSeconds = String(seconds).padStart(2, '0');
+    const formattedMinutes = hours > 0 ?
+        String(minutes).padStart(2, '0') :
+        String(minutes);
+
+    if (hours > 0) {
+        const hourSeparator = labelHours ? 'h ' : ':';
+        return hours + hourSeparator + formattedMinutes + ':' + formattedSeconds;
+    }
+
+    return formattedMinutes + ':' + formattedSeconds;
+}
+
 // Compatibility for older backend payloads. Remove once all callers use
 // timestamp + timer_mode only.
 export function normalizeTournamentTimerState(apiTournament) {

@@ -5,7 +5,7 @@ import Router from 'next/router';
 
 import {login} from '../api';
 
-import {notify} from 'react-notify-toast';
+import {notify} from './Notifications';
 
 function redirectTargetFromQuery(redirect) {
     const target = Array.isArray(redirect) ? redirect[0] : redirect;

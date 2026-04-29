@@ -1,6 +1,6 @@
 import React from 'react';
 import {Alert, Button, Input, Label} from 'reactstrap';
-import {notify} from 'react-notify-toast';
+import {notify} from './Notifications';
 import {testTournamentSync, updateTournament} from '../api';
 
 export class TournamentSettingsForm extends React.Component {

@@ -94,7 +94,7 @@ test('Auth token renewal is persisted and used by later API requests', async ({ 
 
   await page.goto('/profile');
 
-  expect(validateTokenWasCalled).toBe(true);
+  await expect.poll(() => validateTokenWasCalled).toBe(true);
   await expect.poll(async () => page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('reduxState') || '{}');
     return state.userinfo?.accesstoken;

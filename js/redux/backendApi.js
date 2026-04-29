@@ -1,7 +1,4 @@
-import getConfig from 'next/config';
-const {publicRuntimeConfig} = getConfig();
-
-const apiUrl = publicRuntimeConfig.api_url;
+import {getApiUrl} from '../runtimeConfig';
 
 const axios = require('axios');
 
@@ -38,6 +35,7 @@ function request(state, method, url, data) {
     const config = {
         headers: generateHeaders(state)
     };
+    const apiUrl = getApiUrl();
     const args = method === 'get' || method === 'delete' ?
         [apiUrl + url, config] :
         [apiUrl + url, data, config];
@@ -102,7 +100,7 @@ function authHeadersFromResponse(response) {
     }
     return {
         'access-token': response.headers['access-token'],
-        client: response.headers.client,
-        uid: response.headers.uid
+        'client': response.headers.client,
+        'uid': response.headers.uid
     };
 }
