@@ -3,6 +3,7 @@ import {Col, Navbar, NavbarBrand, Row, Spinner} from 'reactstrap';
 import {Match} from '../Match';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
 import {Timer} from '../Timer';
+import {getTimerReasonLabel} from '../../utils/timerState';
 
 
 function Matches(props) {
@@ -17,7 +18,9 @@ function Matches(props) {
     } else {
         matches = (<Row>
             {props.matches.sort(sortMatchesByPositionAscending()).map(
-                match => <Col md="auto" key={match.id}><Match match={match}/></Col>
+                match => <Col md="auto" key={match.id}>
+                    <Match match={match} positionBadgeMode="group-for-group-matches"/>
+                </Col>
             )}
         </Row>);
     }
@@ -36,7 +39,8 @@ function MatchesViewHeader(props) {
             <NavbarBrand>{props.title}</NavbarBrand>
             {props.timerState && props.timerState.mode &&
                 <div className="ml-auto timer-container">
-                    Spielzeit: <NavbarBrand><Timer timerState={props.timerState}/></NavbarBrand>
+                    {getTimerReasonLabel(props.timerState)}:{' '}
+                    <NavbarBrand><Timer timerState={props.timerState}/></NavbarBrand>
                 </div>
             }
         </Navbar>

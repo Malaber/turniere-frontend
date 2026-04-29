@@ -4,6 +4,7 @@ import {
   seedGroupStageTournament,
   seedAndPlayGroupStage,
   seedGroupStageAndRunToBeforeFinal,
+  finishGroupStageForTournament,
 } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
@@ -22,15 +23,62 @@ function statusText(page: Page, text: string | RegExp) {
   return page.locator('small.text-muted:visible').filter({ hasText: text }).first();
 }
 
+test('Tournament id view renders basic information while full tournament loads', async ({ page }) => {
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  let sawMetaRequest = false;
+  let sawFullRequest = false;
+  let releaseFullTournament: (() => void) | null = null;
+  const fullTournamentBlocked = new Promise<void>((resolve) => {
+    releaseFullTournament = resolve;
+  });
+
+  await page.route(new RegExp(`/tournaments/${tournament.id}(\\?.*)?$`), async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get('simple') === 'true') {
+      sawMetaRequest = true;
+      await route.continue();
+      return;
+    }
+
+    sawFullRequest = true;
+    await fullTournamentBlocked;
+    await route.continue();
+  });
+
+  await page.goto(`/t/${tournament.id}`);
+  await expect(page.locator('.big-image')).toContainText(tournament.name, { timeout: 120000 });
+  await expect(page.getByRole('button', { name: 'Statistiken' })).toBeVisible();
+  await expect(page.getByTestId('tournament-favorites-loading')).toBeVisible();
+  await expect(page.getByTestId('tournament-details-loading')).toBeVisible();
+  expect(sawMetaRequest).toBe(true);
+  await expect.poll(() => sawFullRequest, { timeout: 10000 }).toBe(true);
+
+  releaseFullTournament?.();
+  await expect(page.getByTestId('tournament-details-loading')).toHaveCount(0, { timeout: 120000 });
+  await expect(page.getByTestId('tournament-favorites-loading')).toHaveCount(0);
+  await expect(page.getByText(/Gruppe/i).first()).toBeVisible();
+});
+
 test('Public tournament view renders group-stage and playoff data', async ({ page }, testInfo) => {
   // --- Seed: create group-stage tournament (4 groups × 4 teams, 8 playoff spots) ---
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+  const timer = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 20 * 60,
+    timer_reason: 'custom',
+    timer_reason_text: 'Final-Call',
+  });
+  expectStatus(timer, 200, 'set tournament-page timer reason');
 
   // --- Step 1: fresh tournament page ---
   await page.goto(`/t/${tournament.id}`);
   await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
+  await expect(page.locator('.big-image')).toContainText(/(Final-Call|Spielende):/);
+  await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
 
   await keyframe(page, testInfo, 'tournament_created');
+  await keyframe(page, testInfo, 'tournament_timer_reason_running');
 
   // Tournament name appears in the big-image header
   await expect(page.locator('.big-image')).toBeVisible();
@@ -74,6 +122,38 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
   await keyframe(page, testInfo, 'tournament_final_match');
   await scrollToLocator(thirdPlaceHeading);
   await keyframe(page, testInfo, 'tournament_third_place_match');
+});
+
+test('Tournament view match badges show group-local positions', async ({ page }) => {
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const groupStage = tournament.stages.find((stage) => stage.level === -1);
+  const firstGroup = groupStage?.groups[0];
+  const groupMatch = firstGroup?.matches.slice().sort((a, b) => a.position - b.position)[0];
+  expect(groupMatch).toBeTruthy();
+
+  await page.goto(`/t/${tournament.id}`);
+  await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
+  await page.getByTitle('Matches einblenden').first().click();
+
+  const groupCard = page.locator(`[data-match-id="${groupMatch!.id}"]`);
+  const groupBadge = groupCard.getByTestId('match-position-badge');
+  await expect(groupBadge).toHaveText(String(groupMatch!.position + 1));
+  await expect(groupBadge).toHaveAttribute('data-match-badge-kind', 'position');
+  await expect(groupCard.getByTestId('match-position-badge-group')).toHaveCount(0);
+
+  const { tournament: playoffTournament } = await seedAndPlayGroupStage(2, 4, 4);
+  const playoffStage = playoffTournament.stages.find((stage) => stage.level !== -1);
+  const playoffMatch = playoffStage?.matches.slice().sort((a, b) => a.position - b.position)[0];
+  expect(playoffMatch).toBeTruthy();
+
+  await page.goto(`/t/${playoffTournament.id}`);
+  await expect(page.locator('.stages').first()).toBeVisible({ timeout: 120000 });
+
+  const playoffBadge = page
+    .locator(`[data-match-id="${playoffMatch!.id}"]`)
+    .getByTestId('match-position-badge');
+  await expect(playoffBadge).toHaveText(String(playoffMatch!.position + 1));
+  await expect(playoffBadge).toHaveAttribute('data-match-badge-kind', 'position');
 });
 
 test('Tournament match cards render all visible states as solid cards', async ({ page }, testInfo) => {
@@ -196,4 +276,22 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
     timeout: 10_000,
   });
   await keyframe(page, testInfo, 'live_tournament_finished');
+});
+
+test('Tournament view loads playoff bracket from live tournament snapshot', async ({ page }) => {
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+
+  await page.goto(`/t/${tournament.id}`);
+  await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
+  await expect(page.getByText(/Gruppe/i).first()).toBeVisible({ timeout: 120000 });
+  await expect(page.getByRole('heading', { name: 'Halbfinale', exact: true })).toHaveCount(0);
+
+  const { tournament: updatedTournament } = await finishGroupStageForTournament(tournament.id);
+  expect(updatedTournament.stages.some((stage) => stage.level !== -1)).toBe(true);
+
+  await expect(page.getByRole('heading', { name: 'Halbfinale', exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.locator('[data-match-state="not_started"]').first())
+    .toBeVisible();
 });

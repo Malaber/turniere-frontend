@@ -16,6 +16,13 @@ import {DuringGameView} from '../js/components/fullscreen/DuringGameView';
 import {BetweenGamesView} from '../js/components/fullscreen/BetweenGamesView';
 import {BeamerTimerEffects} from '../js/components/fullscreen/BeamerTimerEffects';
 import {TimerOnlyView} from '../js/components/fullscreen/TimerOnlyView';
+import {WerbungView} from '../js/components/fullscreen/WerbungView';
+import {
+    beamerMediaImageForKey,
+    selectedWerbungImages,
+    WERBUNG_DISPLAY_MODE,
+    werbungRotationMs
+} from '../js/utils/beamerMedia';
 
 
 const DISPLAY_STATE_LABELS = {
@@ -29,7 +36,8 @@ const DISPLAY_STATE_LABELS = {
     'between_games': 'Zwischen den Spielen',
     'during_game': 'Während dem Spiel',
     'timer_only': 'Nur Timer',
-    'static_image': 'Statisches Bild'
+    'static_image': 'Statisches Bild',
+    'werbung': 'Werbung'
 };
 
 const DEFAULT_DISPLAY_STATE_FILTERS = {
@@ -43,13 +51,8 @@ const DEFAULT_DISPLAY_STATE_FILTERS = {
     'timer_only': {},
     'groups': {},
     'group_tables': {},
-    'static_image': {}
-};
-
-const STATIC_IMAGE_URLS = {
-    bpwstr_banner: '/static/images/bpwstr_banner.jpg',
-    bpwstr_logo: '/static/images/bpwstr_logo.png',
-    turniere_logo: '/static/images/logo-questionmark.png'
+    'static_image': {},
+    'werbung': {}
 };
 
 const GROUPS_QR_CODE_URL = '/static/images/logo-questionmark.png';
@@ -95,9 +98,20 @@ function displayStateUsesMatches(displayState) {
 }
 
 function displayStateForBeamer(beamer) {
-    return beamer && beamer.config && beamer.config.display_mode === 'timer_only' ?
-        'timer_only' :
-        beamer.display_state;
+    if (!beamer) {
+        return null;
+    }
+    if (beamer && beamer.config && beamer.config.display_mode === 'timer_only') {
+        return 'timer_only';
+    }
+    if (beamer && beamer.config && beamer.config.display_mode === WERBUNG_DISPLAY_MODE) {
+        return 'werbung';
+    }
+    return beamer.display_state;
+}
+
+function showTimerReasonForBeamerConfig(config) {
+    return !config || config.show_timer_reason !== false;
 }
 
 
@@ -441,7 +455,10 @@ class Main extends React.Component {
                 matches={matches}
                 timerState={timerState}/>;
         case 'timer_only':
-            return <TimerOnlyView timerState={timerState}/>;
+            return <TimerOnlyView
+                timerState={timerState}
+                showReason={showTimerReasonForBeamerConfig(this.state.beamerConfig)}
+            />;
         case 'between_games':
             return <BetweenGamesView
                 tournamentMeta={tournamentMeta}
@@ -450,7 +467,7 @@ class Main extends React.Component {
         case 'static_image':
             return <div className="fullscreen-static-image">
                 <img
-                    src={STATIC_IMAGE_URLS[(this.state.beamerConfig || {}).image_key] || STATIC_IMAGE_URLS.bpwstr_logo}
+                    src={beamerMediaImageForKey((this.state.beamerConfig || {}).image_key).src}
                     alt=""
                 />
                 <style jsx>{`
@@ -470,6 +487,12 @@ class Main extends React.Component {
                     }
                 `}</style>
             </div>;
+        case 'werbung':
+            return <WerbungView
+                images={selectedWerbungImages(this.state.beamerConfig || {})}
+                rotationMs={werbungRotationMs(this.state.beamerConfig || {})}
+                timerState={timerState}
+            />;
         case 'matches_all':
         case 'matches_in_progress':
         case 'matches_upcoming':
@@ -505,7 +528,10 @@ class Main extends React.Component {
                 <Head>
                     <title>{tournamentMeta.name}: turnie.re</title>
                 </Head>
-                <BeamerTimerEffects timerState={this.state.timerState}/>
+                <BeamerTimerEffects
+                    timerState={this.state.timerState}
+                    soundEffectCommand={(this.state.beamerConfig || {}).sound_effect_command}
+                />
                 {this.renderView()}
             </div>);
         }

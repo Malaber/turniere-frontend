@@ -157,6 +157,7 @@ export class Match extends React.Component {
                 data-team-level-ids={`${team1Id},${team2Id}`}
                 data-match-id={this.state.match.id}
                 data-decider-match={this.state.match.decider ? 'true' : 'false'}
+                data-match-state={this.state.match.state}
             >
                 <div className={styles.matchCardRow}>
                     <CardBody
@@ -171,6 +172,7 @@ export class Match extends React.Component {
                     </CardBody>
                     <MatchPositionBadge
                         match={this.state.match}
+                        mode={this.props.positionBadgeMode || 'position'}
                         className={'badge bg-secondary ' + styles.matchCardBadge}
                         groupClassName={styles.matchCardBadgeGroup}
                         positionClassName={styles.matchCardBadgeNumber}

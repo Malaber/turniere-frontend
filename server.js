@@ -76,7 +76,25 @@ app.prepare()
             res.send(runtimeConfigScript());
         });
 
+        server.patch('/tournaments/:id/sync_state', (req, res) => {
+            const backendBaseUrl = apiUrl.replace(/\/$/, '');
+            res.status(404).json({
+                error: 'wrong_service',
+                message: `PATCH ${req.path} reached turniere-frontend. Sync push endpoints live on turniere-backend.`,
+                hint: 'Use the backend API URL configured in TURNIERE_API_URL for sync_target_url.',
+                configuredBackendUrl: apiUrl,
+                backendEndpoint: `${backendBaseUrl}/tournaments/${encodeURIComponent(req.params.id)}/sync_state`
+            });
+        });
+
         server.get('/t/:code', async (req, res) => {
+            if (/^\d+$/.test(req.params.code)) {
+                const actualPage = '/tournament';
+                const queryParam = {code: req.params.code};
+                app.render(req, res, actualPage, queryParam);
+                return;
+            }
+
             try {
                 const tournamentId = await resolvePublicTournamentIdByCode(req.params.code) ||
                     await resolveTournamentId(req.params.code);

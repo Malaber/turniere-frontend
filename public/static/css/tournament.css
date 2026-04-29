@@ -349,6 +349,72 @@
     margin-bottom: 0;
 }
 
+.mission-beamer-soundboard {
+    grid-column: 1 / -1;
+}
+
+.mission-beamer-media-checklist {
+    grid-column: 1 / -1;
+}
+
+.mission-beamer-media-label {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.mission-beamer-media-option {
+    align-items: center;
+    border: 1px solid #d9e1ea;
+    border-radius: 8px;
+    display: inline-flex;
+    margin: 0 0.5rem 0.5rem 0;
+    min-height: 4.5rem;
+    padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+    vertical-align: top;
+}
+
+.mission-beamer-media-option label {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.6rem;
+    margin-bottom: 0;
+}
+
+.mission-beamer-media-thumb {
+    align-items: center;
+    background: #eef3f8;
+    border-radius: 6px;
+    display: inline-flex;
+    height: 3rem;
+    justify-content: center;
+    overflow: hidden;
+    width: 4.5rem;
+}
+
+.mission-beamer-media-thumb img {
+    height: 100%;
+    object-fit: contain;
+    width: 100%;
+}
+
+.mission-beamer-soundboard-label {
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.mission-beamer-sounds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.mission-beamer-sounds .btn {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.35rem;
+    min-height: 2.5rem;
+}
+
 .mission-beamer-empty {
     border: 1px dashed #d9e1ea;
     border-radius: 8px;

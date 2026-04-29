@@ -13,6 +13,12 @@ const COUNTDOWN_THRESHOLD_S = 10;
 const FINISHED_DISPLAY_MS = 10000;
 
 
+function getTotalPages(matches, matchesPerPage = MATCHES_PER_PAGE) {
+    if (!matches || matches.length === 0) return 0;
+    return Math.ceil(matches.length / matchesPerPage);
+}
+
+
 function AnimatedDigit({value}) {
     const offset = -(value * 10);
     return (
@@ -104,6 +110,7 @@ export class AnimatedTimer extends React.Component {
         if (!display.active) return null;
 
         if (display.mode === TIMER_MODE_COUNTDOWN && display.ms === 0) {
+            if (this.props.hideFinished) return null;
             return (
                 <div className={styles.timerFinished}>
                     Spiel vorbei!
@@ -156,6 +163,7 @@ export class DuringGameView extends React.Component {
         super(props);
         this.state = {
             pageIndex: 0,
+            hasPaged: false,
             matchesPerPage: MATCHES_PER_PAGE,
             viewportHeight: null,
             timerPhase: 'normal' // 'normal' | 'countdown' | 'finished'
@@ -182,6 +190,29 @@ export class DuringGameView extends React.Component {
         );
     }
 
+    componentDidUpdate(prevProps, prevState) {
+        if (prevProps.matches !== this.props.matches) {
+            this.updateViewportLayout();
+        }
+
+        const prevTotal = getTotalPages(prevProps.matches, prevState.matchesPerPage);
+        const total = getTotalPages(this.props.matches, this.state.matchesPerPage);
+        const nextState = {};
+
+        if (total > 0 && this.state.pageIndex >= total) {
+            nextState.pageIndex = 0;
+        }
+
+        if (prevTotal === 0 && total > 0 && this.state.hasPaged) {
+            nextState.hasPaged = false;
+            nextState.pageIndex = 0;
+        }
+
+        if (Object.keys(nextState).length > 0) {
+            this.setState(nextState);
+        }
+    }
+
     componentWillUnmount() {
         clearInterval(this.intervalId);
         clearTimeout(this._finishedTimeout);
@@ -194,12 +225,6 @@ export class DuringGameView extends React.Component {
         }
         if (typeof window !== 'undefined') {
             window.removeEventListener('resize', this.updateViewportLayout);
-        }
-    }
-
-    componentDidUpdate(prevProps) {
-        if (prevProps.matches !== this.props.matches) {
-            this.updateViewportLayout();
         }
     }
 
@@ -226,7 +251,8 @@ export class DuringGameView extends React.Component {
         const total = Math.ceil(matches.length / this.state.matchesPerPage);
         if (total <= 1) return;
         this.setState(prev => ({
-            pageIndex: (prev.pageIndex + 1) % total
+            pageIndex: (prev.pageIndex + 1) % total,
+            hasPaged: true
         }));
     }
 
@@ -272,11 +298,15 @@ export class DuringGameView extends React.Component {
             [...matches].sort(sortMatchesByPositionAscending()) :
             [];
         const totalPages = Math.ceil(sorted.length / matchesPerPage);
-        const start = pageIndex * matchesPerPage;
-        const page = sorted.slice(start, start + matchesPerPage);
+        const pages = [];
+        for (let i = 0; i < totalPages; i++) {
+            pages.push(sorted.slice(
+                i * matchesPerPage,
+                (i + 1) * matchesPerPage
+            ));
+        }
 
-        // Choose grid columns: 4 cols for a full page, fewer when < 4 matches
-        const cols = Math.min(4, page.length);
+        const page = pages[pageIndex] || [];
         let matchContent;
         if (matches == null) {
             matchContent = (
@@ -293,21 +323,46 @@ export class DuringGameView extends React.Component {
             );
         } else {
             matchContent = (
-                <div
-                    className={styles.matchGrid}
-                    key={pageIndex}
-                    style={{
-                        '--match-grid-columns': cols
-                    }}
-                >
-                    {page.map((m, i) =>
-                        <FullscreenMatchCard
-                            key={m.id}
-                            match={m}
-                            index={i}
-                            showScores
-                        />
-                    )}
+                <div className={styles.matchCarousel}>
+                    <div
+                        className={styles.matchCarouselTrack}
+                        data-testid="fullscreen-match-carousel-track"
+                        style={{
+                            transform: 'translateX(-' + (pageIndex * 100) + '%)'
+                        }}
+                    >
+                        {pages.map((matchPage, pageNumber) => {
+                            const active = pageNumber === pageIndex;
+                            const animateCards = active && !this.state.hasPaged;
+                            const cols = Math.min(4, matchPage.length);
+
+                            return (
+                                <div
+                                    key={pageNumber}
+                                    className={styles.matchCarouselPage}
+                                    aria-hidden={!active}
+                                >
+                                    <div
+                                        className={styles.matchGrid}
+                                        style={{
+                                            '--match-grid-columns': cols
+                                        }}
+                                    >
+                                        {matchPage.map((m, i) =>
+                                            <FullscreenMatchCard
+                                                key={m.id}
+                                                match={m}
+                                                index={i}
+                                                animateEntry={animateCards}
+                                                isActive={active}
+                                                showScores
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             );
         }
@@ -361,6 +416,7 @@ export class DuringGameView extends React.Component {
                             timerState={timerState}
                             onPhaseChange={this.onTimerPhaseChange}
                             testId="fullscreen-timer"
+                            hideFinished={timerPhase === 'normal'}
                         />
                     ) : (
                         <div className={styles.noTimer}>

@@ -35,6 +35,8 @@ export function FullscreenMatchCard({
     index,
     showScores = false,
     fillHeight = false,
+    animateEntry = true,
+    isActive = true,
     animationDelayStep = 0.06
 }) {
     const team1 = match.team1;
@@ -50,23 +52,32 @@ export function FullscreenMatchCard({
         <div
             className={joinClasses(
                 styles.matchCard,
+                animateEntry ? styles.matchCardEnter : '',
                 fillHeight ? styles.matchCardFill : styles.matchCardAspect,
                 stateClass(match.state)
             )}
             style={{animationDelay: delay}}
-            data-testid="fullscreen-match-card"
+            data-testid={isActive ? 'fullscreen-match-card' : 'fullscreen-match-card-inactive'}
             data-match-id={match.id}
             data-match-state={match.state}
         >
             <div className={styles.matchContent}>
                 <div className={styles.matchTeamRow}>
-                    <TeamName name={team1.name} className={t1Cls} testId="fullscreen-team-name"/>
+                    <TeamName
+                        name={team1.name}
+                        className={t1Cls}
+                        testId={isActive ? 'fullscreen-team-name' : 'fullscreen-team-name-inactive'}
+                    />
                     {showScores && (
                         <span className={styles.teamScore}>{scoreFor(match, team1)}</span>
                     )}
                 </div>
                 <div className={styles.matchTeamRow}>
-                    <TeamName name={team2.name} className={t2Cls} testId="fullscreen-team-name"/>
+                    <TeamName
+                        name={team2.name}
+                        className={t2Cls}
+                        testId={isActive ? 'fullscreen-team-name' : 'fullscreen-team-name-inactive'}
+                    />
                     {showScores && (
                         <span className={styles.teamScore}>{scoreFor(match, team2)}</span>
                     )}
@@ -76,8 +87,8 @@ export function FullscreenMatchCard({
                 match={match}
                 as="div"
                 className={styles.matchBadge}
-                testId="fullscreen-match-badge"
-                showGroup={false}
+                testId={isActive ? 'fullscreen-match-badge' : 'fullscreen-match-badge-inactive'}
+                mode="group-for-group-matches"
             />
         </div>
     );

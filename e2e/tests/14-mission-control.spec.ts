@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { countBeamerEffects, installBeamerEffectSpies, waitForBeamerEffect } from '../helpers/beamer-audio';
 import { injectAuth } from '../helpers/auth';
 import { keyframe } from '../helpers/screenshot';
 import {
@@ -75,6 +76,12 @@ async function expectStartHoldProgressStarted(button: Locator) {
   }).toBeGreaterThan(0);
 }
 
+async function expectBeamerCardOrder(page: Page, expectedNames: string[]) {
+  await expect.poll(async () => page.locator('.mission-beamer-name').evaluateAll((elements) => (
+    elements.map((element) => element.textContent?.trim() ?? '')
+  )), { timeout: 20_000 }).toEqual(expectedNames);
+}
+
 async function holdStartUntilConfirmOpen(page: Page, button: Locator) {
   await button.hover();
   await page.mouse.down();
@@ -136,6 +143,52 @@ async function expectUnlockProgressDrainsAndLocks(card: Locator, score: Locator)
   await expect(card.getByRole('button', { name: /Locked/ })).toBeVisible();
 }
 
+test('Mission Control configures Werbung image checklist', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = await loggedInClient();
+
+  const beamer = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
+    name: 'werbung-control',
+    display_state: 'during_game',
+    config: {},
+  });
+  expectStatus(beamer, 201, 'create werbung-control beamer');
+
+  await page.goto(`/t/${tournament.id}/mission-control#beamer`);
+  const card = page.getByTestId(`mission-beamer-card-${beamer.json.id}`);
+  await expect(card).toBeVisible({ timeout: 20_000 });
+
+  await card.getByTestId(`mission-beamer-mode-${beamer.json.id}`).selectOption('werbung');
+  const checklist = card.getByTestId(`mission-beamer-werbung-checklist-${beamer.json.id}`);
+  await expect(checklist).toBeVisible();
+  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_banner`)).toBeChecked();
+
+  const tennis = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis_blurred`);
+  await tennis.click();
+
+  await expect.poll(async () => {
+    const beamers = await client.get<Array<{ id: number; config: Record<string, unknown> }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(beamers, 200, 'fetch beamers after werbung config');
+    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
+    return updated?.config;
+  }, { timeout: 20_000 }).toMatchObject({
+    display_mode: 'werbung',
+    werbung_image_keys: expect.arrayContaining(['bpwstr_banner', 'bpwstr_logo']),
+  });
+
+  await expect.poll(async () => {
+    const beamers = await client.get<Array<{ id: number; config: { werbung_image_keys?: string[] } }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(beamers, 200, 'fetch beamers after werbung uncheck');
+    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
+    return updated?.config.werbung_image_keys || [];
+  }, { timeout: 20_000 }).not.toContain('tennis_blurred');
+});
+
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
@@ -144,7 +197,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await page.goto(`/t/${tournament.id}/mission-control`);
   await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
 
-  await expect(page.getByRole('heading', { name: 'Timer' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Timer', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Checklisten' })).toBeVisible();
@@ -311,17 +364,17 @@ test('Mission Control saves independent beamer display controls instantly', asyn
   const client = await loggedInClient();
 
   const main = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
-    name: 'Main stage',
+    name: 'Zeta stage',
     display_state: 'between_games',
     config: {},
   });
-  expectStatus(main, 201, 'create main stage beamer');
+  expectStatus(main, 201, 'create zeta stage beamer');
   const side = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
-    name: 'Side wall',
+    name: 'Alpha wall',
     display_state: 'group_tables',
     config: {},
   });
-  expectStatus(side, 201, 'create side wall beamer');
+  expectStatus(side, 201, 'create alpha wall beamer');
 
   await page.goto(`/t/${tournament.id}/mission-control`);
   await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
@@ -329,8 +382,9 @@ test('Mission Control saves independent beamer display controls instantly', asyn
 
   await expect(page.getByTestId('mission-beamer-control')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Aktualisieren' })).toHaveCount(0);
-  await expect(page.getByText('Main stage')).toBeVisible();
-  await expect(page.getByText('Side wall')).toBeVisible();
+  await expect(page.getByText('Zeta stage')).toBeVisible();
+  await expect(page.getByText('Alpha wall')).toBeVisible();
+  await expectBeamerCardOrder(page, ['Alpha wall', 'default', 'Zeta stage']);
   await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('between_games');
   await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toBeVisible();
   const mainMatchSelect = page.getByTestId(`mission-beamer-match-${main.json.id}`);
@@ -352,6 +406,7 @@ test('Mission Control saves independent beamer display controls instantly', asyn
     expectStatus(updated, 200, 'fetch beamers after mode update');
     return updated.json.find((beamer) => beamer.id === main.json.id)?.display_state;
   }, { timeout: 20_000 }).toBe('during_game');
+  await expectBeamerCardOrder(page, ['Alpha wall', 'default', 'Zeta stage']);
   await expect(page.getByTestId(`mission-beamer-mode-${side.json.id}`)).toHaveValue('group_tables');
 
   await page.getByTestId(`mission-beamer-match-${main.json.id}`).selectOption('state:in_progress');
@@ -380,15 +435,123 @@ test('Mission Control saves independent beamer display controls instantly', asyn
   await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('timer_only');
   await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toHaveCount(0);
   await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveCount(0);
+  await expect(page.getByTestId(`mission-beamer-timer-reason-${main.json.id}`)).toBeChecked({ timeout: 20_000 });
   await expect(page.getByText('Timer Only · Nur Timer')).toBeVisible({ timeout: 20_000 });
+  await keyframe(page, testInfo, 'beamer_timer_only_reason_setting');
   await expect.poll(async () => {
-    const updated = await client.get<Array<{ id: number; display_state: string; config?: { display_mode?: string } }>>(
+    const updated = await client.get<Array<{
+      id: number;
+      display_state: string;
+      config?: { display_mode?: string; show_timer_reason?: boolean };
+    }>>(
       `/tournaments/${tournament.id}/beamers`,
     );
     expectStatus(updated, 200, 'fetch beamers after timer-only update');
     const beamer = updated.json.find((candidate) => candidate.id === main.json.id);
-    return `${beamer?.display_state}:${beamer?.config?.display_mode}`;
-  }, { timeout: 20_000 }).toBe('during_game:timer_only');
+    return `${beamer?.display_state}:${beamer?.config?.display_mode}:${beamer?.config?.show_timer_reason}`;
+  }, { timeout: 20_000 }).toBe('during_game:timer_only:true');
+
+  await page.getByTestId(`mission-beamer-timer-reason-${main.json.id}`).uncheck();
+  await expect(page.getByTestId(`mission-beamer-timer-reason-${main.json.id}`)).not.toBeChecked();
+  await keyframe(page, testInfo, 'beamer_timer_only_without_reason_setting');
+  await expect.poll(async () => {
+    const updated = await client.get<Array<{
+      id: number;
+      display_state: string;
+      config?: { display_mode?: string; show_timer_reason?: boolean };
+    }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(updated, 200, 'fetch beamers after timer-only reason toggle');
+    const beamer = updated.json.find((candidate) => candidate.id === main.json.id);
+    return `${beamer?.display_state}:${beamer?.config?.display_mode}:${beamer?.config?.show_timer_reason}`;
+  }, { timeout: 20_000 }).toBe('during_game:timer_only:false');
+  await expectBeamerCardOrder(page, ['Alpha wall', 'default', 'Zeta stage']);
+});
+
+test('Mission Control soundboard controls beamer audio with timer priority', async ({ context, page }, testInfo) => {
+  test.setTimeout(180_000);
+  await injectAuth(context);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = await loggedInClient();
+
+  const beamer = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
+    name: 'Soundboard',
+    display_state: 'static_image',
+    config: { image_key: 'bpwstr_logo' },
+  });
+  expectStatus(beamer, 201, 'create soundboard beamer');
+
+  const beamerPage = await context.newPage();
+  await installBeamerEffectSpies(beamerPage);
+  await beamerPage.goto(`/t/${tournament.id}/fullscreen?beamer=${encodeURIComponent('Soundboard')}`);
+  await waitForBeamerEffect(beamerPage, 'audio-permission-allowed');
+
+  await page.goto(`/t/${tournament.id}/mission-control#beamer`);
+  await expect(page.getByTestId('mission-beamer-control')).toBeVisible({ timeout: 20_000 });
+  const card = page.getByTestId(`mission-beamer-card-${beamer.json.id}`);
+  await expect(card.getByTestId(`mission-beamer-soundboard-${beamer.json.id}`)).toBeVisible();
+  await expect(card.getByTestId(`mission-sound-play-${beamer.json.id}-start-countdown`)).toBeVisible();
+  await expect(card.getByTestId(`mission-sound-play-${beamer.json.id}-mid-game-warning`)).toBeVisible();
+  await expect(card.getByTestId(`mission-sound-play-${beamer.json.id}-end-countdown`)).toBeVisible();
+
+  const startCount = await countBeamerEffects(beamerPage, 'sound-effect', 'start-countdown');
+  const startButton = card.getByTestId(`mission-sound-play-${beamer.json.id}-start-countdown`);
+  await expect(startButton).toBeEnabled();
+  await startButton.click();
+  await waitForBeamerEffect(beamerPage, 'sound-effect', 'start-countdown', startCount + 1);
+  await waitForBeamerEffect(beamerPage, 'sound-started', 'start-countdown');
+
+  const warningCount = await countBeamerEffects(beamerPage, 'sound-effect', 'mid-game-warning');
+  const warningButton = card.getByTestId(`mission-sound-play-${beamer.json.id}-mid-game-warning`);
+  await expect(warningButton).toBeEnabled();
+  await warningButton.click();
+  await waitForBeamerEffect(beamerPage, 'sound-effect', 'mid-game-warning', warningCount + 1);
+  await expect.poll(async () => {
+    const events = await beamerPage.evaluate(() => (window as any).__beamerAudioEvents || []);
+    return events.some((event) => event.type === 'audio-pause' && event.src.includes('start_countdown.mp3'));
+  }, { timeout: 8_000 }).toBe(true);
+
+  const stopButton = card.getByTestId(`mission-sound-stop-${beamer.json.id}`);
+  await expect(stopButton).toBeEnabled();
+  await stopButton.click();
+  await expect.poll(async () => {
+    const events = await beamerPage.evaluate(() => (window as any).__beamerTimerEffects?.events || []);
+    return events.some((event) => (
+      event.type === 'sound-stop' &&
+      event.reason === 'soundboard-stop' &&
+      event.scope === 'soundboard' &&
+      event.stopped === true
+    ));
+  }, { timeout: 8_000 }).toBe(true);
+
+  const replayCount = await countBeamerEffects(beamerPage, 'sound-effect', 'start-countdown');
+  await expect(startButton).toBeEnabled();
+  await startButton.click();
+  await waitForBeamerEffect(beamerPage, 'sound-effect', 'start-countdown', replayCount + 1);
+
+  const timerCount = await countBeamerEffects(beamerPage, 'sound', 'end-countdown');
+  const timerRes = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 12,
+  });
+  expectStatus(timerRes, 200, 'start timer cue');
+  await waitForBeamerEffect(beamerPage, 'sound', 'end-countdown', timerCount + 1);
+
+  const skipCount = await countBeamerEffects(beamerPage, 'sound-effect-skip', 'mid-game-warning');
+  await expect(warningButton).toBeEnabled();
+  await warningButton.click();
+  await waitForBeamerEffect(beamerPage, 'sound-effect-skip', 'mid-game-warning', skipCount + 1);
+  await expect.poll(async () => {
+    const events = await beamerPage.evaluate(() => (window as any).__beamerTimerEffects?.events || []);
+    return events.some((event) => (
+      event.type === 'sound-effect-skip' &&
+      event.cue === 'mid-game-warning' &&
+      event.reason === 'timer-sound-active'
+    ));
+  }, { timeout: 8_000 }).toBe(true);
+
+  await keyframe(page, testInfo, 'beamer_soundboard');
 });
 
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({
@@ -418,6 +581,9 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   await expect(page.getByTestId('mission-tournament-link')).toHaveText(/Turnier öffnen/);
   await expect(page.getByRole('heading', { name: 'Countdown starten' })).toBeVisible();
   await expect(page.getByTestId('mission-current-timer-display')).toBeVisible();
+  await expect(page.getByTestId('mission-timer-reason-control')).toBeVisible();
+  await page.getByTestId('mission-timer-reason-select').selectOption('custom');
+  await page.getByTestId('mission-timer-reason-text').fill('Final-Call');
   await expect(page.getByTestId('mission-timer-quick-20s')).toContainText('00:20');
   await expect(page.getByTestId('mission-timer-quick-2015')).toContainText('20:15');
   await expect(page.getByRole('heading', { name: 'Countup starten' })).toBeVisible();
@@ -426,10 +592,20 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   await page.locator('#missionTimerSeconds').fill('05');
   await page.locator('#missionTimerSeconds').press('Enter');
   await expect.poll(async () => {
-    const timer = await client.get<{ mode?: string; timer_mode?: string }>(`/tournaments/${tournament.id}/timer`);
+    const timer = await client.get<{
+      mode?: string;
+      timer_mode?: string;
+      timer_reason?: string;
+      timer_reason_text?: string;
+    }>(`/tournaments/${tournament.id}/timer`);
     expectStatus(timer, 200, 'fetch timer after enter submit');
-    return timer.json.mode ?? timer.json.timer_mode;
-  }, { timeout: 20_000 }).toBe('countdown');
+    return [
+      timer.json.mode ?? timer.json.timer_mode,
+      timer.json.timer_reason,
+      timer.json.timer_reason_text,
+    ].join(':');
+  }, { timeout: 20_000 }).toBe('countdown:custom:Final-Call');
+  await expect(page.getByTestId('mission-current-timer-reason')).toHaveText('Final-Call', { timeout: 20_000 });
   await keyframe(page, testInfo, 'timer_control_mockup');
 
   await page.getByRole('link', { name: 'Beamer' }).click();

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
-import { seedGroupStageTournament } from '../helpers/scenario-seeder';
+import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
@@ -9,6 +9,14 @@ const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
+
+type ApiMatchForBadge = {
+  id: number;
+  position: number;
+  state: string;
+  group?: { number: number } | null;
+  match_scores: Array<{ id: number; team: { name: string } | null }>;
+};
 
 async function expectDuringGameEmpty(page: Page): Promise<void> {
   await expect(page.getByText(/Kein Timer gesetzt/i)).toBeVisible({ timeout: 20_000 });
@@ -133,6 +141,49 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
   await keyframe(page, testInfo, 'fullscreen_beamer_between_games');
 });
 
+test('Fullscreen beamer badges show group numbers for group matches and positions for playoff matches', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const { tournament: groupTournament } = await seedGroupStageTournament(2, 4, 4);
+  const groupMatches = await client.get<ApiMatchForBadge[]>(`/tournaments/${groupTournament.id}/matches`);
+  expectStatus(groupMatches, 200, 'fetch group matches for badge labels');
+  const groupMatch = groupMatches.json.find((match) =>
+    match.group?.number === 2 && match.state === 'not_started' && match.match_scores.length === 2
+  );
+  expect(groupMatch).toBeTruthy();
+
+  const startedGroup = await client.patch(`/matches/${groupMatch!.id}`, { state: 'in_progress' });
+  expectStatus(startedGroup, 200, 'start group match for badge label');
+
+  await page.goto(`/t/${groupTournament.id}/fullscreen?display=during_game`);
+  const groupCard = page.locator(`[data-match-id="${groupMatch!.id}"]`);
+  await expect(groupCard).toBeVisible({ timeout: 20_000 });
+  const groupBadge = groupCard.getByTestId('fullscreen-match-badge');
+  await expect(groupBadge).toHaveText('2');
+  await expect(groupBadge).toHaveAttribute('data-match-badge-kind', 'group');
+
+  const { tournament: playoffTournament } = await seedAndPlayGroupStage(2, 4, 4);
+  const playoffMatches = await client.get<ApiMatchForBadge[]>(`/tournaments/${playoffTournament.id}/matches`);
+  expectStatus(playoffMatches, 200, 'fetch playoff matches for badge labels');
+  const playoffMatch = playoffMatches.json.find((match) =>
+    !match.group && match.state === 'not_started' && match.match_scores.length === 2
+  );
+  expect(playoffMatch).toBeTruthy();
+
+  const startedPlayoff = await client.patch(`/matches/${playoffMatch!.id}`, { state: 'in_progress' });
+  expectStatus(startedPlayoff, 200, 'start playoff match for badge label');
+
+  await page.goto(`/t/${playoffTournament.id}/fullscreen?display=during_game`);
+  const playoffCard = page.locator(`[data-match-id="${playoffMatch!.id}"]`);
+  await expect(playoffCard).toBeVisible({ timeout: 20_000 });
+  const playoffBadge = playoffCard.getByTestId('fullscreen-match-badge');
+  await expect(playoffBadge).toHaveText(String(playoffMatch!.position + 1));
+  await expect(playoffBadge).toHaveAttribute('data-match-badge-kind', 'position');
+});
+
 test('Fullscreen beamer page updates live from backend ActionCable only', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
@@ -252,7 +303,7 @@ test('Matches-only beamer displays backend-returned matches without client state
   await keyframe(page, testInfo, 'matches_only_finished_match');
 });
 
-test('Fullscreen timer updates live for countup mode', async ({ page }) => {
+test('Fullscreen timer updates live for countup mode', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
 
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
@@ -267,12 +318,62 @@ test('Fullscreen timer updates live for countup mode', async ({ page }) => {
   const anchor = new Date(Date.now() - 3 * 60 * 1000 - 15 * 1000).toISOString();
   const timerRes = await client.patch(
     `/tournaments/${tournament.id}/timer`,
-    { timestamp: anchor, timer_mode: 'countup' },
+    {
+      timestamp: anchor,
+      timer_mode: 'countup',
+      timer_reason: 'custom',
+      timer_reason_text: 'Overtime',
+    },
   );
   expectStatus(timerRes, 200, 'start countup timer');
 
-  await expect(page.getByText(/Spielzeit:/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
+  await expect(page.getByText(/(Overtime|Spielende):/i)).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('.timer-container')).toContainText(/3:[1-5][0-9]|4:0[0-9]/, {
     timeout: 10_000,
   });
+  await keyframe(page, testInfo, 'fullscreen_timer_reason_countup');
+});
+
+test('Werbung beamer rotates selected images and shows timer reason', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(4, 4, 8);
+
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const timerEnd = new Date(Date.now() + 20 * 60 * 1000).toISOString();
+  const timerRes = await client.patch(
+    `/tournaments/${tournament.id}/timer`,
+    {
+      timestamp: timerEnd,
+      timer_mode: 'countdown',
+      timer_reason: 'custom',
+      timer_reason_text: 'Werbepause',
+    },
+  );
+  expectStatus(timerRes, 200, 'set werbung timer');
+
+  const beamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'werbung',
+    display_state: 'static_image',
+    config: {
+      display_mode: 'werbung',
+      werbung_image_keys: ['bpwstr_logo', 'bpwstr_banner'],
+      werbung_rotation_seconds: 1,
+    },
+  });
+  expectStatus(beamer, 201, 'create werbung beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=werbung`);
+  await expect(page.getByTestId('beamer-werbung-view')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('beamer-werbung-reason')).toContainText(/Werbepause|Spielende/);
+  await expect(page.getByTestId('beamer-werbung-timer')).toBeVisible();
+  await expect(page.getByTestId('beamer-werbung-image')).toHaveAttribute('src', /bpwstr_logo/);
+  await expect(page.getByTestId('beamer-werbung-image')).toHaveAttribute('src', /bpwstr_banner/, {
+    timeout: 5_000,
+  });
+  await expect(page.locator('body')).toHaveClass(/hide-cursor/);
+  await keyframe(page, testInfo, 'fullscreen_werbung_beamer');
 });

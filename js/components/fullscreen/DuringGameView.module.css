@@ -127,12 +127,123 @@
     overflow: hidden;
 }
 
+.matchCarousel {
+    width: 100%;
+    overflow: hidden;
+}
+
+.matchCarouselTrack {
+    display: flex;
+    width: 100%;
+    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+}
+
+.matchCarouselPage {
+    flex: 0 0 100%;
+    min-width: 0;
+}
+
 .matchGrid {
     display: grid;
     grid-template-columns: repeat(var(--match-grid-columns, 4), minmax(0, 1fr));
     gap: 0.75rem;
     max-width: 100%;
     margin: 0 auto;
+}
+
+/* === Match Card === */
+
+.matchCard {
+    background: #d4edda;
+    border-left: 4px solid #1b7a2b;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    overflow: hidden;
+    container-type: size;
+    aspect-ratio: 5 / 1;
+}
+
+.matchCardEnter {
+    animation-name: cardEnter;
+    animation-duration: 0.5s;
+    animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+    animation-fill-mode: both;
+}
+
+@keyframes cardEnter {
+    from {
+        opacity: 0;
+        transform: translateY(14px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.matchContent {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: clamp(0.3rem, 8cqh, 1.5rem) clamp(0.6rem, 5cqw, 2rem);
+}
+
+.matchBadge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1b7a2b;
+    color: #ffffff;
+    font-size: clamp(1.2rem, 25cqh, 3.2rem);
+    font-weight: 700;
+    width: 2ch;
+    padding: 0 clamp(0.2rem, 2cqw, 0.6rem);
+    flex-shrink: 0;
+    box-sizing: content-box;
+}
+
+.matchTeamRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.1rem 0;
+}
+
+.matchTeamRow + .matchTeamRow {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding-top: 0.15rem;
+}
+
+.teamName {
+    color: #1a1a1a;
+    font-size: clamp(1.1rem, 18cqh, 2.2rem);
+    font-weight: 600;
+    flex: 1;
+    line-height: 1.25;
+    padding-right: 0.5rem;
+}
+
+.teamNameWinner {
+    color: #1a1a1a;
+    font-size: clamp(1.1rem, 18cqh, 2.2rem);
+    font-weight: 800;
+    flex: 1;
+    line-height: 1.25;
+    padding-right: 0.5rem;
+}
+
+.teamScore {
+    color: #0055b8;
+    font-family: Halt, sans-serif;
+    font-size: clamp(1rem, 21cqh, 2.6rem);
+    font-weight: 700;
+    min-width: 1.75rem;
+    text-align: right;
 }
 
 .matchesLoading {

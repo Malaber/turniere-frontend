@@ -1,4 +1,5 @@
 import { test, expect, Page, devices } from '@playwright/test';
+import { installBeamerEffectSpies, waitForBeamerEffect } from '../helpers/beamer-audio';
 import { keyframe } from '../helpers/screenshot';
 import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
 import {
@@ -64,9 +65,23 @@ async function waitForMatchStateCount(
 
 async function setupBeamerAndMatches(
   matchCount: number,
-  opts: { timerSeconds?: number; beamerName?: string; displayState?: string } = {},
+  opts: {
+    timerSeconds?: number;
+    timerReason?: string;
+    timerReasonText?: string;
+    beamerName?: string;
+    displayState?: string;
+    showTimerReason?: boolean;
+  } = {},
 ) {
-  const { timerSeconds, beamerName = 'e2e-during', displayState = 'during_game' } = opts;
+  const {
+    timerSeconds,
+    timerReason,
+    timerReasonText,
+    beamerName = 'e2e-during',
+    displayState = 'during_game',
+    showTimerReason = true,
+  } = opts;
 
   // Use more groups/teams to have enough matches available
   const { tournament } = await seedGroupStageTournament(8, 4, 8, longGroupStageTeamName);
@@ -75,16 +90,24 @@ async function setupBeamerAndMatches(
   await client.login(e2eEmail, e2ePassword);
 
   if (timerSeconds !== undefined) {
+    const timerPayload: Record<string, string | number> = { timestamp_seconds: timerSeconds };
+    if (timerReason) timerPayload.timer_reason = timerReason;
+    if (timerReasonText) timerPayload.timer_reason_text = timerReasonText;
     const timerRes = await client.patch(
       `/tournaments/${tournament.id}/timer`,
-      { timestamp_seconds: timerSeconds },
+      timerPayload,
     );
     expectStatus(timerRes, 200, 'set timer');
   }
 
   // Try creating a beamer; fall back to ?display= URL if backend lacks beamer support
   const beamerPayload = displayState === 'timer_only'
-    ? { name: beamerName, display_state: 'during_game', config: { display_mode: 'timer_only' }, is_default: false }
+    ? {
+      name: beamerName,
+      display_state: 'during_game',
+      config: { display_mode: 'timer_only', show_timer_reason: showTimerReason },
+      is_default: false,
+    }
     : { name: beamerName, display_state: displayState, is_default: false };
 
   const beamerRes = await client.post(
@@ -103,92 +126,25 @@ async function setupBeamerAndMatches(
   return { tournament, client, fullscreenQuery };
 }
 
-async function installBeamerEffectSpies(page: Page) {
-  await page.addInitScript(() => {
-    (window as any).__beamerAudioEvents = [];
-    (window as any).__beamerAudioUnlocked = false;
-
-    const markAudioUnlocked = () => {
-      (window as any).__beamerAudioUnlocked = true;
-    };
-    window.addEventListener('click', markAudioUnlocked, { capture: true });
-    window.addEventListener('pointerup', markAudioUnlocked, { capture: true });
-    window.addEventListener('touchend', markAudioUnlocked, { capture: true });
-
-    class FakeAudio {
-      src: string;
-      preload = '';
-      volume = 1;
-      currentTime = 0;
-      muted = false;
-      readyState = 1;
-
-      constructor(src: string) {
-        this.src = src;
-        (window as any).__beamerAudioEvents.push({ type: 'audio-created', src });
-      }
-
-      play() {
-        if (
-          (window as any).__blockBeamerAudioUntilInteraction &&
-          !(window as any).__beamerAudioUnlocked &&
-          !this.muted
-        ) {
-          (window as any).__beamerAudioEvents.push({
-            type: 'audio-blocked',
-            src: this.src,
-            currentTime: this.currentTime,
-          });
-          return Promise.reject(new Error('NotAllowedError'));
-        }
-
-        (window as any).__beamerAudioEvents.push({
-          type: 'audio-play',
-          src: this.src,
-          currentTime: this.currentTime,
-          muted: this.muted,
-          volume: this.volume,
-        });
-        return Promise.resolve();
-      }
-
-      pause() {
-        (window as any).__beamerAudioEvents.push({
-          type: 'audio-pause',
-          src: this.src,
-          currentTime: this.currentTime,
-        });
-      }
-
-      load() {
-        (window as any).__beamerAudioEvents.push({ type: 'audio-load', src: this.src });
-      }
-
-      addEventListener(eventName: string, callback: () => void) {
-        if (['loadedmetadata', 'seeked', 'canplay'].includes(eventName)) {
-          callback();
-        }
-      }
-    }
-
-    (window as any).Audio = FakeAudio;
-  });
+async function activeCardAnimationName(page: Page): Promise<string> {
+  return page
+    .getByTestId('fullscreen-match-card')
+    .first()
+    .evaluate((el) => getComputedStyle(el).animationName);
 }
 
-async function waitForBeamerEffect(page: Page, type: string, cue?: string) {
-  await page.waitForFunction(
-    ({ expectedType, expectedCue }) => {
-      const events = (window as any).__beamerTimerEffects?.events || [];
+async function carouselTranslateX(page: Page): Promise<number> {
+  return page
+    .getByTestId('fullscreen-match-carousel-track')
+    .evaluate((el) => {
+      const transform = getComputedStyle(el).transform;
+      const matrix = transform.match(/^matrix\((.+)\)$/);
 
-      return events.some((event) => {
-        if (event.type !== expectedType) return false;
-        if (!expectedCue) return true;
-        return event.cue === expectedCue;
-      });
-    },
-    { expectedType: type, expectedCue: cue },
-    { timeout: 8_000 },
-  );
+      if (!matrix) return 0;
+
+      const values = matrix[1].split(',').map((value) => Number(value.trim()));
+      return values[4] || 0;
+    });
 }
 
 async function readAnimatedTimerText(page: Page, testId: string): Promise<string> {
@@ -222,6 +178,7 @@ test('During-game view shows animated timer that updates', async ({ page }, test
 
   const { tournament, fullscreenQuery } = await setupBeamerAndMatches(14, {
     timerSeconds: 5 * 60,
+    timerReason: 'tournament_start',
   });
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
@@ -257,6 +214,7 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   // Timer should be visible
   const timerDigits = page.locator('[class*="digitSlot"]');
   await expect(timerDigits.first()).toBeVisible();
+  await expect(page.getByText(/Turnierstart/i)).toHaveCount(0);
 
   const readTimer = () =>
     page.evaluate(() => {
@@ -429,8 +387,9 @@ test('Timer-only beamer renders urgent timer without matches and keeps sound act
   await page.setViewportSize({ width: 1920, height: 1080 });
   await installBeamerEffectSpies(page);
 
-  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(8, {
+  const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(8, {
     timerSeconds: 12,
+    timerReason: 'playoff_start',
     beamerName: 'timer-only',
     displayState: 'timer_only',
   });
@@ -439,11 +398,30 @@ test('Timer-only beamer renders urgent timer without matches and keeps sound act
 
   await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('timer-only-timer')).toBeVisible();
+  await expect(page.getByTestId('timer-only-reason')).toHaveText('Playoff-Start');
   await expect(page.locator('[class*="timerUrgent"]')).toBeVisible();
   await expect(page.getByTestId('fullscreen-match-card')).toHaveCount(0);
   await expect(page.getByText(/keine laufenden Matches/i)).toHaveCount(0);
   await waitForBeamerEffect(page, 'sound', 'end-countdown');
   await keyframe(page, testInfo, 'timer_only_countdown_sound');
+
+  const resetTimer = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 5 * 60,
+    timer_reason: 'playoff_start',
+  });
+  expectStatus(resetTimer, 200, 'reset timer-only countdown');
+  const hiddenReasonBeamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'timer-only-hidden-reason',
+    display_state: 'during_game',
+    config: { display_mode: 'timer_only', show_timer_reason: false },
+    is_default: false,
+  });
+  expectStatus(hiddenReasonBeamer, 201, 'create timer-only hidden reason beamer');
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=timer-only-hidden-reason`);
+  await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('timer-only-timer')).toBeVisible();
+  await expect(page.getByTestId('timer-only-reason')).toHaveCount(0);
+  await keyframe(page, testInfo, 'timer_only_without_reason');
 });
 
 test('Animated fullscreen timer pads minutes after hours and days', async ({ page }) => {
@@ -711,7 +689,7 @@ test('During-game view rotates match pages', async ({ page }, testInfo) => {
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   const matchCards = page.getByTestId('fullscreen-match-card');
-  await expect(matchCards.first()).toBeVisible();
+  await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'rotation_page1');
 
   // First page should show 16 matches (MATCHES_PER_PAGE)
@@ -726,6 +704,9 @@ test('During-game view rotates match pages', async ({ page }, testInfo) => {
   expect(dotCount).toBe(2); // ceil(30/16) = 2
 
   const firstPageTexts = await matchCards.allInnerTexts();
+  const firstPageTranslateX = await carouselTranslateX(page);
+  expect(Math.abs(firstPageTranslateX)).toBeLessThan(1);
+  expect(await activeCardAnimationName(page)).toContain('cardEnter');
 
   // Wait for the 10s page rotation cycle plus buffer
   await page.waitForTimeout(11_000);
@@ -733,12 +714,23 @@ test('During-game view rotates match pages', async ({ page }, testInfo) => {
   // Second page must show different matches
   const secondPageTexts = await matchCards.allInnerTexts();
   expect(firstPageTexts).not.toEqual(secondPageTexts);
+  expect(await activeCardAnimationName(page)).toBe('none');
+
+  // The whole batch slides left instead of re-playing per-card fly-in animations
+  const secondPageTranslateX = await carouselTranslateX(page);
+  expect(secondPageTranslateX).toBeLessThan(firstPageTranslateX - 100);
 
   // Second page should show the remaining 14 matches
   const secondPageCount = await matchCards.count();
   expect(secondPageCount).toBe(14);
 
   await keyframe(page, testInfo, 'rotation_page2');
+
+  // End of the cycle slides back to the first batch without card fatigue
+  await page.waitForTimeout(11_000);
+  expect(await matchCards.allInnerTexts()).toEqual(firstPageTexts);
+  expect(Math.abs(await carouselTranslateX(page))).toBeLessThan(1);
+  expect(await activeCardAnimationName(page)).toBe('none');
 });
 
 // ---------------------------------------------------------------------------
