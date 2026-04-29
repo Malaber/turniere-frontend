@@ -196,7 +196,9 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
   await expect(modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' })).toBeVisible();
   await modal.getByRole('button', { name: 'Entscheidungsmatch anlegen' }).click();
 
+  await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 15000 });
   await expect(deciderCard).toBeVisible({ timeout: 15000 });
+  await expectCleanMatchPositionBadge(deciderCard, 7);
   await deciderCard.click({ force: true });
   modal = page.getByRole('dialog');
   await expect(visibleModal(page)).toBeVisible();
