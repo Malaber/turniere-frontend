@@ -14,6 +14,12 @@ export class PlayoffStages extends Component {
         this.onUpdateStageError = this.onUpdateStageError.bind(this);
     }
 
+    componentDidUpdate(prevProps) {
+        if (prevProps.playoffStages !== this.props.playoffStages) {
+            this.setState({stages: this.props.playoffStages});
+        }
+    }
+
     updateStage(id) {
         getStage(id, this.onUpdateStageSuccess, this.onUpdateStageError);
     }
