@@ -118,6 +118,21 @@ function beamerDisplayStateFor(beamer) {
     return beamer.config && beamer.config.display_mode === 'timer_only' ? 'timer_only' : beamer.display_state;
 }
 
+function compareBeamersByName(left, right) {
+    const nameResult = (left.name || '').localeCompare(right.name || '', 'de', {
+        numeric: true,
+        sensitivity: 'base'
+    });
+    if (nameResult !== 0) {
+        return nameResult;
+    }
+    return String(left.id || '').localeCompare(String(right.id || ''), 'de', {numeric: true});
+}
+
+function sortBeamersByName(beamers) {
+    return (beamers || []).slice().sort(compareBeamersByName);
+}
+
 function matchFilterValue(filters) {
     const entries = Object.keys(filters)
         .filter(key => filters[key] !== null && filters[key] !== undefined && filters[key] !== '')
@@ -521,7 +536,7 @@ class MissionBeamer extends React.Component {
     reload() {
         getBeamers(this.props.tournament.id,
             beamers => this.setState({
-                beamers: beamers || [],
+                beamers: sortBeamersByName(beamers),
                 loading: false,
                 savingById: {},
                 selectionsById: {}

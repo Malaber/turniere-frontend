@@ -76,6 +76,12 @@ async function expectStartHoldProgressStarted(button: Locator) {
   }).toBeGreaterThan(0);
 }
 
+async function expectBeamerCardOrder(page: Page, expectedNames: string[]) {
+  await expect.poll(async () => page.locator('.mission-beamer-name').evaluateAll((elements) => (
+    elements.map((element) => element.textContent?.trim() ?? '')
+  )), { timeout: 20_000 }).toEqual(expectedNames);
+}
+
 async function holdStartUntilConfirmOpen(page: Page, button: Locator) {
   await button.hover();
   await page.mouse.down();
@@ -312,17 +318,17 @@ test('Mission Control saves independent beamer display controls instantly', asyn
   const client = await loggedInClient();
 
   const main = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
-    name: 'Main stage',
+    name: 'Zeta stage',
     display_state: 'between_games',
     config: {},
   });
-  expectStatus(main, 201, 'create main stage beamer');
+  expectStatus(main, 201, 'create zeta stage beamer');
   const side = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
-    name: 'Side wall',
+    name: 'Alpha wall',
     display_state: 'group_tables',
     config: {},
   });
-  expectStatus(side, 201, 'create side wall beamer');
+  expectStatus(side, 201, 'create alpha wall beamer');
 
   await page.goto(`/t/${tournament.id}/mission-control`);
   await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
@@ -330,8 +336,9 @@ test('Mission Control saves independent beamer display controls instantly', asyn
 
   await expect(page.getByTestId('mission-beamer-control')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Aktualisieren' })).toHaveCount(0);
-  await expect(page.getByText('Main stage')).toBeVisible();
-  await expect(page.getByText('Side wall')).toBeVisible();
+  await expect(page.getByText('Zeta stage')).toBeVisible();
+  await expect(page.getByText('Alpha wall')).toBeVisible();
+  await expectBeamerCardOrder(page, ['Alpha wall', 'default', 'Zeta stage']);
   await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('between_games');
   await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toBeVisible();
   const mainMatchSelect = page.getByTestId(`mission-beamer-match-${main.json.id}`);
@@ -353,6 +360,7 @@ test('Mission Control saves independent beamer display controls instantly', asyn
     expectStatus(updated, 200, 'fetch beamers after mode update');
     return updated.json.find((beamer) => beamer.id === main.json.id)?.display_state;
   }, { timeout: 20_000 }).toBe('during_game');
+  await expectBeamerCardOrder(page, ['Alpha wall', 'default', 'Zeta stage']);
   await expect(page.getByTestId(`mission-beamer-mode-${side.json.id}`)).toHaveValue('group_tables');
 
   await page.getByTestId(`mission-beamer-match-${main.json.id}`).selectOption('state:in_progress');
@@ -412,6 +420,7 @@ test('Mission Control saves independent beamer display controls instantly', asyn
     const beamer = updated.json.find((candidate) => candidate.id === main.json.id);
     return `${beamer?.display_state}:${beamer?.config?.display_mode}:${beamer?.config?.show_timer_reason}`;
   }, { timeout: 20_000 }).toBe('during_game:timer_only:false');
+  await expectBeamerCardOrder(page, ['Alpha wall', 'default', 'Zeta stage']);
 });
 
 test('Mission Control soundboard controls beamer audio with timer priority', async ({ context, page }, testInfo) => {
