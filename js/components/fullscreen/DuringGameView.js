@@ -1,20 +1,21 @@
 import React from 'react';
 import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
-import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
+import {formatTimerMs, getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
 import styles from './DuringGameView.module.css';
 import {FullscreenMatchCard} from './FullscreenMatchCard';
 
 
 const MATCHES_PER_PAGE = 16;
+const PORTRAIT_MATCHES_PER_PAGE = 8;
 const PAGE_CYCLE_MS = 10000;
 const COUNTDOWN_THRESHOLD_S = 10;
 const FINISHED_DISPLAY_MS = 10000;
 
 
-function getTotalPages(matches) {
+function getTotalPages(matches, matchesPerPage = MATCHES_PER_PAGE) {
     if (!matches || matches.length === 0) return 0;
-    return Math.ceil(matches.length / MATCHES_PER_PAGE);
+    return Math.ceil(matches.length / matchesPerPage);
 }
 
 
@@ -109,6 +110,7 @@ export class AnimatedTimer extends React.Component {
         if (!display.active) return null;
 
         if (display.mode === TIMER_MODE_COUNTDOWN && display.ms === 0) {
+            if (this.props.hideFinished) return null;
             return (
                 <div className={styles.timerFinished}>
                     Spiel vorbei!
@@ -117,21 +119,10 @@ export class AnimatedTimer extends React.Component {
         }
 
         const totalSeconds = Math.floor(display.ms / 1000);
-        const hours = Math.floor(totalSeconds / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
         const isUrgent = display.mode === TIMER_MODE_COUNTDOWN &&
             (totalSeconds <= 10 || this.props.forceUrgent);
 
-        const chars = [];
-        if (hours > 0) {
-            String(hours).split('').forEach(c => chars.push(c));
-            chars.push(':');
-        }
-        String(minutes).split('').forEach(c => chars.push(c));
-        chars.push(':');
-        String(seconds).padStart(2, '0').split('')
-            .forEach(c => chars.push(c));
+        const chars = formatTimerMs(display.ms).split('');
 
         const cls = styles.timer +
             (isUrgent ? ' ' + styles.timerUrgent : '') +
@@ -167,22 +158,39 @@ export class DuringGameView extends React.Component {
         this.state = {
             pageIndex: 0,
             hasPaged: false,
+            matchesPerPage: MATCHES_PER_PAGE,
+            viewportHeight: null,
             timerPhase: 'normal' // 'normal' | 'countdown' | 'finished'
         };
         this.cyclePage = this.cyclePage.bind(this);
         this.onTimerPhaseChange = this.onTimerPhaseChange.bind(this);
+        this.updateViewportLayout = this.updateViewportLayout.bind(this);
         this._finishedTimeout = null;
     }
 
     componentDidMount() {
+        if (typeof window !== 'undefined' && window.matchMedia) {
+            this.portraitMediaQuery = window.matchMedia('(max-aspect-ratio: 3 / 4)');
+            this.updateViewportLayout();
+            if (this.portraitMediaQuery.addEventListener) {
+                this.portraitMediaQuery.addEventListener('change', this.updateViewportLayout);
+            } else if (this.portraitMediaQuery.addListener) {
+                this.portraitMediaQuery.addListener(this.updateViewportLayout);
+            }
+            window.addEventListener('resize', this.updateViewportLayout);
+        }
         this.intervalId = setInterval(
             this.cyclePage, PAGE_CYCLE_MS
         );
     }
 
-    componentDidUpdate(prevProps) {
-        const prevTotal = getTotalPages(prevProps.matches);
-        const total = getTotalPages(this.props.matches);
+    componentDidUpdate(prevProps, prevState) {
+        if (prevProps.matches !== this.props.matches) {
+            this.updateViewportLayout();
+        }
+
+        const prevTotal = getTotalPages(prevProps.matches, prevState.matchesPerPage);
+        const total = getTotalPages(this.props.matches, this.state.matchesPerPage);
         const nextState = {};
 
         if (total > 0 && this.state.pageIndex >= total) {
@@ -202,6 +210,16 @@ export class DuringGameView extends React.Component {
     componentWillUnmount() {
         clearInterval(this.intervalId);
         clearTimeout(this._finishedTimeout);
+        if (this.portraitMediaQuery) {
+            if (this.portraitMediaQuery.removeEventListener) {
+                this.portraitMediaQuery.removeEventListener('change', this.updateViewportLayout);
+            } else if (this.portraitMediaQuery.removeListener) {
+                this.portraitMediaQuery.removeListener(this.updateViewportLayout);
+            }
+        }
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('resize', this.updateViewportLayout);
+        }
     }
 
     onTimerPhaseChange(phase) {
@@ -224,7 +242,7 @@ export class DuringGameView extends React.Component {
     cyclePage() {
         const {matches} = this.props;
         if (!matches || matches.length === 0) return;
-        const total = Math.ceil(matches.length / MATCHES_PER_PAGE);
+        const total = Math.ceil(matches.length / this.state.matchesPerPage);
         if (total <= 1) return;
         this.setState(prev => ({
             pageIndex: (prev.pageIndex + 1) % total,
@@ -232,21 +250,53 @@ export class DuringGameView extends React.Component {
         }));
     }
 
+    updateViewportLayout() {
+        const matchesPerPage = this.portraitMediaQuery && this.portraitMediaQuery.matches ?
+            PORTRAIT_MATCHES_PER_PAGE :
+            MATCHES_PER_PAGE;
+        const viewportHeight = typeof window !== 'undefined' ?
+            window.innerHeight :
+            null;
+
+        this.setState(prev => {
+            const matchCount = this.props.matches ? this.props.matches.length : 0;
+            const totalPages = Math.max(1, Math.ceil(matchCount / matchesPerPage));
+            const pageIndex = Math.min(prev.pageIndex, totalPages - 1);
+
+            if (
+                prev.matchesPerPage === matchesPerPage &&
+                prev.viewportHeight === viewportHeight &&
+                prev.pageIndex === pageIndex
+            ) {
+                return null;
+            }
+
+            return {
+                matchesPerPage,
+                viewportHeight,
+                pageIndex
+            };
+        });
+    }
+
     render() {
         const {matches, timerState} = this.props;
-        const {pageIndex, timerPhase} = this.state;
+        const {pageIndex, timerPhase, matchesPerPage, viewportHeight} = this.state;
         const hasTimer = timerState && timerState.mode;
         const takeover = timerPhase === 'countdown' || timerPhase === 'finished';
+        const rootStyle = viewportHeight ?
+            {'--fullscreen-height': viewportHeight + 'px'} :
+            undefined;
 
         const sorted = matches ?
             [...matches].sort(sortMatchesByPositionAscending()) :
             [];
-        const totalPages = Math.ceil(sorted.length / MATCHES_PER_PAGE);
+        const totalPages = Math.ceil(sorted.length / matchesPerPage);
         const pages = [];
         for (let i = 0; i < totalPages; i++) {
             pages.push(sorted.slice(
-                i * MATCHES_PER_PAGE,
-                (i + 1) * MATCHES_PER_PAGE
+                i * matchesPerPage,
+                (i + 1) * matchesPerPage
             ));
         }
 
@@ -289,7 +339,7 @@ export class DuringGameView extends React.Component {
                                     <div
                                         className={styles.matchGrid}
                                         style={{
-                                            gridTemplateColumns: 'repeat(' + cols + ', 1fr)'
+                                            '--match-grid-columns': cols
                                         }}
                                     >
                                         {matchPage.map((m, i) =>
@@ -316,7 +366,7 @@ export class DuringGameView extends React.Component {
         // Fullscreen takeover for countdown / finished
         if (takeover) {
             return (
-                <div className={styles.duringGameRoot}>
+                <div className={styles.duringGameRoot} style={rootStyle}>
                     <div className={styles.timerTakeover}>
                         {hasTimer ? (
                             <AnimatedTimer
@@ -331,8 +381,20 @@ export class DuringGameView extends React.Component {
                     </div>
 
                     <style global jsx>{`
+                        html,
                         body {
                             background: #ffffff;
+                            height: 100%;
+                            margin: 0;
+                            min-height: 0 !important;
+                            overflow: hidden;
+                        }
+
+                        #__next,
+                        #__next > div {
+                            height: 100%;
+                            min-height: 0 !important;
+                            overflow: hidden;
                         }
                     `}</style>
                 </div>
@@ -340,12 +402,13 @@ export class DuringGameView extends React.Component {
         }
 
         return (
-            <div className={styles.duringGameRoot}>
+            <div className={styles.duringGameRoot} style={rootStyle}>
                 <div className={styles.timerContainer}>
                     {hasTimer ? (
                         <AnimatedTimer
                             timerState={timerState}
                             onPhaseChange={this.onTimerPhaseChange}
+                            hideFinished={timerPhase === 'normal'}
                         />
                     ) : (
                         <div className={styles.noTimer}>
@@ -371,8 +434,20 @@ export class DuringGameView extends React.Component {
                 )}
 
                 <style global jsx>{`
+                    html,
                     body {
                         background: #ffffff;
+                        height: 100%;
+                        margin: 0;
+                        min-height: 0 !important;
+                        overflow: hidden;
+                    }
+
+                    #__next,
+                    #__next > div {
+                        height: 100%;
+                        min-height: 0 !important;
+                        overflow: hidden;
                     }
                 `}</style>
             </div>

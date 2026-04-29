@@ -1,5 +1,5 @@
 import React from 'react';
-import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../utils/timerState';
+import {formatTimerMs, getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../utils/timerState';
 
 export function Timer({timerState}) {
     const [display, setDisplay] = React.useState(
@@ -27,17 +27,7 @@ export function Timer({timerState}) {
             return 'Spiel vorbei!';
         }
 
-        const hours = Math.floor(nextDisplay.ms / (1000 * 60 * 60));
-        const minutes = Math.floor((nextDisplay.ms % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((nextDisplay.ms % (1000 * 60)) / 1000);
-        const formattedSeconds = seconds < 10 ? '0' + seconds : seconds;
-
-        let formattedTimeLeft = '';
-        if (hours > 0) {
-            formattedTimeLeft += hours + 'h ';
-        }
-        formattedTimeLeft += minutes + ':' + formattedSeconds;
-        return formattedTimeLeft;
+        return formatTimerMs(nextDisplay.ms, {labelHours: true});
     };
 
     return <span>{formatTimeLeft(display)}</span>;

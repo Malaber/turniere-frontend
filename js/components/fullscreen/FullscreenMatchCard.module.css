@@ -9,6 +9,9 @@
     align-items: stretch;
     overflow: hidden;
     container-type: size;
+}
+
+.matchCardEnter {
     animation-name: cardEnter;
     animation-duration: 0.5s;
     animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
@@ -112,4 +115,32 @@
     padding: 0 clamp(0.2rem, 2cqw, 0.6rem);
     flex-shrink: 0;
     box-sizing: content-box;
+}
+
+@media (max-aspect-ratio: 3 / 4) {
+    .matchCardAspect {
+        aspect-ratio: 3.5 / 1;
+    }
+
+    .matchContent {
+        padding: clamp(0.25rem, 7cqh, 0.55rem) clamp(0.45rem, 5cqw, 0.8rem);
+    }
+
+    .teamName,
+    .teamNameWinner {
+        font-size: clamp(0.82rem, 18cqh, 1.35rem);
+        line-height: 1.15;
+        padding-right: 0.35rem;
+    }
+
+    .teamScore {
+        font-size: clamp(1rem, 22cqh, 1.8rem);
+        min-width: 1.4rem;
+    }
+
+    .matchBadge {
+        font-size: clamp(1rem, 28cqh, 2.1rem);
+        padding: 0 clamp(0.18rem, 2cqw, 0.4rem);
+        width: 1.8ch;
+    }
 }

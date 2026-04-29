@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
+const expectedFrontendVersion = process.env.TURNIERE_EXPECTED_FRONTEND_VERSION;
 
 const defaultFallbackGitSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const gitCommitShaRegex = /^[0-9a-f]{40}$/;
@@ -23,8 +24,12 @@ test('Version page displays frontend and backend versions', async ({ page }) => 
   const frontendVersion = (await frontendVersionLocator.textContent())?.trim();
 
   expect(frontendVersion).toBeTruthy();
-  expect(frontendVersion).toMatch(gitCommitShaRegex);
-  expect(frontendVersion).not.toBe(defaultFallbackGitSha);
+  if (expectedFrontendVersion) {
+    expect(frontendVersion).toBe(expectedFrontendVersion);
+  } else {
+    expect(frontendVersion).toMatch(gitCommitShaRegex);
+    expect(frontendVersion).not.toBe(defaultFallbackGitSha);
+  }
 
   await expect(page.getByTestId('backend-version')).toHaveText('backend-e2e');
 });
