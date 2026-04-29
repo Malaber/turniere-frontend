@@ -172,6 +172,7 @@ export class Match extends React.Component {
                     </CardBody>
                     <MatchPositionBadge
                         match={this.state.match}
+                        mode={this.props.positionBadgeMode || 'position'}
                         className={'badge bg-secondary ' + styles.matchCardBadge}
                         groupClassName={styles.matchCardBadgeGroup}
                         positionClassName={styles.matchCardBadgeNumber}

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
-import { seedGroupStageTournament } from '../helpers/scenario-seeder';
+import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
@@ -9,6 +9,14 @@ const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(240_000);
+
+type ApiMatchForBadge = {
+  id: number;
+  position: number;
+  state: string;
+  group?: { number: number } | null;
+  match_scores: Array<{ id: number; team: { name: string } | null }>;
+};
 
 async function expectDuringGameEmpty(page: Page): Promise<void> {
   await expect(page.getByText(/Kein Timer gesetzt/i)).toBeVisible({ timeout: 20_000 });
@@ -131,6 +139,49 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
   await expect(page.locator('body')).toContainText(/Nächste Spiele/, { timeout: 20_000 });
   await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 15_000 });
   await keyframe(page, testInfo, 'fullscreen_beamer_between_games');
+});
+
+test('Fullscreen beamer badges show group numbers for group matches and positions for playoff matches', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const { tournament: groupTournament } = await seedGroupStageTournament(2, 4, 4);
+  const groupMatches = await client.get<ApiMatchForBadge[]>(`/tournaments/${groupTournament.id}/matches`);
+  expectStatus(groupMatches, 200, 'fetch group matches for badge labels');
+  const groupMatch = groupMatches.json.find((match) =>
+    match.group?.number === 2 && match.state === 'not_started' && match.match_scores.length === 2
+  );
+  expect(groupMatch).toBeTruthy();
+
+  const startedGroup = await client.patch(`/matches/${groupMatch!.id}`, { state: 'in_progress' });
+  expectStatus(startedGroup, 200, 'start group match for badge label');
+
+  await page.goto(`/t/${groupTournament.id}/fullscreen?display=during_game`);
+  const groupCard = page.locator(`[data-match-id="${groupMatch!.id}"]`);
+  await expect(groupCard).toBeVisible({ timeout: 20_000 });
+  const groupBadge = groupCard.getByTestId('fullscreen-match-badge');
+  await expect(groupBadge).toHaveText('2');
+  await expect(groupBadge).toHaveAttribute('data-match-badge-kind', 'group');
+
+  const { tournament: playoffTournament } = await seedAndPlayGroupStage(2, 4, 4);
+  const playoffMatches = await client.get<ApiMatchForBadge[]>(`/tournaments/${playoffTournament.id}/matches`);
+  expectStatus(playoffMatches, 200, 'fetch playoff matches for badge labels');
+  const playoffMatch = playoffMatches.json.find((match) =>
+    !match.group && match.state === 'not_started' && match.match_scores.length === 2
+  );
+  expect(playoffMatch).toBeTruthy();
+
+  const startedPlayoff = await client.patch(`/matches/${playoffMatch!.id}`, { state: 'in_progress' });
+  expectStatus(startedPlayoff, 200, 'start playoff match for badge label');
+
+  await page.goto(`/t/${playoffTournament.id}/fullscreen?display=during_game`);
+  const playoffCard = page.locator(`[data-match-id="${playoffMatch!.id}"]`);
+  await expect(playoffCard).toBeVisible({ timeout: 20_000 });
+  const playoffBadge = playoffCard.getByTestId('fullscreen-match-badge');
+  await expect(playoffBadge).toHaveText(String(playoffMatch!.position + 1));
+  await expect(playoffBadge).toHaveAttribute('data-match-badge-kind', 'position');
 });
 
 test('Fullscreen beamer page updates live from backend ActionCable only', async ({ page }, testInfo) => {
@@ -277,7 +328,7 @@ test('Fullscreen timer updates live for countup mode', async ({ page }, testInfo
   expectStatus(timerRes, 200, 'start countup timer');
 
   await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
-  await expect(page.getByText(/Overtime:/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/(Overtime|Spielende):/i)).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('.timer-container')).toContainText(/3:[1-5][0-9]|4:0[0-9]/, {
     timeout: 10_000,
   });

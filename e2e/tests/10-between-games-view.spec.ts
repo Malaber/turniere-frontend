@@ -127,8 +127,10 @@ test('Between-games view shows 32 matches with truncated long names', async ({ p
   // Group number badges should be present
   const badgeTexts = await badges.allInnerTexts();
   expect(badgeTexts.length).toBe(32);
-  // Badges show group numbers (1-6)
+  // Badges show group numbers (1-6), not per-group match positions.
   expect(badgeTexts.every((t) => /^\d+$/.test(t))).toBe(true);
+  await expect(badges.first()).toHaveAttribute('data-match-badge-kind', 'group');
+  await expect(badges.nth(31)).toHaveAttribute('data-match-badge-kind', 'group');
 
   await keyframe(page, testInfo, 'between_games_truncated_names');
 
