@@ -31,6 +31,14 @@ import {
 import {TournamentSettingsForm} from './TournamentSettingsForm';
 import {TeamName} from './TeamName';
 import {Timer} from './Timer';
+import {
+    allBeamerMediaImageKeys,
+    BEAMER_MEDIA_IMAGES,
+    DEFAULT_BEAMER_MEDIA_IMAGE_KEY,
+    sanitizeWerbungImageKeys,
+    WERBUNG_DISPLAY_MODE,
+    WERBUNG_IMAGE_KEYS_CONFIG_KEY
+} from '../utils/beamerMedia';
 
 function stageName(level) {
     const names = ['Finale', 'Halbfinale', 'Viertelfinale', 'Achtelfinale'];
@@ -57,7 +65,8 @@ const DISPLAY_STATES = [
     {value: 'during_game', label: 'Während dem Spiel'},
     {value: 'timer_only', label: 'Nur Timer'},
     {value: 'group_tables', label: 'Gruppenstand'},
-    {value: 'static_image', label: 'Statisches Bild'}
+    {value: 'static_image', label: 'Statisches Bild'},
+    {value: 'werbung', label: 'Werbung'}
 ];
 
 const BEAMER_MODES = [
@@ -65,7 +74,8 @@ const BEAMER_MODES = [
     {value: 'during_game', label: 'Matches with Timer', displayState: 'during_game'},
     {value: 'timer_only', label: 'Timer Only', displayState: 'during_game', configDisplayMode: 'timer_only'},
     {value: 'between_games', label: 'Matches Only', displayState: 'between_games'},
-    {value: 'static_image', label: 'Static Image', displayState: 'static_image'}
+    {value: 'static_image', label: 'Static Image', displayState: 'static_image'},
+    {value: 'werbung', label: 'Werbung', displayState: 'static_image', configDisplayMode: WERBUNG_DISPLAY_MODE}
 ];
 
 const BEAMER_MATCH_STATES = [
@@ -73,12 +83,6 @@ const BEAMER_MATCH_STATES = [
     {value: 'in_progress', label: 'Laufend'},
     {value: 'not_started', label: 'Nicht gestartet'},
     {value: 'finished', label: 'Beendet'}
-];
-
-const STATIC_IMAGE_OPTIONS = [
-    {value: 'bpwstr_banner', label: 'BPWSTR Banner'},
-    {value: 'bpwstr_logo', label: 'BPWSTR Logo'},
-    {value: 'turniere_logo', label: 'Turnie Logo'}
 ];
 
 const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'checklists', 'teams', 'settings'];
@@ -104,6 +108,9 @@ function beamerModeFor(beamer) {
     if (beamer.config && beamer.config.display_mode === 'timer_only') {
         return 'timer_only';
     }
+    if (beamer.config && beamer.config.display_mode === WERBUNG_DISPLAY_MODE) {
+        return 'werbung';
+    }
 
     const mode = BEAMER_MODES.find(item => item.displayState === beamer.display_state && !item.configDisplayMode);
     return mode ? mode.value : 'during_game';
@@ -115,7 +122,13 @@ function beamerModeLabel(value) {
 }
 
 function beamerDisplayStateFor(beamer) {
-    return beamer.config && beamer.config.display_mode === 'timer_only' ? 'timer_only' : beamer.display_state;
+    if (beamer.config && beamer.config.display_mode === 'timer_only') {
+        return 'timer_only';
+    }
+    if (beamer.config && beamer.config.display_mode === WERBUNG_DISPLAY_MODE) {
+        return 'werbung';
+    }
+    return beamer.display_state;
 }
 
 function matchFilterValue(filters) {
@@ -508,6 +521,7 @@ class MissionBeamer extends React.Component {
         this.updateMode = this.updateMode.bind(this);
         this.updateMatchSelection = this.updateMatchSelection.bind(this);
         this.updateImageSelection = this.updateImageSelection.bind(this);
+        this.updateWerbungImageSelection = this.updateWerbungImageSelection.bind(this);
         this.updateTimerOnlyReason = this.updateTimerOnlyReason.bind(this);
         this.playSoundEffect = this.playSoundEffect.bind(this);
         this.stopSoundEffect = this.stopSoundEffect.bind(this);
@@ -570,13 +584,19 @@ class MissionBeamer extends React.Component {
             return;
         }
         const currentConfig = beamer.config || {};
-        const config = mode.value === 'timer_only' ?
-            {
-                display_mode: 'timer_only',
-                show_timer_reason: currentConfig.show_timer_reason !== false
-            } :
-            Object.assign({}, currentConfig);
-        if (mode.value !== 'timer_only') {
+        const config = Object.assign({}, currentConfig);
+        if (mode.value === 'timer_only') {
+            config.display_mode = 'timer_only';
+            config.show_timer_reason = currentConfig.show_timer_reason !== false;
+        } else if (mode.value === 'werbung') {
+            config.display_mode = WERBUNG_DISPLAY_MODE;
+            config[WERBUNG_IMAGE_KEYS_CONFIG_KEY] =
+                sanitizeWerbungImageKeys(currentConfig[WERBUNG_IMAGE_KEYS_CONFIG_KEY]);
+            if (config[WERBUNG_IMAGE_KEYS_CONFIG_KEY].length === 0) {
+                config[WERBUNG_IMAGE_KEYS_CONFIG_KEY] = allBeamerMediaImageKeys();
+            }
+            delete config.show_timer_reason;
+        } else {
             delete config.display_mode;
             delete config.show_timer_reason;
         }
@@ -598,6 +618,23 @@ class MissionBeamer extends React.Component {
     updateImageSelection(beamer, value) {
         const config = Object.assign({}, beamer.config || {}, {image_key: value});
         delete config.display_mode;
+        delete config.show_timer_reason;
+        this.update(beamer, {
+            display_state: 'static_image',
+            config
+        });
+    }
+
+    updateWerbungImageSelection(beamer, imageKey, checked) {
+        const currentConfig = beamer.config || {};
+        const currentKeys = sanitizeWerbungImageKeys(currentConfig[WERBUNG_IMAGE_KEYS_CONFIG_KEY]);
+        const nextKeys = checked ?
+            sanitizeWerbungImageKeys(currentKeys.concat([imageKey])) :
+            currentKeys.filter(key => key !== imageKey);
+        const config = Object.assign({}, currentConfig, {
+            display_mode: WERBUNG_DISPLAY_MODE,
+            [WERBUNG_IMAGE_KEYS_CONFIG_KEY]: nextKeys
+        });
         delete config.show_timer_reason;
         this.update(beamer, {
             display_state: 'static_image',
@@ -663,7 +700,10 @@ class MissionBeamer extends React.Component {
                         const saving = Boolean(this.state.savingById[beamer.id]);
                         const disabled = saving || this.props.disabled;
                         const matchSelection = config.match_filter || '';
-                        const imageSelection = config.image_key || STATIC_IMAGE_OPTIONS[0].value;
+                        const imageSelection = config.image_key || DEFAULT_BEAMER_MEDIA_IMAGE_KEY;
+                        const werbungImageKeys = sanitizeWerbungImageKeys(
+                            config[WERBUNG_IMAGE_KEYS_CONFIG_KEY]
+                        );
                         const timerReasonSelection = this.state.selectionsById[beamer.id];
                         const showTimerReason = timerReasonSelection === undefined ?
                             config.show_timer_reason !== false :
@@ -745,13 +785,52 @@ class MissionBeamer extends React.Component {
                                                     beamer,
                                                     event.target.value
                                                 )}>
-                                                {STATIC_IMAGE_OPTIONS.map(option => (
-                                                    <option key={option.value} value={option.value}>
+                                                {BEAMER_MEDIA_IMAGES.map(option => (
+                                                    <option key={option.key} value={option.key}>
                                                         {option.label}
                                                     </option>
                                                 ))}
                                             </Input>
                                         </FormGroup>}
+
+                                    {mode === 'werbung' &&
+                                        <div className='mission-beamer-media-checklist'
+                                            data-testid={'mission-beamer-werbung-checklist-' + beamer.id}>
+                                            <div className='mission-beamer-media-label'>Werbebilder</div>
+                                            {BEAMER_MEDIA_IMAGES.map(image => {
+                                                const inputId = 'missionBeamerWerbungImage' +
+                                                    beamer.id + image.key;
+                                                const checked = werbungImageKeys.indexOf(image.key) !== -1;
+                                                return (
+                                                    <FormGroup check className='mission-beamer-media-option'
+                                                        key={image.key}>
+                                                        <Input
+                                                            id={inputId}
+                                                            type='checkbox'
+                                                            checked={checked}
+                                                            disabled={disabled}
+                                                            data-testid={'mission-beamer-werbung-image-' +
+                                                                beamer.id + '-' + image.key}
+                                                            onChange={event => this.updateWerbungImageSelection(
+                                                                beamer,
+                                                                image.key,
+                                                                event.target.checked
+                                                            )}
+                                                        />
+                                                        <Label check for={inputId}>
+                                                            <span className='mission-beamer-media-thumb'>
+                                                                <img src={image.src} alt='' />
+                                                            </span>
+                                                            <span>{image.label}</span>
+                                                        </Label>
+                                                    </FormGroup>
+                                                );
+                                            })}
+                                            {werbungImageKeys.length === 0 &&
+                                                <Alert color='warning' className='mt-2 mb-0'>
+                                                    Keine Bilder ausgewählt. Werbung zeigt nur Timer-Hinweis.
+                                                </Alert>}
+                                        </div>}
 
                                     {mode === 'timer_only' &&
                                         <FormGroup check>
