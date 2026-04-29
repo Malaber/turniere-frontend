@@ -88,6 +88,13 @@ app.prepare()
         });
 
         server.get('/t/:code', async (req, res) => {
+            if (/^\d+$/.test(req.params.code)) {
+                const actualPage = '/tournament';
+                const queryParam = {code: req.params.code};
+                app.render(req, res, actualPage, queryParam);
+                return;
+            }
+
             try {
                 const tournamentId = await resolvePublicTournamentIdByCode(req.params.code) ||
                     await resolveTournamentId(req.params.code);

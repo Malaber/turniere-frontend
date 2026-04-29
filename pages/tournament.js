@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import React from 'react';
 import {connect} from 'react-redux';
-import {Alert, Badge, ButtonGroup} from 'reactstrap';
+import {Alert, Badge, ButtonGroup, Spinner} from 'reactstrap';
 
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import {Footer} from '../js/components/Footer';
@@ -12,7 +12,7 @@ import {TournamentBigImage} from '../js/components/TournamentBigImage';
 import {EditButton, TournamentStatusBar} from '../js/components/TournamentStatusBar';
 import {LinkButton} from '../js/components/LinkButton';
 import {LoadingPage} from '../js/components/LoadingPage';
-import {getTournament} from '../js/redux/tournamentApi';
+import {getTournament, getTournamentMeta} from '../js/redux/tournamentApi';
 import {FavoriteBar} from '../js/components/FavoriteBar';
 import {ScrollToTopButton} from '../js/components/ScrollToTopButton';
 import {connectToTimerSocket} from '../js/utils/beamerSocket';
@@ -23,14 +23,18 @@ import {requestTournamentList} from '../js/api';
 
 class PrivateTournamentPage extends React.Component {
     render() {
-        const {ownerUsername, playoffStages, groupStage} = this.props.tournament;
+        const {ownerUsername, playoffStages = [], groupStage = null} = this.props.tournament;
         const {isSignedIn, username} = this.props;
         const isOwner = username === ownerUsername;
         const isReadOnly = this.props.tournament.readOnlyMode === true;
+        const teams = Array.isArray(this.props.tournament.teams) ? this.props.tournament.teams : [];
 
         return (
             <div className='pb-5'>
-                <TournamentBigImage {...this.props.tournament}/>
+                <TournamentBigImage
+                    {...this.props.tournament}
+                    isLoadingBasic={this.props.loadingBasicInfo}
+                />
                 <StatusBar tournament={this.props.tournament} isOwner={isOwner} isSignedIn={isSignedIn}/>
                 {isReadOnly &&
                     <div className='container mt-3'>
@@ -41,21 +45,29 @@ class PrivateTournamentPage extends React.Component {
                             </div>
                         </Alert>
                     </div>}
-                <FavoriteBar teams={this.props.tournament.teams} tournamentId={this.props.tournament.id}/>
+                {this.props.loadingTournament ?
+                    <TournamentFavoritesLoading/> :
+                    <FavoriteBar teams={teams} tournamentId={this.props.tournament.id}/>}
                 <div className='stages'>
-                    {groupStage != null &&
-                    <div><GroupStage
-                        groups={groupStage.groups}
-                        stageId={groupStage.id}
-                        stageState={groupStage.state}
-                        isSignedIn={isSignedIn}
-                        isOwner={isOwner}
-                        readOnlyMode={isReadOnly}
-                        teams={this.props.tournament.teams}
-                        onTournamentChange={this.props.onTournamentChange}
-                    /></div>}
-                    <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
-                        isOwner={isOwner} readOnlyMode={isReadOnly}/>
+                    {this.props.loadErrorStatus ?
+                        <TournamentLoadError statusCode={this.props.loadErrorStatus}/> :
+                        (this.props.loadingTournament ?
+                            <TournamentDetailsLoading/> :
+                            <>
+                                {groupStage != null &&
+                                <div><GroupStage
+                                    groups={groupStage.groups}
+                                    stageId={groupStage.id}
+                                    stageState={groupStage.state}
+                                    isSignedIn={isSignedIn}
+                                    isOwner={isOwner}
+                                    readOnlyMode={isReadOnly}
+                                    teams={teams}
+                                    onTournamentChange={this.props.onTournamentChange}
+                                /></div>}
+                                <PlayoffStages playoffStages={playoffStages} isSignedIn={isSignedIn}
+                                    isOwner={isOwner} readOnlyMode={isReadOnly}/>
+                            </>)}
                 </div>
                 <ScrollToTopButton />
             </div>
@@ -107,6 +119,37 @@ function mapStateToTournamentPageProperties(state) {
 
 const TournamentPage = connect(mapStateToTournamentPageProperties)(PrivateTournamentPage);
 
+function TournamentFavoritesLoading() {
+    return (
+        <div className="favorites py-3" data-testid="tournament-favorites-loading">
+            <div className="container text-secondary">
+                <Spinner size="sm" className="me-2"/>
+                Teams werden geladen...
+            </div>
+        </div>
+    );
+}
+
+function TournamentDetailsLoading() {
+    return (
+        <div className="tournament-inline-loader py-5 text-center text-secondary"
+            data-testid="tournament-details-loading">
+            <Spinner className="mb-3"/>
+            <div className="h4 custom-font">Spielplan wird geladen...</div>
+        </div>
+    );
+}
+
+function TournamentLoadError(props) {
+    return (
+        <div className="container py-4" data-testid="tournament-details-error">
+            <Alert color="danger">
+                Turnierdaten konnten nicht geladen werden. Status: {props.statusCode}
+            </Alert>
+        </div>
+    );
+}
+
 class Main extends React.Component {
     static async getInitialProps({query}) {
         return {query};
@@ -117,11 +160,20 @@ class Main extends React.Component {
 
         this.state = {
             tournament: null,
-            loaded: false
+            tournamentMeta: null,
+            loadedMeta: false,
+            loadedFull: false,
+            metaStatus: null,
+            fullStatus: null,
+            fullLoading: false
         };
+        this.onTournamentMetaRequestSuccess = this.onTournamentMetaRequestSuccess.bind(this);
+        this.onTournamentMetaRequestError = this.onTournamentMetaRequestError.bind(this);
         this.onTournamentRequestSuccess = this.onTournamentRequestSuccess.bind(this);
         this.onTournamentRequestError = this.onTournamentRequestError.bind(this);
+        this.loadTournamentMeta = this.loadTournamentMeta.bind(this);
         this.reloadTournament = this.reloadTournament.bind(this);
+        this.connectTournamentStreams = this.connectTournamentStreams.bind(this);
         this.redirectCodeToId = this.redirectCodeToId.bind(this);
         this.redirectCodeFromTournamentLists = this.redirectCodeFromTournamentLists.bind(this);
         this.onTimerMessage = this.onTimerMessage.bind(this);
@@ -129,7 +181,11 @@ class Main extends React.Component {
     }
 
     componentDidMount() {
-        this.reloadTournament();
+        if (this.shouldLazyLoadTournament()) {
+            this.loadTournamentMeta();
+        } else {
+            this.reloadTournament();
+        }
     }
 
     componentWillUnmount() {
@@ -141,13 +197,69 @@ class Main extends React.Component {
         }
     }
 
+    shouldLazyLoadTournament() {
+        return isTournamentIdValue(this.props.query.code);
+    }
+
+    loadTournamentMeta() {
+        this.setState({fullLoading: true});
+        getTournamentMeta(
+            this.props.query.code,
+            this.onTournamentMetaRequestSuccess,
+            this.onTournamentMetaRequestError
+        );
+    }
+
     reloadTournament() {
+        if (!this.state.tournament) {
+            this.setState({fullLoading: true});
+        }
         getTournament(this.props.query.code, this.onTournamentRequestSuccess, this.onTournamentRequestError);
     }
 
+    onTournamentMetaRequestSuccess(requestStatus, tournamentMeta) {
+        this.setState({
+            metaStatus: requestStatus,
+            tournamentMeta: tournamentMeta,
+            loadedMeta: true,
+            fullLoading: true
+        }, () => {
+            this.redirectCodeToId(tournamentMeta);
+            this.connectTournamentStreams(tournamentMeta);
+            this.reloadTournament();
+        });
+    }
+
+    onTournamentMetaRequestError(error) {
+        if (error.response && error.response.status === 404) {
+            this.redirectCodeFromTournamentLists(true);
+            return;
+        }
+
+        const status = error.response ? error.response.status : -1;
+        this.setState({
+            metaStatus: status,
+            loadedMeta: true,
+            fullLoading: false
+        });
+    }
+
     onTournamentRequestSuccess(requestStatus, tournament) {
-        this.setState({status: requestStatus, tournament: tournament, loaded: true});
-        this.redirectCodeToId(tournament);
+        this.setState({
+            fullStatus: requestStatus,
+            metaStatus: requestStatus,
+            tournament: tournament,
+            tournamentMeta: tournament,
+            loadedMeta: true,
+            loadedFull: true,
+            fullLoading: false
+        }, () => {
+            this.redirectCodeToId(tournament);
+            this.connectTournamentStreams(tournament);
+        });
+    }
+
+    connectTournamentStreams(tournament) {
         if (!this.timerSocket && tournament.id) {
             this.timerSocket = connectToTimerSocket({
                 tournamentId: tournament.id,
@@ -172,9 +284,6 @@ class Main extends React.Component {
             return;
         }
         if (String(this.props.query.code) === String(tournament.id)) {
-            if (String(tournament.code) !== String(this.props.query.code)) {
-                this.redirectCodeFromTournamentLists(false);
-            }
             return;
         }
         window.location.replace('/t/' + tournament.id);
@@ -185,11 +294,12 @@ class Main extends React.Component {
             this.redirectCodeFromTournamentLists(true);
             return;
         }
-        if (error.response) {
-            this.setState({status: error.response.status, loaded: true});
-        } else {
-            this.setState({status: -1, loaded: true});
-        }
+        const status = error.response ? error.response.status : -1;
+        this.setState({
+            fullStatus: status,
+            loadedFull: true,
+            fullLoading: false
+        });
     }
 
     redirectCodeFromTournamentLists(showNotFound = true) {
@@ -201,7 +311,13 @@ class Main extends React.Component {
             }
             return false;
         };
-        const setNotFound = () => this.setState({status: 404, loaded: true});
+        const setNotFound = () => this.setState({
+            metaStatus: 404,
+            fullStatus: 404,
+            loadedMeta: true,
+            loadedFull: true,
+            fullLoading: false
+        });
         const tryPublic = () => requestTournamentList('public', tournaments => {
             if (!redirectMatch(tournaments)) {
                 if (showNotFound) {
@@ -227,15 +343,23 @@ class Main extends React.Component {
         }
 
         this.setState(prev => {
-            if (!prev.tournament) {
+            const tournamentTimerState = normalizeTimerState(message);
+            if (!prev.tournament && !prev.tournamentMeta) {
                 return null;
             }
 
-            return {
-                tournament: Object.assign({}, prev.tournament, {
-                    timerState: normalizeTimerState(message)
-                })
-            };
+            const nextState = {};
+            if (prev.tournament) {
+                nextState.tournament = Object.assign({}, prev.tournament, {
+                    timerState: tournamentTimerState
+                });
+            }
+            if (prev.tournamentMeta) {
+                nextState.tournamentMeta = Object.assign({}, prev.tournamentMeta, {
+                    timerState: tournamentTimerState
+                });
+            }
+            return nextState;
         });
     }
 
@@ -248,43 +372,88 @@ class Main extends React.Component {
         }
 
         this.setState(prev => {
-            const cachedMetadata = prev.tournament ? {
-                readOnlyMode: prev.tournament.readOnlyMode,
-                syncTargetUrl: prev.tournament.syncTargetUrl,
-                syncAuthToken: prev.tournament.syncAuthToken,
-                syncLastPushedAt: prev.tournament.syncLastPushedAt,
-                syncLastPushError: prev.tournament.syncLastPushError
+            const previousTournament = prev.tournament || prev.tournamentMeta;
+            const cachedMetadata = previousTournament ? {
+                readOnlyMode: previousTournament.readOnlyMode,
+                syncTargetUrl: previousTournament.syncTargetUrl,
+                syncAuthToken: previousTournament.syncAuthToken,
+                syncLastPushedAt: previousTournament.syncLastPushedAt,
+                syncLastPushError: previousTournament.syncLastPushError
             } : null;
+            const tournament = convertTournamentSnapshot(message.tournament, cachedMetadata);
 
             return {
-                status: 200,
-                tournament: convertTournamentSnapshot(message.tournament, cachedMetadata),
-                loaded: true
+                fullStatus: 200,
+                metaStatus: 200,
+                tournament: tournament,
+                tournamentMeta: tournament,
+                loadedMeta: true,
+                loadedFull: true,
+                fullLoading: false
             };
         });
     }
 
     render() {
-        const tournamentName = this.state.tournament === null ? 'Turnier' : this.state.tournament.name;
+        const lazyRoute = this.shouldLazyLoadTournament();
+        const displayTournament = this.state.tournament ||
+            this.state.tournamentMeta ||
+            (lazyRoute && !this.state.loadedMeta ? createTournamentPlaceholder(this.props.query.code) : null);
+        const tournamentName = displayTournament === null ? 'Turnier' : displayTournament.name;
+        const loadErrorStatus = this.state.tournamentMeta &&
+            this.state.loadedFull &&
+            this.state.fullStatus !== 200 ?
+            this.state.fullStatus :
+            null;
 
-        const {status, tournament} = this.state;
-
-        if (status === 200) {
+        if (displayTournament && (
+            this.state.fullStatus === 200 ||
+            this.state.metaStatus === 200 ||
+            (lazyRoute && !this.state.loadedMeta)
+        )) {
             return (<div>
                 <Head>
                     <title>{tournamentName}: turnie.re</title>
                 </Head>
-                <TurniereNavigation tournament={tournament} />
-                <TournamentPage tournament={tournament} onTournamentChange={this.reloadTournament}/>
+                <TurniereNavigation tournament={this.state.tournament || this.state.tournamentMeta} />
+                <TournamentPage
+                    tournament={displayTournament}
+                    onTournamentChange={this.reloadTournament}
+                    loadingBasicInfo={lazyRoute && !this.state.tournamentMeta && !this.state.tournament}
+                    loadingTournament={!this.state.tournament && !loadErrorStatus}
+                    loadErrorStatus={loadErrorStatus}
+                />
                 <Footer/>
             </div>);
-        } else {
-            if (!this.state.loaded) {
-                return <LoadingPage title='turnie.re' text='Turnier wird geladen...'/>;
-            }
-            return <ErrorPageComponent statusCode={status}/>;
         }
+
+        if (!lazyRoute && !this.state.loadedFull) {
+            return <LoadingPage title='turnie.re' text='Turnier wird geladen...'/>;
+        }
+
+        return <ErrorPageComponent statusCode={this.state.fullStatus || this.state.metaStatus || -1}/>;
     }
+}
+
+function isTournamentIdValue(value) {
+    return /^[0-9]+$/.test(String(value || ''));
+}
+
+function createTournamentPlaceholder(tournamentId) {
+    return {
+        id: tournamentId,
+        code: tournamentId,
+        description: '',
+        name: 'Turnier wird geladen...',
+        isPublic: null,
+        readOnlyMode: false,
+        ownerUsername: null,
+        groupStage: null,
+        playoffStages: [],
+        teamActionLists: [],
+        teams: [],
+        timerState: null
+    };
 }
 
 export default Main;
