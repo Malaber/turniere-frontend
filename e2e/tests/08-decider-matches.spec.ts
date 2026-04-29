@@ -18,6 +18,16 @@ async function expectNoHorizontalOverflow(page) {
   expect(hasOverflow).toBe(false);
 }
 
+async function waitForTournamentDetails(page: Page) {
+  await expect(page.getByTestId('tournament-details-loading')).toHaveCount(0, { timeout: 120000 });
+}
+
+async function gotoTournament(page: Page, tournamentId: number) {
+  await page.goto(`/t/${tournamentId}`);
+  await page.waitForLoadState('networkidle');
+  await waitForTournamentDetails(page);
+}
+
 function visibleModal(page) {
   return page.getByRole('dialog').first();
 }
@@ -82,8 +92,7 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
     .locator('[data-ranking-decision-trigger]');
   let modal = page.getByRole('dialog');
 
-  await page.goto(`/t/${tournament.id}`);
-  await page.waitForLoadState('networkidle');
+  await gotoTournament(page, tournament.id);
 
   await expect(decisionIcons).toHaveCount(2, { timeout: 15000 });
   await keyframe(page, testInfo, 'decider_required');
@@ -156,6 +165,7 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   expect((await finishResponse).ok()).toBe(true);
   await expect.poll(async () => {
     await page.reload();
+    await waitForTournamentDetails(page);
     return page.locator('.stages').textContent();
   }, {
     timeout: 30000,
@@ -170,8 +180,7 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
   const teamOneRow = deciderCard.locator('tbody tr', { hasText: relevantTeamNames[0] }).locator('td');
   const teamTwoRow = deciderCard.locator('tbody tr', { hasText: relevantTeamNames[1] }).locator('td');
 
-  await page.goto(`/t/${tournament.id}`);
-  await page.waitForLoadState('networkidle');
+  await gotoTournament(page, tournament.id);
 
   const tieBreakNeededCount = await page.getByLabel('Tie-Break nötig').count();
   test.skip(tieBreakNeededCount === 0, 'Backend does not require decider for 1-vs-2 advancing tie yet.');
@@ -224,8 +233,7 @@ test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstr
 test('Public user can inspect a required decider modal', async ({ page }, testInfo) => {
   const { tournament } = await seedRelevantDeciderScenario();
 
-  await page.goto(`/t/${tournament.id}`);
-  await page.waitForLoadState('networkidle');
+  await gotoTournament(page, tournament.id);
 
   await expect(page.locator('[data-ranking-decision-trigger]')).toHaveCount(2);
   await page.locator('[data-ranking-decision-trigger]').first().click();
@@ -241,8 +249,7 @@ test('Owner can inspect a resolved decider modal', async ({ context, page }, tes
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedResolvedDeciderScenario();
 
-  await page.goto(`/t/${tournament.id}`);
-  await page.waitForLoadState('networkidle');
+  await gotoTournament(page, tournament.id);
 
   const decisionTriggers = await waitForRankingDecisionTrigger(page);
   await expectResolvedDecisionIconCount(page);
@@ -257,8 +264,7 @@ test('Owner can inspect a resolved decider modal', async ({ context, page }, tes
 test('Public user can inspect a resolved decider modal', async ({ page }, testInfo) => {
   const { tournament } = await seedResolvedDeciderScenario();
 
-  await page.goto(`/t/${tournament.id}`);
-  await page.waitForLoadState('networkidle');
+  await gotoTournament(page, tournament.id);
 
   const decisionTriggers = await waitForRankingDecisionTrigger(page);
   await expectResolvedDecisionIconCount(page);
@@ -305,8 +311,7 @@ test('Mobile tournament view keeps decider tables readable without side scrollin
   await page.setViewportSize({ width: 390, height: 844 });
   const { tournament } = await seedRelevantDeciderScenario();
 
-  await page.goto(`/t/${tournament.id}`);
-  await page.waitForLoadState('networkidle');
+  await gotoTournament(page, tournament.id);
 
   await expect(page.locator('[data-ranking-decision-trigger]')).toHaveCount(2);
   await expectNoHorizontalOverflow(page);
@@ -323,8 +328,7 @@ test('Owner can inspect a non-blocking tie modal', async ({ context, page }, tes
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedIrrelevantTieScenario();
 
-  await page.goto(`/t/${tournament.id}`);
-  await page.waitForLoadState('networkidle');
+  await gotoTournament(page, tournament.id);
 
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0);
   const decisionTriggers = page.locator('[data-ranking-decision-trigger]');
@@ -344,8 +348,7 @@ test('Owner can inspect a non-blocking tie modal', async ({ context, page }, tes
 test('Public user can inspect a non-blocking tie modal', async ({ page }, testInfo) => {
   const { tournament } = await seedIrrelevantTieScenario();
 
-  await page.goto(`/t/${tournament.id}`);
-  await page.waitForLoadState('networkidle');
+  await gotoTournament(page, tournament.id);
 
   await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0);
   const decisionTriggers = page.locator('[data-ranking-decision-trigger]');
