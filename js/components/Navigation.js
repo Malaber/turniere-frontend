@@ -7,10 +7,11 @@ import React from 'react';
 import {logout} from '../api';
 import {notify} from './Notifications';
 import {Timer} from './Timer';
+import {getTimerReasonLabel} from '../utils/timerState';
 
 const NavbarTimer = ({timerState, className}) => (
     <NavbarText className={className}>
-        <span className={'hide-below-400-w'}>Spielzeit: </span><Timer timerState={timerState}/>
+        <span className={'hide-below-400-w'}>{getTimerReasonLabel(timerState)}: </span><Timer timerState={timerState}/>
     </NavbarText>
 );
 

@@ -65,9 +65,23 @@ async function waitForMatchStateCount(
 
 async function setupBeamerAndMatches(
   matchCount: number,
-  opts: { timerSeconds?: number; beamerName?: string; displayState?: string } = {},
+  opts: {
+    timerSeconds?: number;
+    timerReason?: string;
+    timerReasonText?: string;
+    beamerName?: string;
+    displayState?: string;
+    showTimerReason?: boolean;
+  } = {},
 ) {
-  const { timerSeconds, beamerName = 'e2e-during', displayState = 'during_game' } = opts;
+  const {
+    timerSeconds,
+    timerReason,
+    timerReasonText,
+    beamerName = 'e2e-during',
+    displayState = 'during_game',
+    showTimerReason = true,
+  } = opts;
 
   // Use more groups/teams to have enough matches available
   const { tournament } = await seedGroupStageTournament(8, 4, 8, longGroupStageTeamName);
@@ -76,16 +90,24 @@ async function setupBeamerAndMatches(
   await client.login(e2eEmail, e2ePassword);
 
   if (timerSeconds !== undefined) {
+    const timerPayload: Record<string, string | number> = { timestamp_seconds: timerSeconds };
+    if (timerReason) timerPayload.timer_reason = timerReason;
+    if (timerReasonText) timerPayload.timer_reason_text = timerReasonText;
     const timerRes = await client.patch(
       `/tournaments/${tournament.id}/timer`,
-      { timestamp_seconds: timerSeconds },
+      timerPayload,
     );
     expectStatus(timerRes, 200, 'set timer');
   }
 
   // Try creating a beamer; fall back to ?display= URL if backend lacks beamer support
   const beamerPayload = displayState === 'timer_only'
-    ? { name: beamerName, display_state: 'during_game', config: { display_mode: 'timer_only' }, is_default: false }
+    ? {
+      name: beamerName,
+      display_state: 'during_game',
+      config: { display_mode: 'timer_only', show_timer_reason: showTimerReason },
+      is_default: false,
+    }
     : { name: beamerName, display_state: displayState, is_default: false };
 
   const beamerRes = await client.post(
@@ -135,6 +157,7 @@ test('During-game view shows animated timer that updates', async ({ page }, test
 
   const { tournament, fullscreenQuery } = await setupBeamerAndMatches(14, {
     timerSeconds: 5 * 60,
+    timerReason: 'tournament_start',
   });
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
@@ -170,6 +193,7 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   // Timer should be visible
   const timerDigits = page.locator('[class*="digitSlot"]');
   await expect(timerDigits.first()).toBeVisible();
+  await expect(page.getByText(/Turnierstart/i)).toHaveCount(0);
 
   const readTimer = () =>
     page.evaluate(() => {
@@ -342,8 +366,9 @@ test('Timer-only beamer renders urgent timer without matches and keeps sound act
   await page.setViewportSize({ width: 1920, height: 1080 });
   await installBeamerEffectSpies(page);
 
-  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(8, {
+  const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(8, {
     timerSeconds: 12,
+    timerReason: 'playoff_start',
     beamerName: 'timer-only',
     displayState: 'timer_only',
   });
@@ -352,11 +377,30 @@ test('Timer-only beamer renders urgent timer without matches and keeps sound act
 
   await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('timer-only-timer')).toBeVisible();
+  await expect(page.getByTestId('timer-only-reason')).toHaveText('Playoff-Start');
   await expect(page.locator('[class*="timerUrgent"]')).toBeVisible();
   await expect(page.getByTestId('fullscreen-match-card')).toHaveCount(0);
   await expect(page.getByText(/keine laufenden Matches/i)).toHaveCount(0);
   await waitForBeamerEffect(page, 'sound', 'end-countdown');
   await keyframe(page, testInfo, 'timer_only_countdown_sound');
+
+  const resetTimer = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 5 * 60,
+    timer_reason: 'playoff_start',
+  });
+  expectStatus(resetTimer, 200, 'reset timer-only countdown');
+  const hiddenReasonBeamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'timer-only-hidden-reason',
+    display_state: 'during_game',
+    config: { display_mode: 'timer_only', show_timer_reason: false },
+    is_default: false,
+  });
+  expectStatus(hiddenReasonBeamer, 201, 'create timer-only hidden reason beamer');
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=timer-only-hidden-reason`);
+  await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('timer-only-timer')).toBeVisible();
+  await expect(page.getByTestId('timer-only-reason')).toHaveCount(0);
+  await keyframe(page, testInfo, 'timer_only_without_reason');
 });
 
 test('Animated fullscreen timer pads minutes after hours and days', async ({ page }) => {

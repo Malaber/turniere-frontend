@@ -3,6 +3,7 @@ import {Col, Navbar, NavbarBrand, Row, Spinner} from 'reactstrap';
 import {Match} from '../Match';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
 import {Timer} from '../Timer';
+import {getTimerReasonLabel} from '../../utils/timerState';
 
 
 function Matches(props) {
@@ -36,7 +37,8 @@ function MatchesViewHeader(props) {
             <NavbarBrand>{props.title}</NavbarBrand>
             {props.timerState && props.timerState.mode &&
                 <div className="ml-auto timer-container">
-                    Spielzeit: <NavbarBrand><Timer timerState={props.timerState}/></NavbarBrand>
+                    {getTimerReasonLabel(props.timerState)}:{' '}
+                    <NavbarBrand><Timer timerState={props.timerState}/></NavbarBrand>
                 </div>
             }
         </Navbar>

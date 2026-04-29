@@ -25,12 +25,23 @@ function statusText(page: Page, text: string | RegExp) {
 test('Public tournament view renders group-stage and playoff data', async ({ page }, testInfo) => {
   // --- Seed: create group-stage tournament (4 groups × 4 teams, 8 playoff spots) ---
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+  const timer = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 20 * 60,
+    timer_reason: 'custom',
+    timer_reason_text: 'Final-Call',
+  });
+  expectStatus(timer, 200, 'set tournament-page timer reason');
 
   // --- Step 1: fresh tournament page ---
   await page.goto(`/t/${tournament.id}`);
   await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
+  await expect(page.locator('.big-image')).toContainText(/Final-Call:/);
+  await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
 
   await keyframe(page, testInfo, 'tournament_created');
+  await keyframe(page, testInfo, 'tournament_timer_reason_running');
 
   // Tournament name appears in the big-image header
   await expect(page.locator('.big-image')).toBeVisible();
