@@ -54,7 +54,12 @@ async function openDeciderMatchModal(page: Page, card: Locator, heading: string,
 
     try {
       await card.scrollIntoViewIfNeeded({ timeout: attemptTimeout });
-      await card.click({ timeout: attemptTimeout });
+      const cardBody = card.locator('.card-body').first();
+      if (await cardBody.count() > 0) {
+        await cardBody.click({ force: true, timeout: attemptTimeout });
+      } else {
+        await card.click({ timeout: attemptTimeout });
+      }
       const modal = page.getByRole('dialog');
       await expect(visibleModal(page)).toBeVisible({ timeout: attemptTimeout });
       await expect(modal.getByRole('heading', { name: heading })).toBeVisible({ timeout: attemptTimeout });
