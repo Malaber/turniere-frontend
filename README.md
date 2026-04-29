@@ -54,6 +54,20 @@ small warning button appears in the lower right corner before the timer sound is
 needed. Clicking it grants activation for the current page load and retries any
 pending sound at the current timer offset.
 
+Mission Control also has a Beamer soundboard. Each beamer card can play or stop
+sound effects on the matching fullscreen page. Timer sounds always win: if a
+timer cue starts, any soundboard effect is stopped; while a timer sound is
+active, soundboard play requests are ignored. The stop button only stops
+soundboard effects.
+
+To add another soundboard effect:
+
+1. Add the audio file to `public/static/sounds/`.
+2. Add a `key`, `label`, `src`, `volume`, and `durationSeconds` entry in
+   `js/utils/soundEffects.js`.
+3. If the sound should also be an automatic timer cue, add its timer threshold
+   in `js/components/fullscreen/BeamerTimerEffects.js`.
+
 ## Production Setup: Build the Docker Container
 
 ```
