@@ -9,8 +9,9 @@
 }
 
 .matchCardRow {
-    display: flex;
     align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(4rem, 23%, 5.5rem);
 }
 
 .matchCardBody {
@@ -18,8 +19,49 @@
     border-style: solid;
     border-right: 0;
     border-radius: 4px 0 0 4px;
-    padding-left: 1.75rem;
-    padding-right: 1.75rem;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding-left: clamp(0.5rem, 2vw, 1rem);
+    padding-right: clamp(0.5rem, 2vw, 1rem);
+}
+
+.matchTable {
+    --bs-table-accent-bg: transparent;
+    --bs-table-active-bg: transparent;
+    --bs-table-bg: transparent;
+    --bs-table-hover-bg: transparent;
+    --bs-table-striped-bg: transparent;
+
+    background-color: transparent;
+    border-collapse: collapse;
+    min-width: 0;
+}
+
+.matchTable > :not(caption) > * > * {
+    background-color: transparent !important;
+    box-shadow: none !important;
+}
+
+.matchTable th,
+.matchTable td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.65);
+    vertical-align: middle;
+}
+
+.matchTable tr:last-child th,
+.matchTable tr:last-child td {
+    border-bottom: 0;
+}
+
+.matchTable th {
+    padding-left: 0.5rem;
+    padding-right: 0.4rem;
+}
+
+.matchTable td {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
 }
 
 .matchCardBadge {
@@ -28,8 +70,8 @@
     justify-content: center;
     flex-direction: column;
     border-radius: 0 4px 4px 0;
-    min-width: 5.5rem;
-    padding: 1rem;
+    min-width: 0;
+    padding: 0.75rem 0.5rem;
     line-height: 1.2;
     white-space: normal;
     gap: 0.35rem;
@@ -45,4 +87,19 @@
     font-size: 2rem;
     font-weight: 700;
     line-height: 1;
+}
+
+@media (max-width: 575.98px) {
+    .matchCardRow {
+        grid-template-columns: minmax(0, 1fr) clamp(3.75rem, 22%, 4.75rem);
+    }
+
+    .matchCardBody {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+
+    .matchCardBadgeNumber {
+        font-size: 1.8rem;
+    }
 }

@@ -5,6 +5,7 @@ import {
   seedAndPlayGroupStage,
   seedGroupStageAndRunToBeforeFinal,
   finishGroupStageForTournament,
+  longGroupStageTeamName,
 } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
@@ -14,9 +15,112 @@ const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 test.setTimeout(600_000);
 
+type MatchForCardSurface = {
+  id: number;
+  state: string;
+  position: number;
+  match_scores: Array<{ id: number; team: { id: number; name: string } | null }>;
+};
+
 async function scrollToLocator(locator: Locator) {
   await locator.scrollIntoViewIfNeeded();
   await locator.page().waitForTimeout(250);
+}
+
+async function showAllTournamentMatches(page: Page) {
+  await expect(page.getByTitle('Matches einblenden').first()).toBeVisible({ timeout: 120000 });
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const count = await page.getByTitle('Matches einblenden').count();
+    if (count === 0) {
+      return;
+    }
+
+    await page.getByTitle('Matches einblenden').evaluateAll((buttons) => {
+      buttons.forEach((button) => (button as HTMLElement).click());
+    });
+
+    await expect.poll(
+      () => page.getByTitle('Matches einblenden').count(),
+      { timeout: 5000 },
+    ).toBeLessThan(count);
+  }
+  await expect(page.getByTitle('Matches einblenden')).toHaveCount(0);
+}
+
+async function expectMatchCardToUseSingleSurface(card: Locator) {
+  const metric = await card.evaluate((cardElement) => {
+    const body = cardElement.querySelector('.card-body');
+    const table = cardElement.querySelector('table');
+    const badge = cardElement.querySelector('.badge');
+    if (!body || !table || !badge) {
+      return null;
+    }
+
+    const cardRect = cardElement.getBoundingClientRect();
+    const bodyRect = body.getBoundingClientRect();
+    const tableRect = table.getBoundingClientRect();
+    const badgeRect = badge.getBoundingClientRect();
+    const bodyStyle = window.getComputedStyle(body);
+    const tableStyle = window.getComputedStyle(table);
+    const cellBackgrounds = Array.from(table.querySelectorAll('th, td'))
+      .map((cell) => window.getComputedStyle(cell).backgroundColor);
+    const horizontalPadding = parseFloat(bodyStyle.paddingLeft) + parseFloat(bodyStyle.paddingRight);
+
+    return {
+      bodyBackground: bodyStyle.backgroundColor,
+      tableBackground: tableStyle.backgroundColor,
+      cellBackgrounds,
+      cardWidth: cardRect.width,
+      bodyWidth: bodyRect.width,
+      tableWidth: tableRect.width,
+      badgeWidth: badgeRect.width,
+      horizontalPadding,
+      documentOverflow: document.documentElement.scrollWidth - window.innerWidth,
+    };
+  });
+
+  expect(metric).not.toBeNull();
+  expect(metric!.bodyBackground).not.toBe('rgb(255, 255, 255)');
+  expect(metric!.tableBackground).toBe('rgba(0, 0, 0, 0)');
+  for (const background of metric!.cellBackgrounds) {
+    expect(background).toBe('rgba(0, 0, 0, 0)');
+  }
+  expect(metric!.tableWidth / metric!.bodyWidth).toBeGreaterThan(0.86);
+  expect(metric!.badgeWidth / metric!.cardWidth).toBeLessThan(0.28);
+  expect(metric!.horizontalPadding).toBeLessThanOrEqual(32);
+  expect(metric!.documentOverflow).toBeLessThanOrEqual(1);
+}
+
+async function prepareRunningAndFinishedLongNameMatches(
+  client: ApiClient,
+  tournamentId: number,
+): Promise<{ running: MatchForCardSurface; finished: MatchForCardSurface }> {
+  const matchesRes = await client.get<MatchForCardSurface[]>(`/tournaments/${tournamentId}/matches`);
+  expectStatus(matchesRes, 200, 'fetch long-name tournament matches');
+
+  const playable = matchesRes.json
+    .filter((match) => match.state === 'not_started' && match.match_scores.length === 2)
+    .sort((a, b) => a.position - b.position);
+  expect(playable.length).toBeGreaterThanOrEqual(2);
+
+  const finished = playable[0];
+  const running = playable[1];
+
+  const startFinished = await client.patch(`/matches/${finished.id}`, { state: 'in_progress' });
+  expectStatus(startFinished, 200, 'start long-name finished match');
+  for (const score of finished.match_scores) {
+    const points = score.id === finished.match_scores[0].id ? 10 : 7;
+    const updated = await client.patch(`/match_scores/${score.id}`, { points });
+    expectStatus(updated, 200, `update long-name score ${score.id}`);
+  }
+  const finishMatch = await client.patch(`/matches/${finished.id}`, { state: 'finished' });
+  expectStatus(finishMatch, 200, 'finish long-name match');
+
+  const startRunning = await client.patch(`/matches/${running.id}`, { state: 'in_progress' });
+  expectStatus(startRunning, 200, 'start long-name running match');
+
+  return { running, finished };
 }
 
 function statusText(page: Page, text: string | RegExp) {
@@ -43,6 +147,22 @@ test('Tournament id view renders basic information while full tournament loads',
     sawFullRequest = true;
     await fullTournamentBlocked;
     await route.continue();
+  });
+
+  await page.addInitScript(() => {
+    const ClosedWebSocket = class extends EventTarget {
+      static CONNECTING = 0;
+      static OPEN = 1;
+      static CLOSING = 2;
+      static CLOSED = 3;
+
+      readyState = ClosedWebSocket.CLOSED;
+
+      send() { }
+      close() { }
+    };
+
+    (window as any).WebSocket = ClosedWebSocket;
   });
 
   await page.goto(`/t/${tournament.id}`);
@@ -223,6 +343,40 @@ test('Tournament match cards render all visible states as solid cards', async ({
   await expect(byeStatus).toBeVisible({ timeout: 120000 });
   await scrollToLocator(byeStatus);
   await keyframe(page, testInfo, 'match_cards_single_team');
+});
+
+test('Tournament match cards use one surface for active long-name cards', async ({ page }, testInfo) => {
+  const { tournament } = await seedGroupStageTournament(4, 4, 8, longGroupStageTeamName);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+  const { running, finished } = await prepareRunningAndFinishedLongNameMatches(client, tournament.id);
+  const viewports = [
+    { name: 'desktop', width: 1440, height: 900 },
+    { name: 'mobile', width: 390, height: 844 },
+  ];
+
+  for (const viewport of viewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto(`/t/${tournament.id}`);
+    await expect(page.locator('.stages').first()).toBeVisible({ timeout: 120000 });
+    await showAllTournamentMatches(page);
+
+    const runningCard = page.locator(`[data-match-id="${running.id}"]`);
+    await expect(runningCard).toBeVisible();
+    await expect(runningCard).toHaveAttribute('data-match-state', 'in_progress');
+    await scrollToLocator(runningCard);
+    await expect(statusText(page, 'Spiel läuft')).toBeVisible();
+    await expectMatchCardToUseSingleSurface(runningCard);
+    await keyframe(page, testInfo, `match_cards_one_surface_running_${viewport.name}`);
+
+    const finishedCard = page.locator(`[data-match-id="${finished.id}"]`);
+    await expect(finishedCard).toBeVisible();
+    await expect(finishedCard).toHaveAttribute('data-match-state', 'finished');
+    await scrollToLocator(finishedCard);
+    await expect(statusText(page, /Gewinner:/)).toBeVisible();
+    await expectMatchCardToUseSingleSurface(finishedCard);
+    await keyframe(page, testInfo, `match_cards_one_surface_finished_${viewport.name}`);
+  }
 });
 
 test('Tournament view receives live tournament snapshots', async ({ page }, testInfo) => {
