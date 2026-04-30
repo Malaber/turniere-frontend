@@ -56,8 +56,6 @@ const DEFAULT_DISPLAY_STATE_FILTERS = {
     'werbung': {}
 };
 
-const GROUPS_LOGO_URL = '/static/images/bpwstr_logo.png';
-
 function filtersFromConfig(config) {
     if (!config || typeof config.match_filter !== 'string') {
         return null;
@@ -524,8 +522,7 @@ class Main extends React.Component {
         case 'group_tables':
             return <GroupsView
                 tournament={tournament}
-                showQrCode
-                logoUrl={GROUPS_LOGO_URL}/>;
+                showQrCode/>;
         case 'during_game':
             return <DuringGameView
                 tournamentMeta={tournamentMeta}
