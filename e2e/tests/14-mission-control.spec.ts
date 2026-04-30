@@ -205,6 +205,57 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
   }, { timeout: 20_000 }).toEqual(expect.arrayContaining(defaultImageKeys));
 });
 
+test('Mission Control loads transaction log lazily in Verlauf tab', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  let logRequests = 0;
+
+  await page.route('**/api/tournaments/*/transaction_log', async (route) => {
+    logRequests += 1;
+    await route.continue();
+  });
+
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('link', { name: 'Verlauf' })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(logRequests).toBe(0);
+
+  await page.getByRole('link', { name: 'Verlauf' }).click();
+  await expect(page).toHaveURL(/#history$/);
+  await expect(page.getByTestId('mission-transaction-log')).toBeVisible();
+  await expect.poll(async () => logRequests, { timeout: 20_000 }).toBe(1);
+
+  const entries = page.getByTestId('mission-transaction-log-entry');
+  await expect(entries.first()).toBeVisible({ timeout: 20_000 });
+  await expect(entries.first()).toContainText('tournament.created');
+  await expect(page.getByTestId('mission-transaction-log-sequence').first()).toHaveText('#1');
+
+  const sequences = await page.getByTestId('mission-transaction-log-sequence').evaluateAll((elements) => (
+    elements.map((element) => Number((element.textContent ?? '').replace('#', '')))
+  ));
+  const sortedSequences = [...sequences].sort((left, right) => left - right);
+  expect(sequences).toEqual(sortedSequences);
+
+  await page.getByRole('link', { name: 'Timer', exact: true }).click();
+  await page.getByTestId('mission-timer-quick-20s').click();
+  await expect.poll(async () => logRequests, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+
+  await page.getByRole('link', { name: 'Verlauf' }).click();
+  await expect(entries.filter({ hasText: 'tournament.timer_changed' }).first()).toBeVisible({ timeout: 20_000 });
+
+  const requestsAfterMutationRefresh = logRequests;
+  await page.getByRole('link', { name: 'Teams' }).click();
+  await page.getByRole('link', { name: 'Verlauf' }).click();
+  await page.waitForTimeout(500);
+  expect(logRequests).toBe(requestsAfterMutationRefresh);
+
+  await page.getByTestId('mission-transaction-log-refresh').click();
+  await expect.poll(async () => logRequests, { timeout: 20_000 }).toBeGreaterThanOrEqual(
+    requestsAfterMutationRefresh + 1,
+  );
+});
+
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
@@ -217,6 +268,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Checklisten' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Verlauf' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Turnier-Einstellungen' })).toBeVisible();
   await expect(page.getByTestId('mission-tournament-link')).toHaveAttribute('href', `/t/${tournament.id}`);
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
