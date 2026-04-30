@@ -1,7 +1,7 @@
 import React from 'react';
 import {Col, Container, Row, Spinner} from 'reactstrap';
-import {QRCodeSVG} from 'qrcode.react';
 import {Group} from '../GroupStage';
+import {GroupQrCode} from './GroupQrCode';
 
 
 export class GroupsView extends React.Component {
@@ -62,7 +62,7 @@ export class GroupsView extends React.Component {
     }
 
     render() {
-        const {tournament, qrCodeUrl, logoUrl} = this.props;
+        const {tournament, showQrCode, logoUrl} = this.props;
         const {groups, showLogo, backgroundColor} = this.state;
 
         if (!tournament || !tournament.groupStage) {
@@ -87,19 +87,9 @@ export class GroupsView extends React.Component {
             <Container className="fs-5" fluid>
                 <Row className="row-cols-4">
                     {groups.map(group =>
-                        <Col className="mb-2" key={group.id}>
-                            <Group group={group} teams={tournament.teams}/>
-                        </Col>
+                        <Group group={group} key={group.id} teams={tournament.teams}/>
                     )}
-                    {qrCodeUrl && <Col>
-                        <div className="d-flex justify-content-center align-items-center">
-                            <QRCodeSVG
-                                className="shadow mx-auto"
-                                value={qrCodeUrl}
-                                size="300"
-                            />
-                        </div>
-                    </Col>}
+                    {showQrCode && <GroupQrCode/>}
                     {logo}
                 </Row>
             </Container>

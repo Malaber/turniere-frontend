@@ -74,6 +74,41 @@ async function stripGroupFromMatchesEndpoint(page: Page, tournamentId: number): 
   });
 }
 
+async function expectGroupTablesQrCode(page: Page): Promise<void> {
+  const qrCard = page.getByTestId('fullscreen-group-qr-card');
+  const qrCode = page.getByTestId('fullscreen-group-qr-code');
+  const firstGroupCard = page.locator('.card').filter({ hasText: /Gruppe 1/i }).first();
+
+  await expect(qrCard).toBeVisible({ timeout: 10_000 });
+  await expect(qrCode).toBeVisible();
+  await expect(qrCode).toHaveAttribute('src', /\/static\/images\/bpwstr_qr_code\.png$/);
+  await expect(firstGroupCard).toBeVisible();
+  await expect.poll(async () => qrCode.evaluate((node) => (
+    (node as HTMLImageElement).naturalWidth
+  )), { timeout: 10_000 }).toBeGreaterThan(0);
+
+  const [qrCardBox, qrCodeBox, groupCardBox] = await Promise.all([
+    qrCard.boundingBox(),
+    qrCode.boundingBox(),
+    firstGroupCard.boundingBox(),
+  ]);
+
+  expect(qrCardBox).toBeTruthy();
+  expect(qrCodeBox).toBeTruthy();
+  expect(groupCardBox).toBeTruthy();
+
+  const qrCardCenterX = qrCardBox!.x + qrCardBox!.width / 2;
+  const qrCardCenterY = qrCardBox!.y + qrCardBox!.height / 2;
+  const qrCodeCenterX = qrCodeBox!.x + qrCodeBox!.width / 2;
+  const qrCodeCenterY = qrCodeBox!.y + qrCodeBox!.height / 2;
+
+  expect(Math.abs(qrCodeCenterX - qrCardCenterX)).toBeLessThanOrEqual(2);
+  expect(Math.abs(qrCodeCenterY - qrCardCenterY)).toBeLessThanOrEqual(2);
+  expect(Math.abs(qrCardBox!.y - groupCardBox!.y)).toBeLessThanOrEqual(4);
+  expect(qrCodeBox!.width).toBeGreaterThanOrEqual(280);
+  expect(qrCodeBox!.height).toBeGreaterThanOrEqual(280);
+}
+
 test('Fullscreen beamer page renders with default fallback', async ({ page }, testInfo) => {
   // Fullscreen/beamer pages are designed for projectors — use a wide viewport
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -259,6 +294,7 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
   );
   expectStatus(secondUpdate, 200, 'update beamer to group tables');
   await expect(page.getByText(/Gruppe 1/i)).toBeVisible({ timeout: 10_000 });
+  await expectGroupTablesQrCode(page);
   await keyframe(page, testInfo, 'live_beamer_group_tables');
 });
 

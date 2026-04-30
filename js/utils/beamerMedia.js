@@ -3,6 +3,7 @@ export const STATIC_IMAGE_KEY_CONFIG_KEY = 'image_key';
 export const WERBUNG_IMAGE_KEYS_CONFIG_KEY = 'werbung_image_keys';
 export const WERBUNG_ROTATION_SECONDS_CONFIG_KEY = 'werbung_rotation_seconds';
 export const DEFAULT_WERBUNG_ROTATION_SECONDS = 10;
+export const BPWSTR_QR_CODE_IMAGE_KEY = 'bpwstr_qr_code';
 
 export const BEAMER_MEDIA_IMAGES = [
     {
@@ -16,7 +17,7 @@ export const BEAMER_MEDIA_IMAGES = [
         src: '/static/images/bpwstr_logo.png'
     },
     {
-        key: 'bpwstr_qr_code',
+        key: BPWSTR_QR_CODE_IMAGE_KEY,
         label: 'BPWSTR QR-Code',
         src: '/static/images/bpwstr_qr_code.png'
     },
