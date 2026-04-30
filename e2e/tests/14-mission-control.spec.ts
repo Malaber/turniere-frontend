@@ -160,13 +160,19 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
   await expect(card).toBeVisible({ timeout: 20_000 });
 
   await card.getByTestId(`mission-beamer-mode-${beamer.json.id}`).selectOption('werbung');
+
   const checklist = card.getByTestId(`mission-beamer-werbung-checklist-${beamer.json.id}`);
   await expect(checklist).toBeVisible();
+
   await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_banner`)).toBeChecked();
   await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_qr_code`)).toBeChecked();
 
-  const tennis = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis_blurred`);
-  await tennis.click();
+  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis_blurred`)).toHaveCount(0);
+  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis-blurred`)).toHaveCount(0);
+
+  const logo = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_logo`);
+  await expect(logo).not.toBeChecked();
+  await logo.check();
 
   await expect.poll(async () => {
     const beamers = await client.get<Array<{ id: number; config: Record<string, unknown> }>>(
@@ -177,17 +183,23 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
     return updated?.config;
   }, { timeout: 20_000 }).toMatchObject({
     display_mode: 'werbung',
-    werbung_image_keys: expect.arrayContaining(['bpwstr_banner', 'bpwstr_logo', 'bpwstr_qr_code']),
+    werbung_image_keys: expect.arrayContaining([
+      'bpwstr_banner',
+      'bpwstr_logo',
+      'bpwstr_qr_code',
+    ]),
   });
+
+  await logo.uncheck();
 
   await expect.poll(async () => {
     const beamers = await client.get<Array<{ id: number; config: { werbung_image_keys?: string[] } }>>(
       `/tournaments/${tournament.id}/beamers`,
     );
-    expectStatus(beamers, 200, 'fetch beamers after werbung uncheck');
+    expectStatus(beamers, 200, 'fetch beamers after werbung logo uncheck');
     const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
     return updated?.config.werbung_image_keys || [];
-  }, { timeout: 20_000 }).not.toContain('tennis_blurred');
+  }, { timeout: 20_000 }).not.toContain('bpwstr_logo');
 });
 
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
