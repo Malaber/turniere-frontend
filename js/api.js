@@ -296,6 +296,19 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
             action.parameters.errorCallback();
         });
         return Object.assign({}, state, {});
+    case actionTypesTournamentinfo.STOP_MATCH:
+        patchRequest(action.state, '/matches/' + action.parameters.matchId, {
+            state: 'not_started'
+        }).then(resp => {
+            storeOptionalToken(resp);
+            action.parameters.successCallback(resp.data);
+        }).catch(error => {
+            if (error.response) {
+                storeOptionalToken(error.response);
+            }
+            action.parameters.errorCallback();
+        });
+        return Object.assign({}, state, {});
     case actionTypesTournamentinfo.SUBMIT_MATCH_SCORES:
         patchRequest(action.state, '/match_scores/' + action.parameters.scoreIdTeam1, {
             [action.parameters.scoreField || 'points']: action.parameters.scoreTeam1
@@ -679,6 +692,18 @@ export function testTournamentSync(tournamentId, successCallback, errorCallback)
 export function startMatch(matchId, successCallback, errorCallback) {
     __store.dispatch({
         type: actionTypesTournamentinfo.START_MATCH,
+        parameters: {
+            matchId: matchId,
+            successCallback: successCallback,
+            errorCallback: errorCallback
+        },
+        state: getState()
+    });
+}
+
+export function stopMatch(matchId, successCallback, errorCallback) {
+    __store.dispatch({
+        type: actionTypesTournamentinfo.STOP_MATCH,
         parameters: {
             matchId: matchId,
             successCallback: successCallback,

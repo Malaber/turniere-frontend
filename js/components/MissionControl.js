@@ -14,6 +14,7 @@ import {
     startMatch,
     startNextGroupMatches,
     startNextStageMatches,
+    stopMatch,
     submitDeciderMatchScores,
     submitMatchScores,
     updateBeamer,
@@ -1833,6 +1834,7 @@ class MissionMatchCard extends React.Component {
         this.setScore2 = this.setScore2.bind(this);
         this.setLive = this.setLive.bind(this);
         this.startMatch = this.startMatch.bind(this);
+        this.stopMatch = this.stopMatch.bind(this);
         this.submit = this.submit.bind(this);
         this.onFormKeyDown = this.onFormKeyDown.bind(this);
         this.startUnlockHold = this.startUnlockHold.bind(this);
@@ -1845,6 +1847,8 @@ class MissionMatchCard extends React.Component {
         this.unlockTemporarily = this.unlockTemporarily.bind(this);
         this.onStartSuccess = this.onStartSuccess.bind(this);
         this.onStartError = this.onStartError.bind(this);
+        this.onStopSuccess = this.onStopSuccess.bind(this);
+        this.onStopError = this.onStopError.bind(this);
         this.onScoresSuccess = this.onScoresSuccess.bind(this);
         this.onEndSuccess = this.onEndSuccess.bind(this);
         this.onActionError = this.onActionError.bind(this);
@@ -1897,6 +1901,11 @@ class MissionMatchCard extends React.Component {
     startMatch() {
         this.setState({running: true});
         startMatch(this.props.match.id, this.onStartSuccess, this.onStartError);
+    }
+
+    stopMatch() {
+        this.setState({running: true});
+        stopMatch(this.props.match.id, this.onStopSuccess, this.onStopError);
     }
 
     submit(event) {
@@ -2066,6 +2075,17 @@ class MissionMatchCard extends React.Component {
         this.setState({running: false});
     }
 
+    onStopSuccess() {
+        notify.show('Match wurde gestoppt.', 'success', 2000);
+        this.setState({running: false, live: false});
+        this.props.onTournamentChange();
+    }
+
+    onStopError() {
+        notify.show('Match konnte nicht gestoppt werden.', 'error', 3000);
+        this.setState({running: false});
+    }
+
     onScoresSuccess() {
         if (this.submittedLive || this.state.temporaryUnlocked) {
             notify.show('Score wurde gespeichert.', 'success', 2000);
@@ -2093,6 +2113,7 @@ class MissionMatchCard extends React.Component {
         const match = this.props.match;
         const editable = (match.state === 'in_progress' || this.state.temporaryUnlocked) && !this.props.disabled;
         const canStart = match.state === 'not_started' && !this.props.disabled;
+        const canStop = match.state === 'in_progress' && !this.props.disabled;
         const showUnlockButton = match.state === 'finished' && !this.props.disabled;
         const showStaticLock = match.state === 'not_started' || match.state === 'not_ready' ||
             (match.state === 'finished' && this.props.disabled);
@@ -2102,6 +2123,7 @@ class MissionMatchCard extends React.Component {
         return (
             <form onSubmit={this.submit} className={'mission-control-match mission-start-card ' + stateClass}
                 onKeyDown={this.onFormKeyDown}
+                data-match-id={match.id}
                 data-testid='mission-match-card'>
                 {match.decider &&
                     <div className='mission-start-table'>
@@ -2189,6 +2211,12 @@ class MissionMatchCard extends React.Component {
                             data-testid='mission-match-start'
                             disabled={this.state.running} onClick={this.startMatch}>
                             Start
+                        </Button>}
+                    {canStop &&
+                        <Button color='outline-danger' size='sm' type='button'
+                            data-testid='mission-match-stop'
+                            disabled={this.state.running} onClick={this.stopMatch}>
+                            Stop
                         </Button>}
                     <Button color='primary' size='sm' type='submit'
                         data-testid='mission-match-save'
