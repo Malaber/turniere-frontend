@@ -69,6 +69,12 @@ class CreateTournamentForm extends React.Component {
             name: '', description: '', public: false,
             readOnlyMode: false,
             syncAuthToken: '',
+            csvHeaders: [],
+            csvRows: [],
+            csvTeamNameColumn: '',
+            csvImportError: '',
+            csvImportSummary: '',
+            teamListVersion: 0,
 
             groupSize: 4, groupAdvance: 1, teams: [], groups: []
         };
@@ -81,6 +87,9 @@ class CreateTournamentForm extends React.Component {
         this.handlePublicInput = this.handlePublicInput.bind(this);
         this.handleReadOnlyModeInput = this.handleReadOnlyModeInput.bind(this);
         this.handleSyncAuthTokenInput = this.handleSyncAuthTokenInput.bind(this);
+        this.handleCsvInput = this.handleCsvInput.bind(this);
+        this.handleCsvTeamNameColumnInput = this.handleCsvTeamNameColumnInput.bind(this);
+        this.importCsvTeams = this.importCsvTeams.bind(this);
         this.increaseGroupAdvance = this.increaseGroupAdvance.bind(this);
         this.decreaseGroupAdvance = this.decreaseGroupAdvance.bind(this);
         this.increaseGroupSize = this.increaseGroupSize.bind(this);
@@ -171,12 +180,41 @@ class CreateTournamentForm extends React.Component {
             </Form>
             {!this.state.readOnlyMode && <>
                 <h3 className="custom-font mt-4">Teams</h3>
+                <FormGroup>
+                    <Label for="team-csv-file">Teams aus CSV importieren</Label>
+                    <Input id="team-csv-file" type="file" accept=".csv,text/csv" onChange={this.handleCsvInput}/>
+                    <small className="text-muted">
+                        CSV-Datei auswählen, Spalte für Teamnamen wählen und Namen zur Teamliste hinzufügen.
+                    </small>
+                    <WarningPopup text={this.state.csvImportError} shown={this.state.csvImportError.length > 0}/>
+                    {this.state.csvImportSummary.length > 0 &&
+                        <small className="text-success d-block mt-2">{this.state.csvImportSummary}</small>}
+                </FormGroup>
+                {this.state.csvHeaders.length > 0 && <FormGroup>
+                    <Label for="team-csv-column">Spalte für Teamnamen</Label>
+                    <Input id="team-csv-column" type="select" value={this.state.csvTeamNameColumn}
+                        onChange={this.handleCsvTeamNameColumnInput}>
+                        {this.state.csvHeaders.map((header, index) => (
+                            <option key={`${header}-${index}`} value={index}>
+                                {header || `Spalte ${index + 1}`}
+                            </option>
+                        ))}
+                    </Input>
+                    <Button type="button" color="secondary" outline={true} className="mt-2"
+                        onClick={this.importCsvTeams}>
+                        Teamnamen aus CSV hinzufügen
+                    </Button>
+                    <small className="text-muted d-block mt-2">
+                        {this.state.csvRows.length} CSV-Zeile(n) erkannt.
+                    </small>
+                </FormGroup>}
                 <EditableStringList
+                    key={this.state.teamListVersion}
                     addButtonText="hinzufügen"
                     teamPlaceholder="Keine Teams hinzugefügt!"
                     groupPlaceHolder="Keine Gruppen verfügbar!"
-                    teams={[]}
-                    groups={[]}
+                    teams={this.state.teams}
+                    groups={this.state.groups}
                     groupPhaseEnabled={this.state.groupPhaseEnabled}
                     groupSize={this.state.groupSize}
                     onTeamsChange={this.teamListUpdate}
@@ -255,6 +293,102 @@ class CreateTournamentForm extends React.Component {
 
     handleSyncAuthTokenInput(input) {
         this.setState({syncAuthToken: input.target.value});
+    }
+
+    handleCsvInput(input) {
+        const file = input.target.files && input.target.files[0];
+        if (!file) {
+            this.setState({
+                csvHeaders: [],
+                csvRows: [],
+                csvTeamNameColumn: '',
+                csvImportError: '',
+                csvImportSummary: ''
+            });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = event => {
+            try {
+                const parsedCsv = parseCsv(event.target.result || '');
+                const preferredColumn = findPreferredTeamNameColumn(parsedCsv.headers);
+
+                this.setState({
+                    csvHeaders: parsedCsv.headers,
+                    csvRows: parsedCsv.rows,
+                    csvTeamNameColumn: String(preferredColumn),
+                    csvImportError: '',
+                    csvImportSummary: `${parsedCsv.rows.length} CSV-Zeile(n) geladen.`
+                });
+            } catch (error) {
+                this.setState({
+                    csvHeaders: [],
+                    csvRows: [],
+                    csvTeamNameColumn: '',
+                    csvImportError: error.message,
+                    csvImportSummary: ''
+                });
+            }
+        };
+        reader.onerror = () => {
+            this.setState({
+                csvHeaders: [],
+                csvRows: [],
+                csvTeamNameColumn: '',
+                csvImportError: 'Die CSV-Datei konnte nicht gelesen werden.',
+                csvImportSummary: ''
+            });
+        };
+        reader.readAsText(file);
+    }
+
+    handleCsvTeamNameColumnInput(input) {
+        this.setState({
+            csvTeamNameColumn: input.target.value,
+            csvImportError: '',
+            csvImportSummary: ''
+        });
+    }
+
+    importCsvTeams() {
+        const columnIndex = Number(this.state.csvTeamNameColumn);
+        if (!Number.isInteger(columnIndex) || columnIndex < 0) {
+            this.setState({
+                csvImportError: 'Bitte wähle eine CSV-Spalte für Teamnamen.',
+                csvImportSummary: ''
+            });
+            return;
+        }
+
+        const existingTeams = new Set(this.state.teams);
+        const seenCsvTeams = new Set();
+        const importedTeams = [];
+
+        this.state.csvRows.forEach(row => {
+            const teamName = ((row[columnIndex] || '') + '').trim();
+            if (teamName.length === 0 || existingTeams.has(teamName) || seenCsvTeams.has(teamName)) {
+                return;
+            }
+            seenCsvTeams.add(teamName);
+            importedTeams.push(teamName);
+        });
+
+        if (importedTeams.length === 0) {
+            this.setState({
+                csvImportError: 'Keine neuen Teamnamen in dieser CSV-Spalte gefunden.',
+                csvImportSummary: ''
+            });
+            return;
+        }
+
+        this.setState({
+            teams: this.state.teams.concat(importedTeams),
+            groups: appendTeamsToGroups(this.state.groups, this.state.groupSize, importedTeams),
+            csvImportError: '',
+            csvImportSummary: `${importedTeams.length} Team(s) aus CSV hinzugefügt.`,
+            teamListVersion: this.state.teamListVersion + 1
+        });
     }
 
     create() {
@@ -337,4 +471,107 @@ function createTeamArray(groupphase, groups, teams) {
     }
 
     return result;
+}
+
+function parseCsv(text) {
+    const rows = [];
+    let row = [];
+    let field = '';
+    let inQuotes = false;
+    const source = text.replace(/^\uFEFF/, '');
+
+    for (let index = 0; index < source.length; index++) {
+        const character = source[index];
+
+        if (inQuotes) {
+            if (character === '"' && source[index + 1] === '"') {
+                field += '"';
+                index++;
+            } else if (character === '"') {
+                inQuotes = false;
+            } else {
+                field += character;
+            }
+            continue;
+        }
+
+        if (character === '"') {
+            inQuotes = true;
+        } else if (character === ',') {
+            row.push(field);
+            field = '';
+        } else if (character === '\n') {
+            row.push(field);
+            rows.push(row);
+            row = [];
+            field = '';
+        } else if (character === '\r') {
+            if (source[index + 1] === '\n') {
+                index++;
+            }
+            row.push(field);
+            rows.push(row);
+            row = [];
+            field = '';
+        } else {
+            field += character;
+        }
+    }
+
+    if (inQuotes) {
+        throw new Error('Die CSV-Datei konnte nicht gelesen werden. Bitte prüfe die Anführungszeichen.');
+    }
+
+    row.push(field);
+    rows.push(row);
+
+    const nonEmptyRows = rows.filter(csvRow => csvRow.some(value => value.trim().length > 0));
+    if (nonEmptyRows.length < 2) {
+        throw new Error('Die CSV-Datei braucht eine Kopfzeile und mindestens eine Datenzeile.');
+    }
+
+    const headers = nonEmptyRows[0].map(value => value.trim());
+    if (!headers.some(header => header.length > 0)) {
+        throw new Error('Die CSV-Kopfzeile enthält keine Spaltennamen.');
+    }
+
+    return {
+        headers,
+        rows: nonEmptyRows.slice(1)
+    };
+}
+
+function findPreferredTeamNameColumn(headers) {
+    const preferredHeaders = [
+        'Team Name',
+        'Teamname',
+        'Team',
+        'Name Teilnehmer*in',
+        'Teilnehmer*innenname: Vorname',
+        'Firma'
+    ];
+
+    for (let preferenceIndex = 0; preferenceIndex < preferredHeaders.length; preferenceIndex++) {
+        const headerIndex = headers.indexOf(preferredHeaders[preferenceIndex]);
+        if (headerIndex !== -1) {
+            return headerIndex;
+        }
+    }
+
+    return 0;
+}
+
+function appendTeamsToGroups(groups, groupSize, teams) {
+    const nextGroups = groups.map(group => group.slice());
+
+    teams.forEach(team => {
+        let lastGroup = nextGroups[nextGroups.length - 1];
+        if (lastGroup === undefined || lastGroup.length >= groupSize) {
+            nextGroups.push([]);
+        }
+        lastGroup = nextGroups[nextGroups.length - 1];
+        lastGroup.push(team);
+    });
+
+    return nextGroups;
 }
