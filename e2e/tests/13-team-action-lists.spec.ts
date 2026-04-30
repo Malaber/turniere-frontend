@@ -3,6 +3,7 @@ import { injectAuth, injectAuthState, loadAuthState } from '../helpers/auth';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 import { keyframe } from '../helpers/screenshot';
 import { seedAndPlayGroupStage } from '../helpers/scenario-seeder';
+import { waitForActionCableSubscription } from '../helpers/action-cable';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
 const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
@@ -181,6 +182,10 @@ test('Owner can create a new team action list and other viewer receives it live'
   const viewerPage = await viewerContext.newPage();
   await viewerPage.goto(`/t/${tournament.id}/mission-control#checklists`);
   await viewerPage.waitForLoadState('networkidle');
+  await waitForActionCableSubscription(viewerPage, {
+    channel: 'TournamentTeamActionListsChannel',
+    tournament_id: tournament.id,
+  });
 
   const listKey = randomKey('owner_created');
   const listName = `Ausgabe ${Date.now()}`;

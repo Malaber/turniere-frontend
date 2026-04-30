@@ -87,7 +87,13 @@ export async function countBeamerEffects(page: Page, type: string, cue?: string)
   );
 }
 
-export async function waitForBeamerEffect(page: Page, type: string, cue?: string, minimum = 1) {
+export async function waitForBeamerEffect(
+  page: Page,
+  type: string,
+  cue?: string,
+  minimum = 1,
+  timeout = 8_000,
+) {
   await page.waitForFunction(
     ({ expectedType, expectedCue, expectedMinimum }) => {
       const events = (window as any).__beamerTimerEffects?.events || [];
@@ -99,6 +105,6 @@ export async function waitForBeamerEffect(page: Page, type: string, cue?: string
       }).length >= expectedMinimum;
     },
     { expectedType: type, expectedCue: cue, expectedMinimum: minimum },
-    { timeout: 8_000 },
+    { timeout },
   );
 }
