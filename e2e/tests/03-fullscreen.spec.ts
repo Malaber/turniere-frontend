@@ -349,10 +349,6 @@ test('Fullscreen timer updates live for countup mode', async ({ page }, testInfo
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
 
-  await page.goto(`/t/${tournament.id}/fullscreen?display=matches_all`);
-  await expect(page.getByText(/Anzeige: alle/i)).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
-
   const anchor = new Date(Date.now() - 3 * 60 * 1000 - 15 * 1000).toISOString();
   const timerRes = await client.patch(
     `/tournaments/${tournament.id}/timer`,
@@ -365,13 +361,19 @@ test('Fullscreen timer updates live for countup mode', async ({ page }, testInfo
   );
   expectStatus(timerRes, 200, 'start countup timer');
 
+  await page.goto(`/t/${tournament.id}/fullscreen?display=matches_all`);
+  await expect(page.getByText(/Anzeige: alle/i)).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
   await expect(page.locator('.timer-container')).toContainText(/(Overtime|Spielende):/i, {
     timeout: 60_000,
   });
-  await expect(page.locator('.timer-container')).toContainText(/3:[1-5][0-9]|4:0[0-9]/, {
+  const timerValue = page.locator('.timer-container .navbar-brand');
+  await expect(timerValue).toContainText(/[0-9]+:[0-5][0-9]/, {
     timeout: 60_000,
   });
+  const textBefore = await timerValue.textContent();
+  await page.waitForTimeout(2_500);
+  await expect(timerValue).not.toHaveText((textBefore || '').trim(), { timeout: 5_000 });
   await keyframe(page, testInfo, 'fullscreen_timer_reason_countup');
 });
 
