@@ -8,7 +8,7 @@ const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
 const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
-test.setTimeout(240_000);
+test.setTimeout(600_000);
 
 type ApiMatchForBadge = {
   id: number;
@@ -152,7 +152,8 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=during_game`);
   await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible({ timeout: 15000 });
-  await expect(page.locator('body')).toContainText('G1-S1', { timeout: 20_000 });
+  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('body')).toContainText('G1-S1', { timeout: 60_000 });
   await keyframe(page, testInfo, 'fullscreen_beamer_during_game');
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=between_games`);

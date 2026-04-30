@@ -1,6 +1,6 @@
 import { test, expect, Page, devices } from '@playwright/test';
 import { installBeamerEffectSpies, waitForBeamerEffect } from '../helpers/beamer-audio';
-import { keyframe } from '../helpers/screenshot';
+import { keyframe, screenshotFilePath } from '../helpers/screenshot';
 import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
 import {
   LONG_TEAM_NAME_SINGLE_WORD,
@@ -271,7 +271,7 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
 
   // Use direct screenshot — bump animation repeats each second
   await page.screenshot({
-    path: 'screenshots/fullscreen_timer_takeover_during_countdown_and_finished/countdown_takeover.png',
+    path: screenshotFilePath(testInfo, 'countdown_takeover'),
   });
 
   // During takeover, match cards should not be visible
@@ -281,7 +281,7 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
   const timerUrgent = page.locator('[class*="timerUrgent"]');
   await expect(timerUrgent).toBeVisible({ timeout: 5_000 });
   await page.screenshot({
-    path: 'screenshots/fullscreen_timer_takeover_during_countdown_and_finished/countdown_urgent.png',
+    path: screenshotFilePath(testInfo, 'countdown_urgent'),
   });
 
   // Wait for "Spiel vorbei!" finished state
@@ -291,14 +291,14 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
 
   // Use direct screenshot — finishedPulse animation is infinite
   await page.screenshot({
-    path: 'screenshots/fullscreen_timer_takeover_during_countdown_and_finished/finished_takeover.png',
+    path: screenshotFilePath(testInfo, 'finished_takeover'),
   });
 
   // After ~10s the finished display should disappear and matches return
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(500);
   await page.screenshot({
-    path: 'screenshots/fullscreen_timer_takeover_during_countdown_and_finished/back_to_normal.png',
+    path: screenshotFilePath(testInfo, 'back_to_normal'),
   });
 });
 

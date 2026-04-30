@@ -1,9 +1,11 @@
 node_modules/**
 .next/**
-e2e/screenshots/**
-e2e/test-results/**
+e2e/**
+screenshots/**
+test-results/**
 .idea/**
 README.md
 .hound.yml
 .gitignore
 .gitlab-ci.yml
+docker-compose.e2e.yml
