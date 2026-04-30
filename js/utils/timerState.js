@@ -95,6 +95,28 @@ export function getTimerDisplay(timerState, nowMs) {
     };
 }
 
+export function getTimerDisplayMs(timerDisplay) {
+    if (
+        timerDisplay &&
+        timerDisplay.mode === TIMER_MODE_COUNTDOWN &&
+        timerDisplay.ms > 0
+    ) {
+        return Math.ceil(timerDisplay.ms / 1000) * 1000;
+    }
+
+    return timerDisplay && Number.isFinite(timerDisplay.ms) ?
+        timerDisplay.ms :
+        0;
+}
+
+export function getTimerDisplaySeconds(timerDisplay) {
+    return Math.floor(getTimerDisplayMs(timerDisplay) / 1000);
+}
+
+export function formatTimerDisplay(timerDisplay, options = {}) {
+    return formatTimerMs(getTimerDisplayMs(timerDisplay), options);
+}
+
 export function formatTimerMs(ms, {labelHours = false} = {}) {
     const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
     const hours = Math.floor(totalSeconds / 3600);

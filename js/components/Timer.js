@@ -1,5 +1,18 @@
 import React from 'react';
-import {formatTimerMs, getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../utils/timerState';
+import {formatTimerDisplay, getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../utils/timerState';
+
+
+function timerDisplayKey(display) {
+    if (!display.active) return 'inactive';
+    if (
+        display.mode === TIMER_MODE_COUNTDOWN &&
+        display.ms === 0
+    ) {
+        return 'finished';
+    }
+
+    return display.mode + ':' + formatTimerDisplay(display, {labelHours: true});
+}
 
 export function Timer({timerState}) {
     const [display, setDisplay] = React.useState(
@@ -7,15 +20,58 @@ export function Timer({timerState}) {
     );
 
     React.useEffect(() => {
+        let active = true;
+        let frameId = null;
+        let timeoutId = null;
+        let lastKey = null;
+
+        const clearScheduledTick = () => {
+            if (frameId !== null) {
+                window.cancelAnimationFrame(frameId);
+                frameId = null;
+            }
+            if (timeoutId !== null) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+        };
+
+        const scheduleTick = () => {
+            if (!active || !timerState || !timerState.mode) return;
+            if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+                frameId = window.requestAnimationFrame(tick);
+                return;
+            }
+            timeoutId = setTimeout(tick, 250);
+        };
+
+        const publishDisplay = nextDisplay => {
+            const key = timerDisplayKey(nextDisplay);
+            if (key === lastKey) return;
+
+            lastKey = key;
+            setDisplay(nextDisplay);
+        };
+
+        const tick = () => {
+            clearScheduledTick();
+            publishDisplay(getTimerDisplay(timerState, Date.now()));
+            scheduleTick();
+        };
+
         if (!timerState || !timerState.mode) {
-            setDisplay(getTimerDisplay(timerState, Date.now()));
-            return undefined;
+            publishDisplay(getTimerDisplay(timerState, Date.now()));
+            return () => {
+                active = false;
+                clearScheduledTick();
+            };
         }
 
-        const tick = () => setDisplay(getTimerDisplay(timerState, Date.now()));
         tick();
-        const intervalId = setInterval(tick, 1000);
-        return () => clearInterval(intervalId);
+        return () => {
+            active = false;
+            clearScheduledTick();
+        };
     }, [timerState]);
 
     const formatTimeLeft = nextDisplay => {
@@ -27,7 +83,7 @@ export function Timer({timerState}) {
             return 'Spiel vorbei!';
         }
 
-        return formatTimerMs(nextDisplay.ms, {labelHours: true});
+        return formatTimerDisplay(nextDisplay, {labelHours: true});
     };
 
     return <span>{formatTimeLeft(display)}</span>;

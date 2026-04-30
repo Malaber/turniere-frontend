@@ -169,6 +169,14 @@ async function expectAnimatedTimerText(page: Page, testId: string, expected: Reg
     .toMatch(expected);
 }
 
+function parseTimerTextSeconds(text: string): number {
+  const parts = text.split(':').map((part) => Number(part));
+  if (parts.some((part) => !Number.isFinite(part))) return NaN;
+  if (parts.length === 3) return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+  if (parts.length === 2) return (parts[0] * 60) + parts[1];
+  return parts[0] || 0;
+}
+
 // ---------------------------------------------------------------------------
 // Timer tests
 // ---------------------------------------------------------------------------
@@ -238,6 +246,42 @@ test('During-game view shows animated timer that updates', async ({ page }, test
   expect(textBefore).not.toEqual(textAfter);
 
   await keyframe(page, testInfo, 'during_game_timer_updated');
+});
+
+test('Animated fullscreen timer stays current when one-second intervals lag', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.addInitScript(() => {
+    const originalSetInterval = window.setInterval.bind(window);
+    (window as any).setInterval = (
+      handler: string | ((...callbackArgs: unknown[]) => void),
+      timeout?: number,
+      ...args: unknown[]
+    ) => {
+      if (timeout === 1000 && typeof handler === 'function') {
+        return originalSetInterval(() => {
+          window.setTimeout(() => handler(...args), 2200);
+        }, timeout);
+      }
+
+      return originalSetInterval(handler as any, timeout, ...(args as any[]));
+    };
+  });
+
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(4, {
+    timerSeconds: 30,
+    beamerName: 'timer-interval-lag',
+    displayState: 'timer_only',
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+  await expect(page.getByTestId('timer-only-timer')).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(2400);
+
+  const timerText = await readAnimatedTimerText(page, 'timer-only-timer');
+  const secondsRemaining = parseTimerTextSeconds(timerText);
+  expect(secondsRemaining).toBeLessThanOrEqual(28);
+  expect(secondsRemaining).toBeGreaterThan(20);
 });
 
 test('Fullscreen timer takeover during countdown and finished', async ({ page }, testInfo) => {
