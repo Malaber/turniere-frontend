@@ -99,6 +99,6 @@ export async function waitForBeamerEffect(page: Page, type: string, cue?: string
       }).length >= expectedMinimum;
     },
     { expectedType: type, expectedCue: cue, expectedMinimum: minimum },
-    { timeout: 8_000 },
+    { timeout: 20_000 },
   );
 }

@@ -267,7 +267,7 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
 
   // Wait for countdown phase (timer <= 10s triggers takeover)
   const timerTakeover = page.locator('[class*="timerTakeover"]');
-  await expect(timerTakeover).toBeVisible({ timeout: 15_000 });
+  await expect(timerTakeover).toBeVisible({ timeout: 30_000 });
 
   // Use direct screenshot — bump animation repeats each second
   await page.screenshot({

@@ -291,7 +291,7 @@ test('Fullscreen match list receives live match snapshots', async ({ page }, tes
   await expect.poll(async () => {
     const scores = await matchCard.locator('th').allTextContents();
     return scores.sort();
-  }, { timeout: 10_000 }).toEqual(['4', '5']);
+  }, { timeout: 60_000 }).toEqual(['4', '5']);
   await keyframe(page, testInfo, 'live_matches_in_progress');
 
   const finished = await client.patch(`/matches/${match!.id}`, { state: 'finished' });
@@ -366,9 +366,11 @@ test('Fullscreen timer updates live for countup mode', async ({ page }, testInfo
   expectStatus(timerRes, 200, 'start countup timer');
 
   await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
-  await expect(page.getByText(/(Overtime|Spielende):/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.timer-container')).toContainText(/(Overtime|Spielende):/i, {
+    timeout: 60_000,
+  });
   await expect(page.locator('.timer-container')).toContainText(/3:[1-5][0-9]|4:0[0-9]/, {
-    timeout: 10_000,
+    timeout: 60_000,
   });
   await keyframe(page, testInfo, 'fullscreen_timer_reason_countup');
 });

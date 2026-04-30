@@ -125,10 +125,10 @@ async function prepareRunningAndFinishedLongNameMatches(
 }
 
 function statusText(page: Page, text: string | RegExp) {
-  if (typeof text === 'string') {
-    return page.getByText(text, { exact: true }).first();
-  }
-  return page.getByText(text).first();
+  const matcher = typeof text === 'string'
+    ? new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+    : text;
+  return page.locator('small.text-muted').filter({ hasText: matcher }).last();
 }
 
 test('Tournament id view renders basic information while full tournament loads', async ({ page }) => {
