@@ -1,7 +1,7 @@
 import React from 'react';
-import {Col, Container, Row, Spinner} from 'reactstrap';
+import {Container, Row, Spinner} from 'reactstrap';
 import {Group} from '../GroupStage';
-import {GroupQrCode} from './GroupQrCode';
+import {GroupLogo, GroupQrCode} from './GroupMediaCard';
 
 
 export class GroupsView extends React.Component {
@@ -62,7 +62,7 @@ export class GroupsView extends React.Component {
     }
 
     render() {
-        const {tournament, showQrCode, logoUrl} = this.props;
+        const {tournament, showQrCode} = this.props;
         const {groups, showLogo, backgroundColor} = this.state;
 
         if (!tournament || !tournament.groupStage) {
@@ -72,17 +72,6 @@ export class GroupsView extends React.Component {
             </Container>);
         }
 
-        let logo;
-        if (showLogo && logoUrl) {
-            logo = <Col>
-                <div className="d-flex justify-content-center align-items-center">
-                    <img height="300" width="300" src={logoUrl}/>
-                </div>
-            </Col>;
-        } else {
-            logo = <div/>;
-        }
-
         return (<div>
             <Container className="fs-5" fluid>
                 <Row className="row-cols-4">
@@ -90,7 +79,7 @@ export class GroupsView extends React.Component {
                         <Group group={group} key={group.id} teams={tournament.teams}/>
                     )}
                     {showQrCode && <GroupQrCode/>}
-                    {logo}
+                    {showLogo && <GroupLogo/>}
                 </Row>
             </Container>
             <style global jsx>{`

@@ -110,6 +110,39 @@ async function expectGroupTablesQrCode(page: Page): Promise<void> {
   expect(qrCodeBox!.height).toBeGreaterThanOrEqual(280);
 }
 
+async function expectGroupTablesLogo(page: Page): Promise<void> {
+  const qrCard = page.getByTestId('fullscreen-group-qr-card');
+  const logoCard = page.getByTestId('fullscreen-group-logo-card');
+  const logo = page.getByTestId('fullscreen-group-logo');
+
+  await expect(logoCard).toBeVisible({ timeout: 35_000 });
+  await expect(logo).toBeVisible();
+  await expect(logo).toHaveAttribute('src', /\/static\/images\/bpwstr_logo\.png$/);
+  await expect.poll(async () => logo.evaluate((node) => (
+    (node as HTMLImageElement).naturalWidth
+  )), { timeout: 10_000 }).toBeGreaterThan(0);
+
+  const [qrCardBox, logoCardBox, logoBox] = await Promise.all([
+    qrCard.boundingBox(),
+    logoCard.boundingBox(),
+    logo.boundingBox(),
+  ]);
+
+  expect(qrCardBox).toBeTruthy();
+  expect(logoCardBox).toBeTruthy();
+  expect(logoBox).toBeTruthy();
+
+  const logoCardCenterX = logoCardBox!.x + logoCardBox!.width / 2;
+  const logoCardCenterY = logoCardBox!.y + logoCardBox!.height / 2;
+  const logoCenterX = logoBox!.x + logoBox!.width / 2;
+  const logoCenterY = logoBox!.y + logoBox!.height / 2;
+
+  expect(Math.abs(logoCenterX - logoCardCenterX)).toBeLessThanOrEqual(2);
+  expect(Math.abs(logoCenterY - logoCardCenterY)).toBeLessThanOrEqual(2);
+  expect(Math.abs(logoCardBox!.y - qrCardBox!.y)).toBeLessThanOrEqual(4);
+  expect(Math.abs(logoCardBox!.width - qrCardBox!.width)).toBeLessThanOrEqual(4);
+}
+
 test('Fullscreen beamer page renders with default fallback', async ({ page }, testInfo) => {
   // Fullscreen/beamer pages are designed for projectors — use a wide viewport
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -296,6 +329,7 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
   expectStatus(secondUpdate, 200, 'update beamer to group tables');
   await expect(page.getByText(/Gruppe 1/i)).toBeVisible({ timeout: 10_000 });
   await expectGroupTablesQrCode(page);
+  await expectGroupTablesLogo(page);
   await keyframe(page, testInfo, 'live_beamer_group_tables');
 });
 
