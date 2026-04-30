@@ -34,7 +34,7 @@ export function WerbungView(props) {
 
     return (
         <div className={styles.werbungRoot} data-testid="beamer-werbung-view">
-            <main className={styles.werbungStage}>
+            <main className={styles.werbungStage} data-testid="beamer-werbung-stage">
                 {activeImage ? (
                     <img
                         key={activeImage.key}
@@ -50,7 +50,7 @@ export function WerbungView(props) {
                 )}
             </main>
 
-            <footer className={styles.werbungTimerBar}>
+            <footer className={styles.werbungTimerBar} data-testid="beamer-werbung-timer-bar">
                 {hasTimer ? (
                     <React.Fragment>
                         <div className={styles.werbungReason} data-testid="beamer-werbung-reason">

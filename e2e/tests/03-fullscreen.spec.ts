@@ -110,6 +110,60 @@ async function expectGroupTablesQrCode(page: Page): Promise<void> {
   expect(qrCodeBox!.height).toBeGreaterThanOrEqual(280);
 }
 
+async function expectWerbungImageAboveSolidTimerBar(page: Page): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport) {
+    throw new Error('Expected Werbung viewport size to be set');
+  }
+
+  const stage = page.getByTestId('beamer-werbung-stage');
+  const image = page.getByTestId('beamer-werbung-image');
+  const timerBar = page.getByTestId('beamer-werbung-timer-bar');
+
+  await expect(stage).toBeVisible();
+  await expect(image).toBeVisible();
+  await expect(timerBar).toBeVisible();
+  await expect.poll(async () => image.evaluate((node) => {
+    const img = node as HTMLImageElement;
+    return img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
+  }), { timeout: 10_000 }).toBe(true);
+
+  const barStyles = await timerBar.evaluate((node) => {
+    const style = window.getComputedStyle(node);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderTopWidth: style.borderTopWidth,
+    };
+  });
+  expect(barStyles.backgroundColor).toBe('rgb(0, 0, 0)');
+  expect(barStyles.borderTopWidth).toBe('0px');
+
+  const [stageBox, imageBox, timerBarBox] = await Promise.all([
+    stage.boundingBox(),
+    image.boundingBox(),
+    timerBar.boundingBox(),
+  ]);
+
+  if (!stageBox || !imageBox || !timerBarBox) {
+    throw new Error('Expected Werbung stage, image, and timer bar boxes');
+  }
+
+  expect(Math.abs(stageBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(stageBox.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(stageBox.width - viewport.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(stageBox.y + stageBox.height - timerBarBox.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(timerBarBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(timerBarBox.width - viewport.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(timerBarBox.y + timerBarBox.height - viewport.height)).toBeLessThanOrEqual(2);
+
+  expect(imageBox.y).toBeGreaterThanOrEqual(stageBox.y - 1);
+  expect(imageBox.y + imageBox.height).toBeLessThanOrEqual(timerBarBox.y + 1);
+  expect(Math.abs(imageBox.x - stageBox.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(imageBox.y - stageBox.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(imageBox.width - stageBox.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(imageBox.height - stageBox.height)).toBeLessThanOrEqual(2);
+}
+
 test('Fullscreen beamer page renders with default fallback', async ({ page }, testInfo) => {
   // Fullscreen/beamer pages are designed for projectors — use a wide viewport
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -464,6 +518,7 @@ test('Werbung beamer rotates selected images and shows timer reason', async ({ p
   await expect(page.getByTestId('beamer-werbung-reason')).toContainText(/Werbepause|Spielende/);
   await expect(page.getByTestId('beamer-werbung-timer')).toBeVisible();
   await expect(page.getByTestId('beamer-werbung-image')).toHaveAttribute('src', /bpwstr_logo/);
+  await expectWerbungImageAboveSolidTimerBar(page);
   await expect(page.getByTestId('beamer-werbung-image')).toHaveAttribute('src', /bpwstr_banner/, {
     timeout: 5_000,
   });
