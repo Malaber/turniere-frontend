@@ -30,16 +30,25 @@
     text-shadow: 0.1em 0.1em black;
 }
 
+html,
+body,
+#__next {
+    min-height: 100%;
+}
+
 body {
-    position: relative;
+    min-height: 100vh;
+}
+
+#__next > div:has(> footer) {
+    display: flex;
+    flex-direction: column;
     min-height: 100vh;
 }
 
 footer {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
+    flex-shrink: 0;
+    margin-top: auto;
 }
 
 .border-fix {
@@ -48,7 +57,7 @@ footer {
 }
 
 .main {
-    padding-bottom: 5em;
+    padding-bottom: 0;
 }
 
 .turniere-footer__content {
@@ -115,7 +124,7 @@ footer {
     }
 
     .main {
-        padding-bottom: 9rem;
+        padding-bottom: 0;
     }
 }
 

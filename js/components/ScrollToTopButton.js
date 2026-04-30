@@ -4,6 +4,7 @@ import {FaArrowUp} from 'react-icons/fa6';
 
 export function ScrollToTopButton() {
     const [isVisible, setIsVisible] = useState(false);
+    const [isFooterVisible, setIsFooterVisible] = useState(false);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -17,9 +18,23 @@ export function ScrollToTopButton() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    useEffect(() => {
+        const footer = document.querySelector('footer');
+        if (!footer || !('IntersectionObserver' in window)) {
+            return undefined;
+        }
+
+        const observer = new IntersectionObserver(entries => {
+            setIsFooterVisible(entries.some(entry => entry.isIntersecting));
+        });
+        observer.observe(footer);
+        return () => observer.disconnect();
+    }, []);
+
     const scrollToTop = () => {
         window.scrollTo({top: 0, behavior: 'smooth'});
     };
+    const showButton = isVisible && !isFooterVisible;
 
     return (
         <Button
@@ -28,8 +43,9 @@ export function ScrollToTopButton() {
             color="secondary"
             onClick={scrollToTop}
             style={{
-                opacity: isVisible ? 0.7 : 0,
-                pointerEvents: isVisible ? 'auto' : 'none'
+                opacity: showButton ? 0.7 : 0,
+                pointerEvents: showButton ? 'auto' : 'none',
+                visibility: showButton ? 'visible' : 'hidden'
             }}
         >
             <FaArrowUp aria-hidden="true"/>
