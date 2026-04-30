@@ -490,15 +490,22 @@ test('Mission Control keeps Ergebnisse search pinned while scrolling scores', as
   }).toBeGreaterThan(400);
 
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight / 2));
-  await expect.poll(async () => toolbar.evaluate((el) => Math.round(el.getBoundingClientRect().top)), {
+  await expect.poll(async () => toolbar.evaluate((el) => {
+    const navbar = document.querySelector('.navbar.sticky-top');
+    const navbarBottom = navbar?.getBoundingClientRect().bottom ?? 0;
+    return Math.round(el.getBoundingClientRect().top - navbarBottom);
+  }), {
     timeout: 5_000,
-  }).toBeLessThanOrEqual(4);
+  }).toBeGreaterThanOrEqual(4);
   const pinnedGeometry = await toolbar.evaluate((el) => {
+    const navbar = document.querySelector('.navbar.sticky-top');
+    const navbarBottom = navbar?.getBoundingClientRect().bottom ?? 0;
     const rect = el.getBoundingClientRect();
     const inputRect = el.querySelector('[data-testid="mission-control-search"]')?.getBoundingClientRect();
     return {
       top: Math.round(rect.top),
       bottom: Math.round(rect.bottom),
+      navbarBottom: Math.round(navbarBottom),
       inputTop: Math.round(inputRect?.top ?? -1),
       inputBottom: Math.round(inputRect?.bottom ?? -1),
       inputWidth: Math.round(inputRect?.width ?? 0),
@@ -506,7 +513,8 @@ test('Mission Control keeps Ergebnisse search pinned while scrolling scores', as
     };
   });
 
-  expect(pinnedGeometry.top).toBeGreaterThanOrEqual(0);
+  expect(pinnedGeometry.top).toBeGreaterThanOrEqual(pinnedGeometry.navbarBottom + 4);
+  expect(pinnedGeometry.top).toBeLessThanOrEqual(pinnedGeometry.navbarBottom + 24);
   expect(pinnedGeometry.bottom).toBeLessThan(pinnedGeometry.viewportHeight);
   expect(pinnedGeometry.inputTop).toBeGreaterThanOrEqual(pinnedGeometry.top);
   expect(pinnedGeometry.inputBottom).toBeLessThanOrEqual(pinnedGeometry.bottom);

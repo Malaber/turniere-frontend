@@ -517,7 +517,7 @@
     gap: 0.75rem;
     align-items: center;
     position: sticky;
-    top: 0;
+    top: calc(var(--mission-control-navbar-offset, 4rem) + 0.5rem);
     z-index: 20;
     background: #fff;
     border: 1px solid #d9e1ea;

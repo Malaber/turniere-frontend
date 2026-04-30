@@ -259,6 +259,7 @@ export class MissionControl extends React.Component {
         this.handleLocationChange = this.handleLocationChange.bind(this);
         this.handleGlobalKeyDown = this.handleGlobalKeyDown.bind(this);
         this.focusSearch = this.focusSearch.bind(this);
+        this.updateStickyOffset = this.updateStickyOffset.bind(this);
         this.startGroupMatches = this.startGroupMatches.bind(this);
         this.startStageMatches = this.startStageMatches.bind(this);
         this.onActionSuccess = this.onActionSuccess.bind(this);
@@ -278,9 +279,17 @@ export class MissionControl extends React.Component {
         window.addEventListener('popstate', this.handleLocationChange);
         window.addEventListener('hashchange', this.handleLocationChange);
         window.addEventListener('keydown', this.handleGlobalKeyDown);
+        window.addEventListener('resize', this.updateStickyOffset);
+        this.updateStickyOffset();
+        const navbar = document.querySelector('.navbar.sticky-top');
+        if (navbar && typeof window.ResizeObserver === 'function') {
+            this.navbarResizeObserver = new window.ResizeObserver(this.updateStickyOffset);
+            this.navbarResizeObserver.observe(navbar);
+        }
     }
 
     componentDidUpdate(prevProps) {
+        this.updateStickyOffset();
         if (prevProps.tournament.id !== this.props.tournament.id) {
             this.setState({
                 transactionLogEntries: [],
@@ -301,6 +310,12 @@ export class MissionControl extends React.Component {
         window.removeEventListener('popstate', this.handleLocationChange);
         window.removeEventListener('hashchange', this.handleLocationChange);
         window.removeEventListener('keydown', this.handleGlobalKeyDown);
+        window.removeEventListener('resize', this.updateStickyOffset);
+        if (this.navbarResizeObserver) {
+            this.navbarResizeObserver.disconnect();
+            this.navbarResizeObserver = null;
+        }
+        document.documentElement.style.removeProperty('--mission-control-navbar-offset');
     }
 
     setActiveTab(tab, updateUrl = true, callback = null) {
@@ -355,6 +370,12 @@ export class MissionControl extends React.Component {
         }
 
         focus();
+    }
+
+    updateStickyOffset() {
+        const navbar = document.querySelector('.navbar.sticky-top');
+        const height = navbar ? Math.ceil(navbar.getBoundingClientRect().height) : 0;
+        document.documentElement.style.setProperty('--mission-control-navbar-offset', height + 'px');
     }
 
     startGroupMatches() {
