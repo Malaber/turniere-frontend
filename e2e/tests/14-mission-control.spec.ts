@@ -164,42 +164,45 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
   const checklist = card.getByTestId(`mission-beamer-werbung-checklist-${beamer.json.id}`);
   await expect(checklist).toBeVisible();
 
-  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_banner`)).toBeChecked();
-  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_qr_code`)).toBeChecked();
+  const defaultImageKeys = [
+    'bpwstr_banner',
+    'bpwstr_logo',
+    'bpwstr_qr_code',
+    'Merch_Werbebanner',
+    'Schorlepongturnier_Werbebanner',
+  ];
+
+  for (const imageKey of defaultImageKeys) {
+    await expect(
+      card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-${imageKey}`),
+    ).toBeChecked();
+  }
 
   await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis_blurred`)).toHaveCount(0);
   await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis-blurred`)).toHaveCount(0);
 
-  const logo = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_logo`);
-  await expect(logo).not.toBeChecked();
-  await logo.check();
-
-  await expect.poll(async () => {
-    const beamers = await client.get<Array<{ id: number; config: Record<string, unknown> }>>(
-      `/tournaments/${tournament.id}/beamers`,
-    );
-    expectStatus(beamers, 200, 'fetch beamers after werbung config');
-    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
-    return updated?.config;
-  }, { timeout: 20_000 }).toMatchObject({
-    display_mode: 'werbung',
-    werbung_image_keys: expect.arrayContaining([
-      'bpwstr_banner',
-      'bpwstr_logo',
-      'bpwstr_qr_code',
-    ]),
-  });
-
-  await logo.uncheck();
+  const merch = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-Merch_Werbebanner`);
+  await merch.uncheck();
 
   await expect.poll(async () => {
     const beamers = await client.get<Array<{ id: number; config: { werbung_image_keys?: string[] } }>>(
       `/tournaments/${tournament.id}/beamers`,
     );
-    expectStatus(beamers, 200, 'fetch beamers after werbung logo uncheck');
+    expectStatus(beamers, 200, 'fetch beamers after werbung merch uncheck');
     const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
     return updated?.config.werbung_image_keys || [];
-  }, { timeout: 20_000 }).not.toContain('bpwstr_logo');
+  }, { timeout: 20_000 }).not.toContain('Merch_Werbebanner');
+
+  await merch.check();
+
+  await expect.poll(async () => {
+    const beamers = await client.get<Array<{ id: number; config: { werbung_image_keys?: string[] } }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(beamers, 200, 'fetch beamers after werbung merch re-check');
+    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
+    return updated?.config.werbung_image_keys || [];
+  }, { timeout: 20_000 }).toEqual(expect.arrayContaining(defaultImageKeys));
 });
 
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
