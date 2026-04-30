@@ -3,13 +3,17 @@ import {
     Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader,
     Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
 } from 'reactstrap';
-import {FaExternalLinkAlt, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaTrash, FaUsers} from 'react-icons/fa';
+import {
+    FaClock, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaSyncAlt, FaTrash, FaUser,
+    FaUsers
+} from 'react-icons/fa';
 import {notify} from './Notifications';
 import {
     createBeamer,
     deleteBeamer,
     endMatch,
     getBeamers,
+    getTournamentTransactionLog,
     setTournamentTimer,
     startMatch,
     startNextGroupMatches,
@@ -89,7 +93,7 @@ const BEAMER_MATCH_STATES = [
     {value: 'finished', label: 'Beendet'}
 ];
 
-const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'checklists', 'teams', 'settings'];
+const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'checklists', 'teams', 'history', 'settings'];
 const SEARCH_TAB_IDS = ['scores', 'teams'];
 
 function tabFromLocation() {
@@ -242,7 +246,12 @@ export class MissionControl extends React.Component {
         this.state = {
             activeTab: 'timer',
             search: '',
-            actionRunning: null
+            actionRunning: null,
+            transactionLogEntries: [],
+            transactionLogLoaded: false,
+            transactionLogLoading: false,
+            transactionLogErrorStatus: null,
+            transactionLogErrorMessage: ''
         };
         this.searchInput = React.createRef();
         this.setActiveTab = this.setActiveTab.bind(this);
@@ -254,19 +263,37 @@ export class MissionControl extends React.Component {
         this.startStageMatches = this.startStageMatches.bind(this);
         this.onActionSuccess = this.onActionSuccess.bind(this);
         this.onActionError = this.onActionError.bind(this);
+        this.handleTournamentChange = this.handleTournamentChange.bind(this);
+        this.loadTransactionLogIfNeeded = this.loadTransactionLogIfNeeded.bind(this);
+        this.reloadTransactionLog = this.reloadTransactionLog.bind(this);
+        this.onTransactionLogSuccess = this.onTransactionLogSuccess.bind(this);
+        this.onTransactionLogError = this.onTransactionLogError.bind(this);
     }
 
     componentDidMount() {
         const initialTab = tabFromLocation();
         if (initialTab) {
-            this.setState({activeTab: initialTab});
+            this.setActiveTab(initialTab, false);
         }
         window.addEventListener('popstate', this.handleLocationChange);
         window.addEventListener('hashchange', this.handleLocationChange);
         window.addEventListener('keydown', this.handleGlobalKeyDown);
     }
 
-    componentDidUpdate() {
+    componentDidUpdate(prevProps) {
+        if (prevProps.tournament.id !== this.props.tournament.id) {
+            this.setState({
+                transactionLogEntries: [],
+                transactionLogLoaded: false,
+                transactionLogLoading: false,
+                transactionLogErrorStatus: null,
+                transactionLogErrorMessage: ''
+            }, () => {
+                if (this.state.activeTab === 'history') {
+                    this.loadTransactionLogIfNeeded();
+                }
+            });
+        }
         this.handleLocationChange();
     }
 
@@ -281,7 +308,14 @@ export class MissionControl extends React.Component {
             return;
         }
 
-        this.setState({activeTab: tab}, callback);
+        this.setState({activeTab: tab}, () => {
+            if (callback) {
+                callback();
+            }
+            if (tab === 'history') {
+                this.loadTransactionLogIfNeeded();
+            }
+        });
         if (updateUrl && typeof window !== 'undefined') {
             window.history.pushState(null, '', '#' + tab);
         }
@@ -340,13 +374,61 @@ export class MissionControl extends React.Component {
             notify.show('Matches wurden gestartet.', 'success', 2500);
         }
         this.setState({actionRunning: null});
-        this.props.onTournamentChange();
+        this.handleTournamentChange();
     }
 
     onActionError(errorBody) {
         notify.show(errorMessage(errorBody, 'Die Matches konnten nicht gestartet werden.'), 'error', 3000);
         this.setState({actionRunning: null});
+        this.handleTournamentChange();
+    }
+
+    handleTournamentChange() {
         this.props.onTournamentChange();
+        if (this.state.transactionLogLoaded && !this.state.transactionLogLoading) {
+            this.reloadTransactionLog();
+        }
+    }
+
+    loadTransactionLogIfNeeded() {
+        if (this.state.transactionLogLoaded || this.state.transactionLogLoading) {
+            return;
+        }
+        this.reloadTransactionLog();
+    }
+
+    reloadTransactionLog() {
+        if (!this.props.tournament || !this.props.tournament.id || this.state.transactionLogLoading) {
+            return;
+        }
+        this.setState({
+            transactionLogLoading: true,
+            transactionLogErrorStatus: null,
+            transactionLogErrorMessage: ''
+        });
+        getTournamentTransactionLog(
+            this.props.tournament.id,
+            this.onTransactionLogSuccess,
+            this.onTransactionLogError
+        );
+    }
+
+    onTransactionLogSuccess(entries) {
+        this.setState({
+            transactionLogEntries: entries,
+            transactionLogLoaded: true,
+            transactionLogLoading: false,
+            transactionLogErrorStatus: null,
+            transactionLogErrorMessage: ''
+        });
+    }
+
+    onTransactionLogError(errorBody, status) {
+        this.setState({
+            transactionLogLoading: false,
+            transactionLogErrorStatus: status,
+            transactionLogErrorMessage: errorMessage(errorBody, 'Verlauf konnte nicht geladen werden.')
+        });
     }
 
     render() {
@@ -435,6 +517,15 @@ export class MissionControl extends React.Component {
                                 </NavLink>
                             </NavItem>
                             <NavItem>
+                                <NavLink href='#history' active={this.state.activeTab === 'history'}
+                                    onClick={event => {
+                                        event.preventDefault();
+                                        this.setActiveTab('history');
+                                    }}>
+                                    Verlauf
+                                </NavLink>
+                            </NavItem>
+                            <NavItem>
                                 <NavLink href='#settings' active={this.state.activeTab === 'settings'}
                                     onClick={event => {
                                         event.preventDefault();
@@ -451,7 +542,7 @@ export class MissionControl extends React.Component {
                                     tournamentId={tournament.id}
                                     timerState={tournament.timerState}
                                     disabled={!canControl}
-                                    onTournamentChange={this.props.onTournamentChange}
+                                    onTournamentChange={this.handleTournamentChange}
                                 />
                             </TabPane>
 
@@ -476,7 +567,7 @@ export class MissionControl extends React.Component {
                                     onSearchChange={this.setSearch}
                                     searchInputRef={this.searchInput}
                                     disabled={!canControl}
-                                    onTournamentChange={this.props.onTournamentChange}
+                                    onTournamentChange={this.handleTournamentChange}
                                 />
                             </TabPane>
 
@@ -500,7 +591,7 @@ export class MissionControl extends React.Component {
                                     teams={tournament.teams}
                                     search={this.state.search}
                                     disabled={!canControl}
-                                    onTournamentChange={this.props.onTournamentChange}
+                                    onTournamentChange={this.handleTournamentChange}
                                 />
                             </TabPane>
 
@@ -514,11 +605,22 @@ export class MissionControl extends React.Component {
                                 />
                             </TabPane>
 
+                            <TabPane tabId='history'>
+                                <MissionTransactionLog
+                                    entries={this.state.transactionLogEntries}
+                                    loaded={this.state.transactionLogLoaded}
+                                    loading={this.state.transactionLogLoading}
+                                    errorStatus={this.state.transactionLogErrorStatus}
+                                    errorMessage={this.state.transactionLogErrorMessage}
+                                    onRefresh={this.reloadTransactionLog}
+                                />
+                            </TabPane>
+
                             <TabPane tabId='settings'>
                                 <MissionTournamentSettings
                                     tournament={tournament}
                                     disabled={!canEditSettings}
-                                    onTournamentChange={this.props.onTournamentChange}
+                                    onTournamentChange={this.handleTournamentChange}
                                 />
                             </TabPane>
                         </TabContent>
@@ -527,6 +629,185 @@ export class MissionControl extends React.Component {
             </div>
         );
     }
+}
+
+function MissionTransactionLog(props) {
+    const entries = (Array.isArray(props.entries) ? props.entries : []).slice().sort((left, right) => {
+        const leftSequence = Number(left.sequence || 0);
+        const rightSequence = Number(right.sequence || 0);
+        if (leftSequence !== rightSequence) {
+            return leftSequence - rightSequence;
+        }
+        return Number(left.id || 0) - Number(right.id || 0);
+    });
+    const isInitialLoading = props.loading && !props.loaded;
+
+    return (
+        <section className='mission-control-section mission-transaction-log'
+            data-testid='mission-transaction-log'>
+            <div className='mission-transaction-log-header'>
+                <div>
+                    <h3 className='h5 mission-pane-heading mb-1'>
+                        <FaHistory aria-hidden='true' /> Verlauf
+                    </h3>
+                    <div className='text-muted'>
+                        Chronologischer Turnierverlauf für Owner, sortiert nach Sequenz.
+                    </div>
+                </div>
+                <Button outline color='secondary'
+                    disabled={props.loading}
+                    data-testid='mission-transaction-log-refresh'
+                    onClick={props.onRefresh}>
+                    <FaSyncAlt aria-hidden='true' /> {props.loading ? 'Lädt...' : 'Aktualisieren'}
+                </Button>
+            </div>
+
+            {!props.loaded && !props.loading && !props.errorMessage &&
+                <Alert color='light' className='mb-0' data-testid='mission-transaction-log-idle'>
+                    Verlauf wird erst beim Öffnen dieses Tabs geladen.
+                </Alert>}
+
+            {isInitialLoading &&
+                <Alert color='info' className='mb-0' data-testid='mission-transaction-log-loading'>
+                    Verlauf wird geladen...
+                </Alert>}
+
+            {props.errorMessage &&
+                <Alert color='danger' className='mb-3' data-testid='mission-transaction-log-error'>
+                    {transactionLogErrorMessage(props.errorStatus, props.errorMessage)}
+                </Alert>}
+
+            {props.loaded && entries.length === 0 && !props.errorMessage &&
+                <Alert color='light' className='mb-0' data-testid='mission-transaction-log-empty'>
+                    Noch keine Verlaufseinträge vorhanden.
+                </Alert>}
+
+            {entries.length > 0 &&
+                <ol className='mission-transaction-log-list'>
+                    {entries.map(entry => (
+                        <TransactionLogEntry entry={entry} key={entry.id || entry.sequence}/>
+                    ))}
+                </ol>}
+        </section>
+    );
+}
+
+function TransactionLogEntry(props) {
+    const entry = props.entry || {};
+    const userLabel = entry.user && entry.user.username ? entry.user.username : 'System';
+    const metadata = entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {};
+    const chips = transactionMetadataChips(metadata);
+
+    return (
+        <li className='mission-transaction-log-entry' data-testid='mission-transaction-log-entry'>
+            <div className='mission-transaction-log-entry-meta'>
+                <Badge color='primary' pill data-testid='mission-transaction-log-sequence'>
+                    #{entry.sequence}
+                </Badge>
+                <Badge color='light' className='mission-transaction-log-action'>
+                    {entry.action || 'unknown'}
+                </Badge>
+                <span className='mission-transaction-log-detail'>
+                    <FaUser aria-hidden='true' /> {userLabel}
+                </span>
+                <time className='mission-transaction-log-detail' dateTime={entry.created_at || ''}>
+                    <FaClock aria-hidden='true' /> {formatTransactionLogTime(entry.created_at)}
+                </time>
+            </div>
+            <div className='mission-transaction-log-message' data-testid='mission-transaction-log-message'>
+                {entry.message || entry.action || 'Unbekannter Verlaufseintrag'}
+            </div>
+            {chips.length > 0 &&
+                <div className='mission-transaction-log-chips' data-testid='mission-transaction-log-chips'>
+                    {chips.map(chip => chip.href ?
+                        <a href={chip.href} className='mission-transaction-log-chip' key={chip.key}>
+                            {chip.label}
+                        </a> :
+                        <span className='mission-transaction-log-chip' key={chip.key}>
+                            {chip.label}
+                        </span>
+                    )}
+                </div>}
+        </li>
+    );
+}
+
+function transactionLogErrorMessage(status, fallback) {
+    if (status === 401) {
+        return 'Nicht eingeloggt.';
+    }
+    if (status === 403) {
+        return 'Nur Turnier-Owner darf den Verlauf lesen.';
+    }
+    if (status === 404) {
+        return 'Turnier nicht gefunden.';
+    }
+    return fallback;
+}
+
+function formatTransactionLogTime(value) {
+    if (!value) {
+        return 'Zeit unbekannt';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+    return date.toLocaleString('de-DE', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function transactionMetadataChips(metadata) {
+    const chips = [];
+    pushMetadataChip(chips, metadata.match_id, 'Match ', '#scores', 'match');
+    pushMetadataChip(chips, metadata.stage_id, 'Stage ', null, 'stage');
+    pushMetadataChip(chips, metadata.group_id, 'Gruppe ', null, 'group');
+    appendIdListChips(chips, metadata.advanced_match_ids, 'Ziel-Match ', '#scores', 'advanced-match');
+    pushMetadataChip(chips, metadata.team_id, 'Team ', '#teams', 'team-id');
+    pushMetadataChip(chips, metadata.winner_team_id, 'Gewinner-Team ', '#teams', 'winner-team');
+    appendIdListChips(chips, metadata.team_ids, 'Team ', '#teams', 'team-id');
+    appendIdListChips(chips, metadata.advancing_team_ids, 'Team ', '#teams', 'advancing-team');
+    appendTeamChips(chips, metadata.teams || metadata.advancing_teams);
+    return chips;
+}
+
+function pushMetadataChip(chips, value, prefix, href, keyPrefix) {
+    if (value === null || value === undefined || value === '') {
+        return;
+    }
+    chips.push({
+        key: keyPrefix + '-' + value,
+        label: prefix + value,
+        href
+    });
+}
+
+function appendIdListChips(chips, values, prefix, href, keyPrefix) {
+    if (!Array.isArray(values)) {
+        return;
+    }
+    values.forEach(value => pushMetadataChip(chips, value, prefix, href, keyPrefix));
+}
+
+function appendTeamChips(chips, teams) {
+    if (!Array.isArray(teams)) {
+        return;
+    }
+    teams.forEach(team => {
+        if (!team || team.id === null || team.id === undefined) {
+            return;
+        }
+        chips.push({
+            key: 'team-' + team.id,
+            label: (team.name || 'Team') + ' #' + team.id,
+            href: '#teams'
+        });
+    });
 }
 
 class MissionBeamer extends React.Component {
