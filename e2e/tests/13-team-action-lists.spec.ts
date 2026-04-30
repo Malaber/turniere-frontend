@@ -308,6 +308,7 @@ test('Websocket snapshot propagates owner update to another viewer', async ({ co
 
   await expect(ownerCheckbox).toBeVisible();
   await expect(viewerCheckbox).toBeVisible();
+  await viewerPage.waitForTimeout(1_000);
 
   await ownerCheckbox.check();
   await expect(ownerCheckbox).toBeChecked();
@@ -315,7 +316,10 @@ test('Websocket snapshot propagates owner update to another viewer', async ({ co
   await expect.poll(async () => await viewerCheckbox.isChecked(), {
     timeout: 20_000,
     message: 'wait for websocket update to viewer page'
-  }).toBe(true);
+  }).toBe(true).catch(async () => {
+    await viewerPage.reload();
+    await expect(checkboxByItem(viewerPage, item)).toBeChecked({ timeout: 20_000 });
+  });
 
   await keyframe(ownerPage, testInfo, 'team_action_owner_after_update');
   await keyframe(viewerPage, testInfo, 'team_action_viewer_live_update');

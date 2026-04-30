@@ -600,7 +600,7 @@ test('Mission Control soundboard controls beamer audio with timer priority', asy
 
   const timerCount = await countBeamerEffects(beamerPage, 'sound', 'end-countdown');
   const timerRes = await client.patch(`/tournaments/${tournament.id}/timer`, {
-    timestamp_seconds: 12,
+    timestamp_seconds: 20,
   });
   expectStatus(timerRes, 200, 'start timer cue');
   await waitForBeamerEffect(beamerPage, 'sound', 'end-countdown', timerCount + 1);

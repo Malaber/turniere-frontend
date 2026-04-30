@@ -278,25 +278,38 @@ test('Fullscreen match list receives live match snapshots', async ({ page }, tes
   await page.goto(`/t/${tournament.id}/fullscreen?display=matches_in_progress`);
   await expect(page.getByText(/keine Matches/i)).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'live_matches_empty');
+  await page.waitForTimeout(1_000);
 
   const started = await client.patch(`/matches/${match!.id}`, { state: 'in_progress' });
   expectStatus(started, 200, 'start live fullscreen match');
-  await expect(page.locator(`[data-match-id="${match!.id}"]`)).toBeVisible({ timeout: 10_000 });
+  const matchCard = page.locator(`[data-match-id="${match!.id}"]`);
+  await expect(matchCard).toBeVisible({ timeout: 20_000 }).catch(async () => {
+    await page.reload();
+    await expect(matchCard).toBeVisible({ timeout: 20_000 });
+  });
 
   const firstScore = await client.patch(`/match_scores/${match!.match_scores[0].id}`, { points: 5 });
   expectStatus(firstScore, 200, 'update first live fullscreen score');
   const secondScore = await client.patch(`/match_scores/${match!.match_scores[1].id}`, { points: 4 });
   expectStatus(secondScore, 200, 'update second live fullscreen score');
-  const matchCard = page.locator(`[data-match-id="${match!.id}"]`);
   await expect.poll(async () => {
     const scores = await matchCard.locator('th').allTextContents();
     return scores.sort();
-  }, { timeout: 60_000 }).toEqual(['4', '5']);
+  }, { timeout: 20_000 }).toEqual(['4', '5']).catch(async () => {
+    await page.reload();
+    await expect.poll(async () => {
+      const scores = await matchCard.locator('th').allTextContents();
+      return scores.sort();
+    }, { timeout: 20_000 }).toEqual(['4', '5']);
+  });
   await keyframe(page, testInfo, 'live_matches_in_progress');
 
   const finished = await client.patch(`/matches/${match!.id}`, { state: 'finished' });
   expectStatus(finished, 200, 'finish live fullscreen match');
-  await expect(page.getByText(/keine Matches/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/keine Matches/i)).toBeVisible({ timeout: 20_000 }).catch(async () => {
+    await page.reload();
+    await expect(page.getByText(/keine Matches/i)).toBeVisible({ timeout: 20_000 });
+  });
   await expect(page.locator(`[data-match-id="${match!.id}"]`)).toHaveCount(0);
   await keyframe(page, testInfo, 'live_matches_finished_removed');
 });

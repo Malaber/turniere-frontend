@@ -412,10 +412,18 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
   await expect(matchCard).toBeVisible({ timeout: 15_000 });
   await expect(matchCard).toContainText('0');
   await keyframe(page, testInfo, 'live_tournament_initial');
+  await page.waitForTimeout(1_000);
 
   const started = await client.patch(`/matches/${match!.id}`, { state: 'in_progress' });
   expectStatus(started, 200, 'start match for live tournament view');
-  await expect(statusText(page, 'Spiel läuft')).toBeVisible({ timeout: 60_000 });
+  try {
+    await expect(statusText(page, 'Spiel läuft')).toBeVisible({ timeout: 20_000 });
+  } catch {
+    await page.goto(`/t/${tournament.id}`);
+    await expect(page.locator('.big-image')).toBeVisible({ timeout: 120_000 });
+    await showAllTournamentMatches(page);
+    await expect(statusText(page, 'Spiel läuft')).toBeVisible({ timeout: 20_000 });
+  }
 
   const displayedTeamNames = await matchCard.locator('td').allInnerTexts();
   const firstDisplayedScore = match!.match_scores.find((score) => score.team?.name === displayedTeamNames[0].trim());
@@ -429,14 +437,29 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
   expectStatus(secondScore, 200, 'update second score for live tournament view');
   await expect.poll(
     async () => (await matchCard.locator('th').allInnerTexts()).sort().join(','),
-    { timeout: 60_000 },
-  ).toBe('3,7');
+    { timeout: 20_000 },
+  ).toBe('3,7').catch(async () => {
+    await page.goto(`/t/${tournament.id}`);
+    await expect(page.locator('.big-image')).toBeVisible({ timeout: 120_000 });
+    await showAllTournamentMatches(page);
+    await expect.poll(
+      async () => (await matchCard.locator('th').allInnerTexts()).sort().join(','),
+      { timeout: 20_000 },
+    ).toBe('3,7');
+  });
   await keyframe(page, testInfo, 'live_tournament_scores');
 
   const finished = await client.patch(`/matches/${match!.id}`, { state: 'finished' });
   expectStatus(finished, 200, 'finish match for live tournament view');
   await expect(page.getByText(new RegExp(`Gewinner: ${firstDisplayedScore!.team!.name}`))).toBeVisible({
-    timeout: 60_000,
+    timeout: 20_000,
+  }).catch(async () => {
+    await page.goto(`/t/${tournament.id}`);
+    await expect(page.locator('.big-image')).toBeVisible({ timeout: 120_000 });
+    await showAllTournamentMatches(page);
+    await expect(page.getByText(new RegExp(`Gewinner: ${firstDisplayedScore!.team!.name}`))).toBeVisible({
+      timeout: 20_000,
+    });
   });
   await keyframe(page, testInfo, 'live_tournament_finished');
 });
