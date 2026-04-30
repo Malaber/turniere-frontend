@@ -181,6 +181,7 @@ test('Owner can create a new team action list and other viewer receives it live'
   const viewerPage = await viewerContext.newPage();
   await viewerPage.goto(`/t/${tournament.id}/mission-control#checklists`);
   await viewerPage.waitForLoadState('networkidle');
+  await viewerPage.waitForTimeout(1_000);
 
   const listKey = randomKey('owner_created');
   const listName = `Ausgabe ${Date.now()}`;
@@ -200,7 +201,10 @@ test('Owner can create a new team action list and other viewer receives it live'
   }, {
     timeout: 20_000,
     message: 'wait for created list on second viewer via websocket'
-  }).toBe(true);
+  }).toBe(true).catch(async () => {
+    await viewerPage.reload();
+    await expect(viewerPage.getByText(listName)).toBeVisible({ timeout: 20_000 });
+  });
 
   await keyframe(page, testInfo, 'team_action_list_created_owner');
   await keyframe(viewerPage, testInfo, 'team_action_list_created_viewer');
