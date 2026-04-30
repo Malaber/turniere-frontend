@@ -56,7 +56,6 @@ const DEFAULT_DISPLAY_STATE_FILTERS = {
     'werbung': {}
 };
 
-const GROUPS_QR_CODE_URL = '/static/images/logo-questionmark.png';
 const GROUPS_LOGO_URL = '/static/images/bpwstr_logo.png';
 
 function filtersFromConfig(config) {
@@ -525,7 +524,7 @@ class Main extends React.Component {
         case 'group_tables':
             return <GroupsView
                 tournament={tournament}
-                qrCodeUrl={GROUPS_QR_CODE_URL}
+                showQrCode
                 logoUrl={GROUPS_LOGO_URL}/>;
         case 'during_game':
             return <DuringGameView

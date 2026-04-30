@@ -6,8 +6,8 @@ import {
     Col,
     Container, Row, Spinner
 } from 'reactstrap';
-import {QRCodeSVG} from 'qrcode.react';
 import {Group} from '../js/components/GroupStage';
+import {GroupQrCode} from '../js/components/fullscreen/GroupQrCode';
 import {connectToTournamentSocket} from '../js/utils/tournamentLiveSocket';
 
 
@@ -26,19 +26,9 @@ function FullscreenPage(props) {
         <Container className="fs-5" fluid>
             <Row className="row-cols-4">
                 {props.groups.map(group => (
-                    <Col className="mb-2">
-                        <Group group={group} key={group.id} teams={props.teams}/>
-                    </Col>
+                    <Group group={group} key={group.id} teams={props.teams}/>
                 ))}
-                <Col>
-                    <div className="d-flex justify-content-center align-items-center">
-                        <QRCodeSVG
-                            className="shadow mx-auto"
-                            value="https://qr.bpwstr.de/2"
-                            size="300"
-                        />
-                    </div>
-                </Col>
+                <GroupQrCode/>
                 {logo}
             </Row>
         </Container>

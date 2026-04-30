@@ -160,34 +160,100 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
   await expect(card).toBeVisible({ timeout: 20_000 });
 
   await card.getByTestId(`mission-beamer-mode-${beamer.json.id}`).selectOption('werbung');
+
   const checklist = card.getByTestId(`mission-beamer-werbung-checklist-${beamer.json.id}`);
   await expect(checklist).toBeVisible();
-  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_banner`)).toBeChecked();
-  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_qr_code`)).toBeChecked();
 
-  const tennis = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis_blurred`);
-  await tennis.click();
+  const defaultImageKeys = [
+    'bpwstr_banner',
+    'bpwstr_logo',
+    'bpwstr_qr_code',
+    'Merch_Werbebanner',
+    'Schorlepongturnier_Werbebanner',
+  ];
 
-  await expect.poll(async () => {
-    const beamers = await client.get<Array<{ id: number; config: Record<string, unknown> }>>(
-      `/tournaments/${tournament.id}/beamers`,
-    );
-    expectStatus(beamers, 200, 'fetch beamers after werbung config');
-    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
-    return updated?.config;
-  }, { timeout: 20_000 }).toMatchObject({
-    display_mode: 'werbung',
-    werbung_image_keys: expect.arrayContaining(['bpwstr_banner', 'bpwstr_logo', 'bpwstr_qr_code']),
-  });
+  for (const imageKey of defaultImageKeys) {
+    await expect(
+      card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-${imageKey}`),
+    ).toBeChecked();
+  }
+
+  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis_blurred`)).toHaveCount(0);
+  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis-blurred`)).toHaveCount(0);
+
+  const merch = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-Merch_Werbebanner`);
+  await merch.uncheck();
 
   await expect.poll(async () => {
     const beamers = await client.get<Array<{ id: number; config: { werbung_image_keys?: string[] } }>>(
       `/tournaments/${tournament.id}/beamers`,
     );
-    expectStatus(beamers, 200, 'fetch beamers after werbung uncheck');
+    expectStatus(beamers, 200, 'fetch beamers after werbung merch uncheck');
     const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
     return updated?.config.werbung_image_keys || [];
-  }, { timeout: 20_000 }).not.toContain('tennis_blurred');
+  }, { timeout: 20_000 }).not.toContain('Merch_Werbebanner');
+
+  await merch.check();
+
+  await expect.poll(async () => {
+    const beamers = await client.get<Array<{ id: number; config: { werbung_image_keys?: string[] } }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(beamers, 200, 'fetch beamers after werbung merch re-check');
+    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
+    return updated?.config.werbung_image_keys || [];
+  }, { timeout: 20_000 }).toEqual(expect.arrayContaining(defaultImageKeys));
+});
+
+test('Mission Control loads transaction log lazily in Verlauf tab', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  let logRequests = 0;
+
+  await page.route('**/api/tournaments/*/transaction_log', async (route) => {
+    logRequests += 1;
+    await route.continue();
+  });
+
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('link', { name: 'Verlauf' })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(logRequests).toBe(0);
+
+  await page.getByRole('link', { name: 'Verlauf' }).click();
+  await expect(page).toHaveURL(/#history$/);
+  await expect(page.getByTestId('mission-transaction-log')).toBeVisible();
+  await expect.poll(async () => logRequests, { timeout: 20_000 }).toBe(1);
+
+  const entries = page.getByTestId('mission-transaction-log-entry');
+  await expect(entries.first()).toBeVisible({ timeout: 20_000 });
+  await expect(entries.first()).toContainText('tournament.created');
+  await expect(page.getByTestId('mission-transaction-log-sequence').first()).toHaveText('#1');
+
+  const sequences = await page.getByTestId('mission-transaction-log-sequence').evaluateAll((elements) => (
+    elements.map((element) => Number((element.textContent ?? '').replace('#', '')))
+  ));
+  const sortedSequences = [...sequences].sort((left, right) => left - right);
+  expect(sequences).toEqual(sortedSequences);
+
+  await page.getByRole('link', { name: 'Timer', exact: true }).click();
+  await page.getByTestId('mission-timer-quick-20s').click();
+  await expect.poll(async () => logRequests, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+
+  await page.getByRole('link', { name: 'Verlauf' }).click();
+  await expect(entries.filter({ hasText: 'tournament.timer_changed' }).first()).toBeVisible({ timeout: 20_000 });
+
+  const requestsAfterMutationRefresh = logRequests;
+  await page.getByRole('link', { name: 'Teams' }).click();
+  await page.getByRole('link', { name: 'Verlauf' }).click();
+  await page.waitForTimeout(500);
+  expect(logRequests).toBe(requestsAfterMutationRefresh);
+
+  await page.getByTestId('mission-transaction-log-refresh').click();
+  await expect.poll(async () => logRequests, { timeout: 20_000 }).toBeGreaterThanOrEqual(
+    requestsAfterMutationRefresh + 1,
+  );
 });
 
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
@@ -202,6 +268,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Checklisten' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Verlauf' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Turnier-Einstellungen' })).toBeVisible();
   await expect(page.getByTestId('mission-tournament-link')).toHaveAttribute('href', `/t/${tournament.id}`);
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
