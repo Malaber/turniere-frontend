@@ -2,6 +2,65 @@ import {getApiUrl} from '../runtimeConfig';
 
 const ACTION_CABLE_PROTOCOL = 'actioncable-v1-json';
 
+function parseIdentifier(identifier) {
+    try {
+        return JSON.parse(identifier);
+    } catch (error) {
+        return {};
+    }
+}
+
+function actionCableDebugState() {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+
+    const existing = window.__turniereActionCable || {};
+    if (!existing.subscriptions) {
+        existing.subscriptions = {};
+    }
+    if (!existing.events) {
+        existing.events = [];
+    }
+    window.__turniereActionCable = existing;
+    return existing;
+}
+
+function recordActionCableEvent(type, identifier, extra = {}) {
+    const state = actionCableDebugState();
+    if (!state || !identifier) {
+        return;
+    }
+
+    const parsedIdentifier = parseIdentifier(identifier);
+    const event = Object.assign({
+        type,
+        identifier,
+        parsedIdentifier,
+        at: Date.now()
+    }, extra);
+
+    if (type === 'confirm_subscription') {
+        state.subscriptions[identifier] = {
+            identifier,
+            parsedIdentifier,
+            confirmed: true,
+            confirmedAt: event.at
+        };
+    }
+    if (type === 'disconnect' && state.subscriptions[identifier]) {
+        state.subscriptions[identifier].confirmed = false;
+        state.subscriptions[identifier].disconnectedAt = event.at;
+    }
+
+    state.events.push(event);
+    if (state.events.length > 300) {
+        state.events.splice(0, state.events.length - 300);
+    }
+
+    window.dispatchEvent(new CustomEvent('turniere:action-cable', {detail: event}));
+}
+
 function websocketUrl() {
     if (typeof window !== 'undefined') {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -59,15 +118,19 @@ export function connectActionCable({identifier, onMessage}) {
             return;
         }
 
-        if (
-            message.type === 'ping' ||
-            message.type === 'confirm_subscription' ||
-            message.type === 'disconnect'
-        ) {
+        if (message.type === 'ping') {
+            return;
+        }
+
+        if (message.type === 'confirm_subscription' || message.type === 'disconnect') {
+            recordActionCableEvent(message.type, message.identifier);
             return;
         }
 
         if (message.identifier === identifier && message.message) {
+            recordActionCableEvent('message', message.identifier, {
+                messageType: message.message.type || null
+            });
             onMessage(message.message);
         }
     }

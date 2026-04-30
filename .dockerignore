@@ -22,6 +22,7 @@ yarn-error.log
 
 Dockerfile
 docker-compose*.yml
+.dockerignore
 
 e2e/**
 screenshots/**

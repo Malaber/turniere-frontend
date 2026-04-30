@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import * as fs from 'fs/promises';
 import { keyframe } from '../helpers/screenshot';
 import { loadAuthState, injectAuth } from '../helpers/auth';
 
@@ -19,17 +20,24 @@ test('Tournament creation flow (requires login)', async ({ page, context }, test
   const tournamentName = `E2E Test Tournament ${Date.now()}`;
   await page.fill('input[name="name"]', tournamentName);
 
-  // Add teams via the EditableStringList component
-  // The component renders an input for each new team — find the add button and team input
-  for (const teamName of ['Alpha', 'Beta', 'Gamma', 'Delta']) {
-    // Type into the last visible team-name input and press Enter or click add
-    const addBtn = page.getByRole('button', { name: 'hinzufügen' });
-    await expect(addBtn).toBeVisible();
+  const csvPath = testInfo.outputPath('teams.csv');
+  await fs.writeFile(csvPath, [
+    '"Bestellnummer","Name Teilnehmer*in","Teilnehmer*innenname: Vorname","Teilnehmer*innenname: Nachname","Produkt","Preis","Eingecheckt","Ausgetreten","Automatisch eingecheckt","E-Mail","Telefonnummer","Team Name","Firma","Gutscheincode","Bestelldatum","Bestelluhrzeit","Benötigt besondere Behandlung","Kommentar","Check-in-Hinweis","Sitzplatz-ID","Sitzbezeichnung","Sitzbereich","Sitzreihe","Sitzplatz","Gesperrt","Gültig ab","Gültig bis","Adresse","Postleitzahl","Stadt","Land","Bundesstaat"',
+    '"39WQH","Simon Maier","Simon","Maier","Team Ticket 11. Beerpongturnier (2 Pers)","50,00","","","Nein","simonmaier@toast.com","","Simsalabier","","","2026-03-01","12:03:00","Nein","","","","","","","","","","","Hauptstraße 435983475","55555","Anderswo","DE",""',
+    '"40WQH","Ada Hopfen","Ada","Hopfen","Team Ticket 11. Beerpongturnier (2 Pers)","50,00","","","Nein","ada@example.com","","Hopfenhelden","","","2026-03-01","12:04:00","Nein","","","","","","","","","","","Bierstraße 12","55555","Anderswo","DE",""',
+    '"41WQH","Ben Becher","Ben","Becher","Team Ticket 11. Beerpongturnier (2 Pers)","50,00","","","Nein","ben@example.com","","Becherwerfer","","","2026-03-01","12:05:00","Nein","","","","","","","","","","","Pingweg 3","55555","Anderswo","DE",""',
+    '"42WQH","Paula Pong","Paula","Pong","Team Ticket 11. Beerpongturnier (2 Pers)","50,00","","","Nein","paula@example.com","","Pongstars","","","2026-03-01","12:06:00","Nein","","","","","","","","","","","Pongallee 4","55555","Anderswo","DE",""',
+  ].join('\n'));
 
-    // Find the text input adjacent to the add button
-    const teamInput = page.locator('input[placeholder="Teamname"]');
-    await teamInput.fill(teamName);
-    await addBtn.click();
+  const csvInput = page.locator('input[type="file"]');
+  await expect(csvInput).toBeVisible();
+  await csvInput.setInputFiles(csvPath);
+  await expect(page.locator('#team-csv-column')).toBeVisible();
+  await expect(page.locator('#team-csv-column')).toHaveValue('11');
+
+  await page.getByRole('button', { name: 'Teamnamen aus CSV hinzufügen' }).click();
+  for (const teamName of ['Simsalabier', 'Hopfenhelden', 'Becherwerfer', 'Pongstars']) {
+    await expect(page.getByText(teamName)).toBeVisible();
   }
 
   await keyframe(page, testInfo, 'create_teams_added');

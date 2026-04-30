@@ -8,6 +8,7 @@ import {
   longGroupStageTeamName,
 } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
+import { waitForActionCableSubscription } from '../helpers/action-cable';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
 const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
@@ -411,6 +412,10 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
   const matchCard = page.locator(`[data-match-id="${match!.id}"]`);
   await expect(matchCard).toBeVisible({ timeout: 15_000 });
   await expect(matchCard).toContainText('0');
+  await waitForActionCableSubscription(page, {
+    channel: 'TournamentChannel',
+    tournament_id: tournament.id,
+  });
   await keyframe(page, testInfo, 'live_tournament_initial');
   await page.waitForTimeout(1_000);
 

@@ -11,7 +11,7 @@ const TIMER_EFFECT_CUES = [
     }),
     Object.assign({}, beamerSoundEffectForKey('mid-game-warning'), {
         secondsRemaining: 10 * 60,
-        startOffsetSeconds: 2
+        startOffsetSeconds: 0
     }),
     Object.assign({}, beamerSoundEffectForKey('end-countdown'), {
         secondsRemaining: 10,
