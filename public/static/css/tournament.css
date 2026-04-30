@@ -516,6 +516,13 @@
     grid-template-columns: minmax(16rem, 32rem) 1fr auto;
     gap: 0.75rem;
     align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #fff;
+    border: 1px solid #d9e1ea;
+    border-radius: 0.45rem;
+    box-shadow: 0 0.35rem 1rem rgba(37, 49, 63, 0.12);
     padding: 0.65rem;
     margin-bottom: 1.25rem;
 }
