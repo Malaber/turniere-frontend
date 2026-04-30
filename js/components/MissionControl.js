@@ -32,11 +32,14 @@ import {
 import {TournamentSettingsForm} from './TournamentSettingsForm';
 import {TeamName} from './TeamName';
 import {Timer} from './Timer';
+import {BeamerMediaSelection} from './BeamerMediaSelection';
 import {
     allBeamerMediaImageKeys,
     BEAMER_MEDIA_IMAGES,
     DEFAULT_BEAMER_MEDIA_IMAGE_KEY,
+    sanitizeBeamerMediaImageKeys,
     sanitizeWerbungImageKeys,
+    STATIC_IMAGE_KEY_CONFIG_KEY,
     WERBUNG_DISPLAY_MODE,
     WERBUNG_IMAGE_KEYS_CONFIG_KEY
 } from '../utils/beamerMedia';
@@ -529,14 +532,21 @@ export class MissionControl extends React.Component {
 class MissionBeamer extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {beamers: [], name: '', loading: false, savingById: {}, selectionsById: {}};
+        this.state = {
+            beamers: [],
+            name: '',
+            loading: false,
+            savingById: {},
+            selectionsById: {},
+            mediaSelectionsById: {}
+        };
         this.setName = this.setName.bind(this);
         this.reload = this.reload.bind(this);
         this.create = this.create.bind(this);
         this.update = this.update.bind(this);
         this.updateMode = this.updateMode.bind(this);
         this.updateMatchSelection = this.updateMatchSelection.bind(this);
-        this.updateImageSelection = this.updateImageSelection.bind(this);
+        this.updateStaticImageSelection = this.updateStaticImageSelection.bind(this);
         this.updateWerbungImageSelection = this.updateWerbungImageSelection.bind(this);
         this.updateTimerOnlyReason = this.updateTimerOnlyReason.bind(this);
         this.playSoundEffect = this.playSoundEffect.bind(this);
@@ -554,7 +564,8 @@ class MissionBeamer extends React.Component {
                 beamers: sortBeamersByName(beamers),
                 loading: false,
                 savingById: {},
-                selectionsById: {}
+                selectionsById: {},
+                mediaSelectionsById: {}
             }),
             this.onError);
     }
@@ -584,6 +595,14 @@ class MissionBeamer extends React.Component {
         this.setState(prev => ({
             savingById: Object.assign({}, prev.savingById, {[beamerId]: saving})
         }));
+    }
+
+    setMediaSelection(beamerId, selection, callback) {
+        this.setState(prev => ({
+            mediaSelectionsById: Object.assign({}, prev.mediaSelectionsById, {
+                [beamerId]: Object.assign({}, prev.mediaSelectionsById[beamerId] || {}, selection)
+            })
+        }), callback);
     }
 
     update(beamer, payload, successMessage = 'Beamer wurde aktualisiert.') {
@@ -631,30 +650,34 @@ class MissionBeamer extends React.Component {
         });
     }
 
-    updateImageSelection(beamer, value) {
-        const config = Object.assign({}, beamer.config || {}, {image_key: value});
+    updateStaticImageSelection(beamer, imageKeys) {
+        const nextKeys = sanitizeBeamerMediaImageKeys(imageKeys);
+        const config = Object.assign({}, beamer.config || {}, {
+            [STATIC_IMAGE_KEY_CONFIG_KEY]: nextKeys[0] || DEFAULT_BEAMER_MEDIA_IMAGE_KEY
+        });
         delete config.display_mode;
         delete config.show_timer_reason;
-        this.update(beamer, {
-            display_state: 'static_image',
-            config
+        this.setMediaSelection(beamer.id, {staticImageKeys: nextKeys}, () => {
+            this.update(beamer, {
+                display_state: 'static_image',
+                config
+            });
         });
     }
 
-    updateWerbungImageSelection(beamer, imageKey, checked) {
+    updateWerbungImageSelection(beamer, imageKeys) {
         const currentConfig = beamer.config || {};
-        const currentKeys = sanitizeWerbungImageKeys(currentConfig[WERBUNG_IMAGE_KEYS_CONFIG_KEY]);
-        const nextKeys = checked ?
-            sanitizeWerbungImageKeys(currentKeys.concat([imageKey])) :
-            currentKeys.filter(key => key !== imageKey);
+        const nextKeys = sanitizeWerbungImageKeys(imageKeys);
         const config = Object.assign({}, currentConfig, {
             display_mode: WERBUNG_DISPLAY_MODE,
             [WERBUNG_IMAGE_KEYS_CONFIG_KEY]: nextKeys
         });
         delete config.show_timer_reason;
-        this.update(beamer, {
-            display_state: 'static_image',
-            config
+        this.setMediaSelection(beamer.id, {werbungImageKeys: nextKeys}, () => {
+            this.update(beamer, {
+                display_state: 'static_image',
+                config
+            });
         });
     }
 
@@ -716,8 +739,12 @@ class MissionBeamer extends React.Component {
                         const saving = Boolean(this.state.savingById[beamer.id]);
                         const disabled = saving || this.props.disabled;
                         const matchSelection = config.match_filter || '';
-                        const imageSelection = config.image_key || DEFAULT_BEAMER_MEDIA_IMAGE_KEY;
-                        const werbungImageKeys = sanitizeWerbungImageKeys(
+                        const imageSelection = sanitizeBeamerMediaImageKeys([
+                            config[STATIC_IMAGE_KEY_CONFIG_KEY] || DEFAULT_BEAMER_MEDIA_IMAGE_KEY
+                        ])[0] || DEFAULT_BEAMER_MEDIA_IMAGE_KEY;
+                        const mediaSelection = this.state.mediaSelectionsById[beamer.id] || {};
+                        const staticImageKeys = mediaSelection.staticImageKeys || [imageSelection];
+                        const werbungImageKeys = mediaSelection.werbungImageKeys || sanitizeWerbungImageKeys(
                             config[WERBUNG_IMAGE_KEYS_CONFIG_KEY]
                         );
                         const timerReasonSelection = this.state.selectionsById[beamer.id];
@@ -789,64 +816,37 @@ class MissionBeamer extends React.Component {
                                         </FormGroup>}
 
                                     {mode === 'static_image' &&
-                                        <FormGroup>
-                                            <Label for={'missionBeamerImage' + beamer.id}>Bild</Label>
-                                            <Input
-                                                id={'missionBeamerImage' + beamer.id}
-                                                type='select'
-                                                value={imageSelection}
-                                                disabled={disabled}
-                                                data-testid={'mission-beamer-image-' + beamer.id}
-                                                onChange={event => this.updateImageSelection(
-                                                    beamer,
-                                                    event.target.value
-                                                )}>
-                                                {BEAMER_MEDIA_IMAGES.map(option => (
-                                                    <option key={option.key} value={option.key}>
-                                                        {option.label}
-                                                    </option>
-                                                ))}
-                                            </Input>
-                                        </FormGroup>}
+                                        <BeamerMediaSelection
+                                            images={BEAMER_MEDIA_IMAGES}
+                                            label='Statisches Bild'
+                                            type='radio'
+                                            selectedKeys={staticImageKeys}
+                                            disabled={disabled}
+                                            idPrefix={'missionBeamerStaticImage' + beamer.id}
+                                            name={'missionBeamerStaticImage' + beamer.id}
+                                            testId={'mission-beamer-static-image-list-' + beamer.id}
+                                            testIdPrefix={'mission-beamer-static-image-' + beamer.id + '-'}
+                                            onChange={keys => this.updateStaticImageSelection(beamer, keys)}
+                                        />}
 
                                     {mode === 'werbung' &&
-                                        <div className='mission-beamer-media-checklist'
-                                            data-testid={'mission-beamer-werbung-checklist-' + beamer.id}>
-                                            <div className='mission-beamer-media-label'>Werbebilder</div>
-                                            {BEAMER_MEDIA_IMAGES.map(image => {
-                                                const inputId = 'missionBeamerWerbungImage' +
-                                                    beamer.id + image.key;
-                                                const checked = werbungImageKeys.indexOf(image.key) !== -1;
-                                                return (
-                                                    <FormGroup check className='mission-beamer-media-option'
-                                                        key={image.key}>
-                                                        <Input
-                                                            id={inputId}
-                                                            type='checkbox'
-                                                            checked={checked}
-                                                            disabled={disabled}
-                                                            data-testid={'mission-beamer-werbung-image-' +
-                                                                beamer.id + '-' + image.key}
-                                                            onChange={event => this.updateWerbungImageSelection(
-                                                                beamer,
-                                                                image.key,
-                                                                event.target.checked
-                                                            )}
-                                                        />
-                                                        <Label check for={inputId}>
-                                                            <span className='mission-beamer-media-thumb'>
-                                                                <img src={image.src} alt='' />
-                                                            </span>
-                                                            <span>{image.label}</span>
-                                                        </Label>
-                                                    </FormGroup>
-                                                );
-                                            })}
+                                        <React.Fragment>
+                                            <BeamerMediaSelection
+                                                images={BEAMER_MEDIA_IMAGES}
+                                                label='Werbebilder'
+                                                type='checkbox'
+                                                selectedKeys={werbungImageKeys}
+                                                disabled={disabled}
+                                                idPrefix={'missionBeamerWerbungImage' + beamer.id}
+                                                testId={'mission-beamer-werbung-checklist-' + beamer.id}
+                                                testIdPrefix={'mission-beamer-werbung-image-' + beamer.id + '-'}
+                                                onChange={keys => this.updateWerbungImageSelection(beamer, keys)}
+                                            />
                                             {werbungImageKeys.length === 0 &&
                                                 <Alert color='warning' className='mt-2 mb-0'>
                                                     Keine Bilder ausgewählt. Werbung zeigt nur Timer-Hinweis.
                                                 </Alert>}
-                                        </div>}
+                                        </React.Fragment>}
 
                                     {mode === 'timer_only' &&
                                         <FormGroup check>
