@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { countBeamerEffects, installBeamerEffectSpies, waitForBeamerEffect } from '../helpers/beamer-audio';
+import { waitForActionCableSubscription } from '../helpers/action-cable';
 import { injectAuth } from '../helpers/auth';
 import { keyframe } from '../helpers/screenshot';
 import {
@@ -587,6 +588,11 @@ test('Mission Control soundboard controls beamer audio with timer priority', asy
   await installBeamerEffectSpies(beamerPage);
   await beamerPage.goto(`/t/${tournament.id}/fullscreen?beamer=${encodeURIComponent('Soundboard')}`);
   await waitForBeamerEffect(beamerPage, 'audio-permission-allowed');
+  await waitForActionCableSubscription(beamerPage, {
+    channel: 'TournamentBeamersChannel',
+    tournament_id: tournament.id,
+    beamer_name: 'Soundboard',
+  });
 
   await page.goto(`/t/${tournament.id}/mission-control#beamer`);
   await expect(page.getByTestId('mission-beamer-control')).toBeVisible({ timeout: 20_000 });
@@ -632,6 +638,10 @@ test('Mission Control soundboard controls beamer audio with timer priority', asy
   await waitForBeamerEffect(beamerPage, 'sound-effect', 'start-countdown', replayCount + 1);
 
   const timerCount = await countBeamerEffects(beamerPage, 'sound', 'end-countdown');
+  await waitForActionCableSubscription(beamerPage, {
+    channel: 'TournamentTimersChannel',
+    tournament_id: tournament.id,
+  });
   const timerRes = await client.patch(`/tournaments/${tournament.id}/timer`, {
     timestamp_seconds: 12,
   });

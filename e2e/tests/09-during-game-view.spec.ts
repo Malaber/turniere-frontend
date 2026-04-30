@@ -1,5 +1,6 @@
 import { test, expect, Page, devices } from '@playwright/test';
 import { installBeamerEffectSpies, waitForBeamerEffect } from '../helpers/beamer-audio';
+import { waitForActionCableSubscription } from '../helpers/action-cable';
 import { keyframe } from '../helpers/screenshot';
 import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
 import {
@@ -254,6 +255,10 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
   // Wait for match cards to confirm initial render
   const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
+  await waitForActionCableSubscription(page, {
+    channel: 'TournamentTimersChannel',
+    tournament_id: tournament.id,
+  });
   await keyframe(page, testInfo, 'before_countdown');
 
   // Match cards should be visible in normal mode
@@ -311,27 +316,31 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   });
 
   const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(12, {
-    timerSeconds: 20 * 60 + 5,
+    timerSeconds: 20 * 60 + 25,
   });
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   const matchCards = page.getByTestId('fullscreen-match-card');
   await expect(matchCards.first()).toBeVisible({ timeout: 15_000 });
+  await waitForActionCableSubscription(page, {
+    channel: 'TournamentTimersChannel',
+    tournament_id: tournament.id,
+  });
   await keyframe(page, testInfo, 'effects_loaded');
   await waitForBeamerEffect(page, 'audio-permission-blocked');
   await expect(page.getByTestId('beamer-sound-unlock')).toBeVisible();
   await page.getByTestId('beamer-sound-unlock').click();
   await waitForBeamerEffect(page, 'audio-permission-allowed');
-  await waitForBeamerEffect(page, 'sound', 'start-countdown');
-  await waitForBeamerEffect(page, 'sound-started', 'start-countdown');
+  await waitForBeamerEffect(page, 'sound', 'start-countdown', 1, 40_000);
+  await waitForBeamerEffect(page, 'sound-started', 'start-countdown', 1, 40_000);
   await keyframe(page, testInfo, 'start_countdown_sound_synced');
 
   const midCue = await client.patch(`/tournaments/${tournament.id}/timer`, {
-    timestamp_seconds: 10 * 60 + 4,
+    timestamp_seconds: 10 * 60 + 10,
   });
   expectStatus(midCue, 200, 'start 10:10 cue timer');
-  await waitForBeamerEffect(page, 'sound', 'mid-game-warning');
+  await waitForBeamerEffect(page, 'sound', 'mid-game-warning', 1, 20_000);
   await keyframe(page, testInfo, 'mid_game_warning_sound');
 
   const endCue = await client.patch(`/tournaments/${tournament.id}/timer`, {

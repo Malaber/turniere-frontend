@@ -76,9 +76,13 @@ class MissionControlPage extends React.Component {
 
     componentDidMount() {
         this.reloadTournament();
+        this.pollInterval = setInterval(this.reloadTournament, 3000);
     }
 
     componentWillUnmount() {
+        if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+        }
         if (this.timerSocket) {
             this.timerSocket.disconnect();
         }

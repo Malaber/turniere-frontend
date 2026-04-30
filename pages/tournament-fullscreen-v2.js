@@ -193,6 +193,7 @@ class Main extends React.Component {
         this.updateMatches = this.updateMatches.bind(this);
         this.updateTimerState = this.updateTimerState.bind(this);
         this.updateTournament = this.updateTournament.bind(this);
+        this.pollLiveState = this.pollLiveState.bind(this);
         this.connectBeamerSocket = this.connectBeamerSocket.bind(this);
         this.connectTimerSocket = this.connectTimerSocket.bind(this);
         this.connectTournamentSocket = this.connectTournamentSocket.bind(this);
@@ -241,9 +242,13 @@ class Main extends React.Component {
 
         // Initial timer snapshot. Live replacements arrive through ActionCable.
         this.updateTimerState();
+        this.pollInterval = setInterval(this.pollLiveState, 3000);
     }
 
     componentWillUnmount() {
+        if (this.pollInterval) {
+            clearInterval(this.pollInterval);
+        }
         if (this.state.socket) {
             this.state.socket.disconnect();
         }
@@ -256,6 +261,18 @@ class Main extends React.Component {
         if (this.state.matchesSocket) {
             this.state.matchesSocket.disconnect();
         }
+    }
+
+    pollLiveState() {
+        this.updateTimerState();
+        this.updateTournament();
+
+        if (this.props.query.display) {
+            this.updateMatches();
+            return;
+        }
+
+        this.refreshBeamerConfig(this.props.query.code, this.state.beamerName);
     }
 
     connectBeamerSocket(beamerName) {
