@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
+import { seedGroupStageTournament } from '../helpers/scenario-seeder';
+
+test.setTimeout(600_000);
 
 test.describe('Mobile footer', () => {
   test.use({
@@ -62,6 +65,35 @@ test.describe('Mobile footer', () => {
     expect(documentWidth).toBeLessThanOrEqual(390);
 
     await keyframe(page, testInfo, 'mobile_footer_long_content');
+  });
+
+  test('stays below the final mobile tournament group', async ({ page }, testInfo) => {
+    const { tournament } = await seedGroupStageTournament(12, 4, 8);
+
+    await page.goto(`/t/${tournament.id}`);
+    await expect(page.locator('.stages').first()).toBeVisible({ timeout: 120000 });
+
+    const footer = page.locator('footer');
+    const finalGroupHeading = page.getByRole('heading', { name: 'Gruppe 12', exact: true });
+    const finalGroupCard = finalGroupHeading.locator(
+      'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " card ")][1]'
+    );
+
+    await expect(finalGroupHeading).toBeVisible();
+    await footer.scrollIntoViewIfNeeded();
+    await expect(footer).toBeInViewport();
+
+    const footerBox = await footer.boundingBox();
+    const finalGroupBox = await finalGroupCard.boundingBox();
+    expect(footerBox).not.toBeNull();
+    expect(finalGroupBox).not.toBeNull();
+    expect(footerBox!.y).toBeGreaterThanOrEqual(finalGroupBox!.y + finalGroupBox!.height - 1);
+    await expect(page.getByRole('button', { name: 'Nach oben' })).toBeHidden();
+
+    const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(documentWidth).toBeLessThanOrEqual(390);
+
+    await keyframe(page, testInfo, 'mobile_footer_tournament_bottom');
   });
 });
 
