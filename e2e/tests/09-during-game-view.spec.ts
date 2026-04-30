@@ -410,16 +410,13 @@ test('Beamer confetti does not fire when expired timer loads', async ({ page }) 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await installBeamerEffectSpies(page);
 
-  const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(4, {
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(4, {
     beamerName: 'timer-only-expired',
     displayState: 'timer_only',
+    timerSeconds: 1,
   });
 
-  const expiredTimer = await client.patch(`/tournaments/${tournament.id}/timer`, {
-    timestamp: new Date(Date.now() - 30_000).toISOString(),
-    timer_mode: 'countdown',
-  });
-  expectStatus(expiredTimer, 200, 'set expired timer');
+  await page.waitForTimeout(1_500);
 
   await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
   await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
