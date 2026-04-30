@@ -3,6 +3,11 @@ import {getApiUrl} from '../runtimeConfig';
 const ACTION_CABLE_PROTOCOL = 'actioncable-v1-json';
 
 function websocketUrl() {
+    if (typeof window !== 'undefined') {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${protocol}//${window.location.host}/cable`;
+    }
+
     const apiUrl = getApiUrl().replace(/\/$/, '');
     if (!apiUrl) {
         throw new Error('TURNIERE_API_URL missing for ActionCable connection');
