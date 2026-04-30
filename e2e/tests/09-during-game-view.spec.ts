@@ -386,9 +386,13 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   const finishStop = effectEvents.find(
     (event) => event.type === 'sound-stop' && event.reason === 'timer-finished',
   );
+  const scheduledConfetti = effectEvents.find((event) => event.type === 'confetti-scheduled');
   const confetti = effectEvents.find((event) => event.type === 'confetti');
   expect(finishStop).toBeFalsy();
+  expect(scheduledConfetti).toBeTruthy();
+  expect(scheduledConfetti.delayMs).toBe(1_000);
   expect(confetti).toBeTruthy();
+  expect(confetti.at - scheduledConfetti.at).toBeGreaterThanOrEqual(900);
   const confettiBursts = effectEvents.filter((event) => event.type === 'confetti');
   expect(confettiBursts.length).toBeGreaterThanOrEqual(3);
   expect(confettiBursts.every((event) => event.style === 'firework')).toBe(true);
