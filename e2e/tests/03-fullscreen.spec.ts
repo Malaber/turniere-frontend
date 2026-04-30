@@ -415,3 +415,27 @@ test('Werbung beamer rotates selected images and shows timer reason', async ({ p
   await expect(page.locator('body')).toHaveClass(/hide-cursor/);
   await keyframe(page, testInfo, 'fullscreen_werbung_beamer');
 });
+
+test('Static image beamer renders selected QR code image', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const beamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'qr-static',
+    display_state: 'static_image',
+    config: {
+      image_key: 'bpwstr_qr_code',
+    },
+  });
+  expectStatus(beamer, 201, 'create qr static beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=qr-static`);
+  await expect(page.getByTestId('beamer-static-image')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('beamer-static-image')).toHaveAttribute('src', /bpwstr_qr_code/);
+  await expect(page.locator('body')).toHaveClass(/hide-cursor/);
+  await keyframe(page, testInfo, 'fullscreen_static_qr_code');
+});

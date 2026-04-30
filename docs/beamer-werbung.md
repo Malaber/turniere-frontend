@@ -1,4 +1,4 @@
-# Beamer Werbung Backend Contract
+# Beamer Media Backend Contract
 
 TUR-162 adds a frontend-only media catalog for now. TUR-109 can replace this
 with backend-owned media packs later, but the current backend only needs to
@@ -41,12 +41,31 @@ Frontend currently knows these keys:
 
 - `bpwstr_banner`
 - `bpwstr_logo`
+- `bpwstr_qr_code`
 - `turniere_logo`
 - `landingpage_background`
 - `tennis_blurred`
 
 Invalid keys are ignored by the frontend. Backend may validate them only after
 TUR-109 introduces media-pack records or an equivalent tournament media API.
+
+## Adding More Images (TUR-170)
+
+Add image files under `public/static/images/`, then register each image in
+`js/utils/beamerMedia.js` inside `BEAMER_MEDIA_IMAGES`:
+
+```js
+{
+    key: 'sponsor_banner',
+    label: 'Sponsor Banner',
+    src: '/static/images/sponsor-banner.jpg'
+}
+```
+
+Use a stable lowercase key. Mission Control reads this catalog for both
+`Statisches Bild` radio buttons and `Werbung` checkboxes. Fullscreen pages use
+the same key through beamer `config.image_key` or `config.werbung_image_keys`.
+No extra page wiring is needed after the catalog entry is added.
 
 ## TUR-109 Follow-Up Shape
 

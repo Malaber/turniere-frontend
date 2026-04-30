@@ -1,4 +1,5 @@
 export const WERBUNG_DISPLAY_MODE = 'werbung';
+export const STATIC_IMAGE_KEY_CONFIG_KEY = 'image_key';
 export const WERBUNG_IMAGE_KEYS_CONFIG_KEY = 'werbung_image_keys';
 export const WERBUNG_ROTATION_SECONDS_CONFIG_KEY = 'werbung_rotation_seconds';
 export const DEFAULT_WERBUNG_ROTATION_SECONDS = 10;
@@ -13,6 +14,11 @@ export const BEAMER_MEDIA_IMAGES = [
         key: 'bpwstr_logo',
         label: 'BPWSTR Logo',
         src: '/static/images/bpwstr_logo.png'
+    },
+    {
+        key: 'bpwstr_qr_code',
+        label: 'BPWSTR QR-Code',
+        src: '/static/images/bpwstr_qr_code.png'
     },
     {
         key: 'turniere_logo',
@@ -46,7 +52,7 @@ export function allBeamerMediaImageKeys() {
     return BEAMER_MEDIA_IMAGES.map(image => image.key);
 }
 
-export function sanitizeWerbungImageKeys(keys) {
+export function sanitizeBeamerMediaImageKeys(keys) {
     if (!Array.isArray(keys)) {
         return [];
     }
@@ -61,8 +67,12 @@ export function sanitizeWerbungImageKeys(keys) {
     });
 }
 
+export function sanitizeWerbungImageKeys(keys) {
+    return sanitizeBeamerMediaImageKeys(keys);
+}
+
 export function beamerMediaImagesForKeys(keys) {
-    return sanitizeWerbungImageKeys(keys).map(key => IMAGE_BY_KEY[key]);
+    return sanitizeBeamerMediaImageKeys(keys).map(key => IMAGE_BY_KEY[key]);
 }
 
 export function selectedWerbungImages(config) {

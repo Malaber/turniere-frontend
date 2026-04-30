@@ -86,9 +86,8 @@ async function holdStartUntilConfirmOpen(page: Page, button: Locator) {
   await button.hover();
   await page.mouse.down();
   await expectStartHoldProgressStarted(button);
-  await page.waitForTimeout(700);
+  await expect(page.getByTestId('mission-start-confirm-modal')).toBeVisible({ timeout: 3_000 });
   await page.mouse.up();
-  await expect(page.getByTestId('mission-start-confirm-modal')).toBeVisible();
 }
 
 async function holdMouseUntilUnlocked(page: Page, card: Locator) {
@@ -163,6 +162,7 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
   const checklist = card.getByTestId(`mission-beamer-werbung-checklist-${beamer.json.id}`);
   await expect(checklist).toBeVisible();
   await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_banner`)).toBeChecked();
+  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_qr_code`)).toBeChecked();
 
   const tennis = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis_blurred`);
   await tennis.click();
@@ -176,7 +176,7 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
     return updated?.config;
   }, { timeout: 20_000 }).toMatchObject({
     display_mode: 'werbung',
-    werbung_image_keys: expect.arrayContaining(['bpwstr_banner', 'bpwstr_logo']),
+    werbung_image_keys: expect.arrayContaining(['bpwstr_banner', 'bpwstr_logo', 'bpwstr_qr_code']),
   });
 
   await expect.poll(async () => {
@@ -192,7 +192,7 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
-  const client = await loggedInClient();
+  const client = new ApiClient(backendUrl);
 
   await page.goto(`/t/${tournament.id}/mission-control`);
   await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
@@ -357,6 +357,51 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page).toHaveURL(new RegExp(`/t/${tournament.id}$`), { timeout: 20_000 });
 });
 
+test('Mission Control stops and restarts a running match', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = await loggedInClient();
+  const groupStage = tournament.stages.find((stage) => stage.level === -1);
+  const runningMatch = groupStage!.groups[0].matches[0];
+  const teamNames = runningMatch.match_scores.map((score) => score.team!.name);
+
+  const started = await client.patch(`/matches/${runningMatch.id}`, { state: 'in_progress' });
+  expectStatus(started, 200, 'start match for stop control');
+
+  await page.goto(`/t/${tournament.id}/mission-control#scores`);
+  await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  const scoresPane = page.locator('.tab-pane.active');
+  await scoresPane.getByTestId('mission-control-search').fill(teamNames[0]);
+  const card = scoresPane
+    .getByTestId('mission-match-card')
+    .filter({ hasText: teamNames[0] })
+    .filter({ hasText: teamNames[1] });
+  await expect(card).toHaveCount(1);
+  await expect(card).toHaveAttribute('data-match-id', String(runningMatch.id));
+  await expect(card.getByTestId('mission-match-stop')).toBeVisible();
+  await expect(card.getByTestId('mission-match-save')).toBeEnabled();
+
+  await card.getByTestId('mission-match-stop').click();
+  await expect.poll(async () => {
+    const match = await client.get<{ state: string }>(`/matches/${runningMatch.id}`);
+    expectStatus(match, 200, 'fetch stopped match');
+    return match.json.state;
+  }, { timeout: 20_000 }).toBe('not_started');
+  await expect(card.getByText('Not Started')).toBeVisible({ timeout: 20_000 });
+  await expect(card.getByTestId('mission-match-start')).toBeVisible();
+  await expect(card.getByTestId('mission-match-stop')).toHaveCount(0);
+  await expect(card.getByTestId('mission-match-save')).toBeDisabled();
+
+  await card.getByTestId('mission-match-start').click();
+  await expect.poll(async () => {
+    const match = await client.get<{ state: string }>(`/matches/${runningMatch.id}`);
+    expectStatus(match, 200, 'fetch restarted match');
+    return match.json.state;
+  }, { timeout: 20_000 }).toBe('in_progress');
+  await expect(card.getByTestId('mission-match-stop')).toBeVisible({ timeout: 20_000 });
+  await expect(card.getByTestId('mission-match-save')).toBeEnabled();
+});
+
 test('Mission Control saves independent beamer display controls instantly', async ({ context, page }, testInfo) => {
   await injectAuth(context);
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -420,21 +465,24 @@ test('Mission Control saves independent beamer display controls instantly', asyn
   }, { timeout: 20_000 }).toBe('state:in_progress');
 
   await page.getByTestId(`mission-beamer-mode-${main.json.id}`).selectOption('static_image');
-  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId(`mission-beamer-image-${main.json.id}`).selectOption('bpwstr_logo');
-  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveValue('bpwstr_logo');
+  const staticImages = page.getByTestId(`mission-beamer-static-image-list-${main.json.id}`);
+  await expect(staticImages).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId(`mission-beamer-static-image-${main.json.id}-bpwstr_logo`)).toBeChecked();
+  await page.getByTestId(`mission-beamer-static-image-${main.json.id}-bpwstr_qr_code`).check();
+  await expect(page.getByTestId(`mission-beamer-static-image-${main.json.id}-bpwstr_qr_code`)).toBeChecked();
+  await expect(page.getByTestId(`mission-beamer-static-image-${main.json.id}-bpwstr_logo`)).not.toBeChecked();
   await expect.poll(async () => {
     const updated = await client.get<Array<{ id: number; config?: { image_key?: string } }>>(
       `/tournaments/${tournament.id}/beamers`,
     );
     expectStatus(updated, 200, 'fetch beamers after image update');
     return updated.json.find((beamer) => beamer.id === main.json.id)?.config?.image_key;
-  }, { timeout: 20_000 }).toBe('bpwstr_logo');
+  }, { timeout: 20_000 }).toBe('bpwstr_qr_code');
 
   await page.getByTestId(`mission-beamer-mode-${main.json.id}`).selectOption('timer_only');
   await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('timer_only');
   await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toHaveCount(0);
-  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveCount(0);
+  await expect(page.getByTestId(`mission-beamer-static-image-list-${main.json.id}`)).toHaveCount(0);
   await expect(page.getByTestId(`mission-beamer-timer-reason-${main.json.id}`)).toBeChecked({ timeout: 20_000 });
   await expect(page.getByText('Timer Only · Nur Timer')).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'beamer_timer_only_reason_setting');
@@ -733,12 +781,19 @@ test('Mission Control group tables match compact tournament standings columns', 
 
   const wideGeometry = await table.evaluate((el) => {
     const stage = el.closest('.mission-match-stage');
+    const cells = Array.from(el.querySelectorAll('tbody tr:first-child td')).map((cell) => (
+      (cell as HTMLElement).getBoundingClientRect().width
+    ));
     return {
       stageWidth: stage?.clientWidth ?? 0,
       tableWidth: el.clientWidth,
+      firstColumnWidth: cells[0] ?? 0,
+      widestStatColumnWidth: Math.max(...cells.slice(2), 0),
     };
   });
-  expect(wideGeometry.tableWidth).toBeLessThan(wideGeometry.stageWidth - 100);
+  expect(wideGeometry.tableWidth).toBeLessThanOrEqual(wideGeometry.stageWidth);
+  expect(wideGeometry.firstColumnWidth).toBeLessThanOrEqual(80);
+  expect(wideGeometry.widestStatColumnWidth).toBeLessThanOrEqual(100);
 
   await page.setViewportSize({ width: 520, height: 900 });
   const longName = table.getByTestId('team-name').filter({

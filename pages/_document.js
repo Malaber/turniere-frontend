@@ -8,7 +8,6 @@ class TurniereDocument extends Document {
                 <Head />
                 <body>
                     <Main />
-                    <script src="/turniere-runtime-config.js" />
                     <NextScript />
                 </body>
             </Html>

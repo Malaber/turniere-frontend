@@ -13,6 +13,16 @@ test('Landing page renders correctly without backend data', async ({ page }, tes
   // Hero text from BigImage component
   await expect(page.getByText('Einfach Turniere organisieren')).toBeVisible();
 
+  // Public beta feedback link
+  const betaWarning = page.getByRole('alert').filter({ hasText: 'Public Beta' });
+  await expect(betaWarning).toContainText('Bei Problemen oder Feedback fülle bitte dieses Formular aus.');
+  await expect(betaWarning.locator('a.alert-link')).toHaveCount(1);
+  await expect(betaWarning.locator('#bugLink')).toHaveCount(0);
+  await expect(betaWarning.locator('#feedbackLink')).toHaveAttribute(
+    'href',
+    'https://gitlab.com/turniere/turniere-frontend/-/issues/new',
+  );
+
   // Turniercode form
   await expect(page.locator('#turniercode-form')).toBeVisible();
   await expect(page.locator('#turniercode-form input[name="code"]')).toBeVisible();
