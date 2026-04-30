@@ -50,8 +50,11 @@ function Betawarning() {
         <h4 className="alert-heading custom-font">Public Beta</h4>
         <p>
             Diese Website ist noch in der Entwicklung.<br/>
-            Bei Problemen fülle bitte <a href="#" id="bugLink" className="alert-link">dieses </a>
-            und für Feedback <a href="#" id="feedbackLink" className="alert-link">dieses</a> Formular aus. </p>
+            Bei Problemen oder Feedback fülle bitte <a
+                href="https://gitlab.com/turniere/turniere-frontend/-/issues/new"
+                id="feedbackLink"
+                className="alert-link"
+            >dieses</a> Formular aus. </p>
     </Alert>);
 }
 
