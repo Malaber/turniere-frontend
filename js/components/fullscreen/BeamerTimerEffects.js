@@ -90,7 +90,6 @@ export class BeamerTimerEffects extends React.Component {
         this.audioPermissionStatus = 'unknown';
         this.lastSoundEffectCommandId = null;
         this.previousMsRemaining = null;
-        this.previousSecondsRemaining = null;
         this.timerSessionKey = null;
         this.finishedTriggered = false;
         this.finishConfettiTimeoutId = null;
@@ -179,7 +178,6 @@ export class BeamerTimerEffects extends React.Component {
         this.pendingElapsedSeconds = null;
         this.pendingPriority = null;
         this.previousMsRemaining = null;
-        this.previousSecondsRemaining = null;
         this.finishedTriggered = false;
         this.clearConfettiTimeouts();
         this.stopTimerSounds('timer-changed');
@@ -192,13 +190,11 @@ export class BeamerTimerEffects extends React.Component {
         const display = getTimerDisplay(timerState, Date.now());
         if (!display.active || display.mode !== TIMER_MODE_COUNTDOWN) {
             this.previousMsRemaining = null;
-            this.previousSecondsRemaining = null;
             this.finishedTriggered = false;
             this.stopTimerSounds('timer-inactive');
             return;
         }
 
-        const secondsRemaining = Math.floor(display.ms / 1000);
         if (display.ms === 0) {
             const crossedFinish = this.previousMsRemaining !== null &&
                 this.previousMsRemaining > 0;
@@ -207,24 +203,23 @@ export class BeamerTimerEffects extends React.Component {
                 this.scheduleConfettiFireworks();
             }
             this.previousMsRemaining = display.ms;
-            this.previousSecondsRemaining = secondsRemaining;
             return;
         }
 
         TIMER_EFFECT_CUES.forEach(cue => {
             if (this.firedCueKeys[cue.key]) return;
 
-            const cueStartSeconds = this.getCueStartSeconds(cue);
-            const elapsedSeconds = Math.max(0, cueStartSeconds - secondsRemaining);
+            const cueStartMs = this.getCueStartMs(cue);
+            const elapsedSeconds = Math.max(0, (cueStartMs - display.ms) / 1000);
             const canSyncFromElapsed = elapsedSeconds < cue.durationSeconds;
-            const crossedCue = this.previousSecondsRemaining !== null &&
-                this.previousSecondsRemaining > cueStartSeconds &&
-                secondsRemaining <= cueStartSeconds;
-            const loadedDuringCue = this.previousSecondsRemaining === null &&
-                secondsRemaining <= cueStartSeconds &&
+            const crossedCue = this.previousMsRemaining !== null &&
+                this.previousMsRemaining > cueStartMs &&
+                display.ms <= cueStartMs;
+            const loadedDuringCue = this.previousMsRemaining === null &&
+                display.ms <= cueStartMs &&
                 canSyncFromElapsed;
 
-            if (crossedCue || loadedDuringCue || secondsRemaining === cueStartSeconds) {
+            if (crossedCue || loadedDuringCue || display.ms === cueStartMs) {
                 this.firedCueKeys[cue.key] = true;
                 if (canSyncFromElapsed) {
                     this.playCue(cue, elapsedSeconds);
@@ -239,20 +234,22 @@ export class BeamerTimerEffects extends React.Component {
         });
 
         this.previousMsRemaining = display.ms;
-        this.previousSecondsRemaining = secondsRemaining;
     }
 
     getCueStartSeconds(cue) {
         return cue.secondsRemaining + cue.startOffsetSeconds;
     }
 
+    getCueStartMs(cue) {
+        return this.getCueStartSeconds(cue) * 1000;
+    }
+
     getElapsedSeconds(cue) {
         const display = getTimerDisplay(this.props.timerState, Date.now());
         if (!display.active || display.mode !== TIMER_MODE_COUNTDOWN) return null;
 
-        const secondsRemaining = Math.floor(display.ms / 1000);
-        const cueStartSeconds = this.getCueStartSeconds(cue);
-        const elapsedSeconds = Math.max(0, cueStartSeconds - secondsRemaining);
+        const cueStartMs = this.getCueStartMs(cue);
+        const elapsedSeconds = Math.max(0, (cueStartMs - display.ms) / 1000);
         if (elapsedSeconds >= cue.durationSeconds) return null;
 
         return elapsedSeconds;
