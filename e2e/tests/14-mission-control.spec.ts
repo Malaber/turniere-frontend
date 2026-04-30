@@ -163,6 +163,7 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
   const checklist = card.getByTestId(`mission-beamer-werbung-checklist-${beamer.json.id}`);
   await expect(checklist).toBeVisible();
   await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_banner`)).toBeChecked();
+  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_qr_code`)).toBeChecked();
 
   const tennis = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis_blurred`);
   await tennis.click();
@@ -176,7 +177,7 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
     return updated?.config;
   }, { timeout: 20_000 }).toMatchObject({
     display_mode: 'werbung',
-    werbung_image_keys: expect.arrayContaining(['bpwstr_banner', 'bpwstr_logo']),
+    werbung_image_keys: expect.arrayContaining(['bpwstr_banner', 'bpwstr_logo', 'bpwstr_qr_code']),
   });
 
   await expect.poll(async () => {
@@ -420,21 +421,24 @@ test('Mission Control saves independent beamer display controls instantly', asyn
   }, { timeout: 20_000 }).toBe('state:in_progress');
 
   await page.getByTestId(`mission-beamer-mode-${main.json.id}`).selectOption('static_image');
-  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId(`mission-beamer-image-${main.json.id}`).selectOption('bpwstr_logo');
-  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveValue('bpwstr_logo');
+  const staticImages = page.getByTestId(`mission-beamer-static-image-list-${main.json.id}`);
+  await expect(staticImages).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId(`mission-beamer-static-image-${main.json.id}-bpwstr_logo`)).toBeChecked();
+  await page.getByTestId(`mission-beamer-static-image-${main.json.id}-bpwstr_qr_code`).check();
+  await expect(page.getByTestId(`mission-beamer-static-image-${main.json.id}-bpwstr_qr_code`)).toBeChecked();
+  await expect(page.getByTestId(`mission-beamer-static-image-${main.json.id}-bpwstr_logo`)).not.toBeChecked();
   await expect.poll(async () => {
     const updated = await client.get<Array<{ id: number; config?: { image_key?: string } }>>(
       `/tournaments/${tournament.id}/beamers`,
     );
     expectStatus(updated, 200, 'fetch beamers after image update');
     return updated.json.find((beamer) => beamer.id === main.json.id)?.config?.image_key;
-  }, { timeout: 20_000 }).toBe('bpwstr_logo');
+  }, { timeout: 20_000 }).toBe('bpwstr_qr_code');
 
   await page.getByTestId(`mission-beamer-mode-${main.json.id}`).selectOption('timer_only');
   await expect(page.getByTestId(`mission-beamer-mode-${main.json.id}`)).toHaveValue('timer_only');
   await expect(page.getByTestId(`mission-beamer-match-${main.json.id}`)).toHaveCount(0);
-  await expect(page.getByTestId(`mission-beamer-image-${main.json.id}`)).toHaveCount(0);
+  await expect(page.getByTestId(`mission-beamer-static-image-list-${main.json.id}`)).toHaveCount(0);
   await expect(page.getByTestId(`mission-beamer-timer-reason-${main.json.id}`)).toBeChecked({ timeout: 20_000 });
   await expect(page.getByText('Timer Only · Nur Timer')).toBeVisible({ timeout: 20_000 });
   await keyframe(page, testInfo, 'beamer_timer_only_reason_setting');

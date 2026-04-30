@@ -20,6 +20,7 @@ import {WerbungView} from '../js/components/fullscreen/WerbungView';
 import {
     beamerMediaImageForKey,
     selectedWerbungImages,
+    STATIC_IMAGE_KEY_CONFIG_KEY,
     WERBUNG_DISPLAY_MODE,
     werbungRotationMs
 } from '../js/utils/beamerMedia';
@@ -527,8 +528,11 @@ class Main extends React.Component {
         case 'static_image':
             return <div className="fullscreen-static-image">
                 <img
-                    src={beamerMediaImageForKey((this.state.beamerConfig || {}).image_key).src}
+                    src={beamerMediaImageForKey(
+                        (this.state.beamerConfig || {})[STATIC_IMAGE_KEY_CONFIG_KEY]
+                    ).src}
                     alt=""
+                    data-testid="beamer-static-image"
                 />
                 <style jsx>{`
                     .fullscreen-static-image {
