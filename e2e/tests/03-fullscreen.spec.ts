@@ -104,7 +104,8 @@ async function expectGroupTablesQrCode(page: Page): Promise<void> {
 
   expect(Math.abs(qrCodeCenterX - qrCardCenterX)).toBeLessThanOrEqual(2);
   expect(Math.abs(qrCodeCenterY - qrCardCenterY)).toBeLessThanOrEqual(2);
-  expect(Math.abs(qrCardBox!.y - groupCardBox!.y)).toBeLessThanOrEqual(4);
+  expect(Math.abs(qrCardBox!.x - groupCardBox!.x)).toBeLessThanOrEqual(4);
+  expect(Math.abs(qrCardBox!.width - groupCardBox!.width)).toBeLessThanOrEqual(4);
   expect(qrCodeBox!.width).toBeGreaterThanOrEqual(280);
   expect(qrCodeBox!.height).toBeGreaterThanOrEqual(280);
 }
