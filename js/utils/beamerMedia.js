@@ -21,19 +21,14 @@ export const BEAMER_MEDIA_IMAGES = [
         src: '/static/images/bpwstr_qr_code.png'
     },
     {
-        key: 'turniere_logo',
-        label: 'Turnie Logo',
-        src: '/static/images/logo-questionmark.png'
+        key: 'Merch_Werbebanner',
+        label: 'Merch_Werbebanner',
+        src: '/static/images/Merch_Werbebanner.png'
     },
     {
-        key: 'landingpage_background',
-        label: 'Landingpage Hintergrund',
-        src: '/static/images/landingpage-background.jpg'
-    },
-    {
-        key: 'tennis_blurred',
-        label: 'Tennis Hintergrund',
-        src: '/static/images/tennis-blurred.jpg'
+        key: 'Schorlepongturnier_Werbebanner',
+        label: 'Schorlepongturnier_Werbebanner',
+        src: '/static/images/Schorlepongturnier_Werbebanner.png'
     }
 ];
 
