@@ -470,6 +470,54 @@ test('Mission Control stops and restarts a running match', async ({ context, pag
   await expect(card.getByTestId('mission-match-save')).toBeEnabled();
 });
 
+test('Mission Control keeps Ergebnisse search pinned while scrolling scores', async ({
+  context,
+  page,
+}, testInfo) => {
+  await injectAuth(context);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const { tournament } = await seedGroupStageTournament(8, 4, 8);
+
+  await page.goto(`/t/${tournament.id}/mission-control#scores`);
+  await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  const scoresPane = page.locator('.tab-pane.active');
+  const toolbar = scoresPane.locator('.mission-match-toolbar');
+  const search = scoresPane.getByTestId('mission-control-search');
+  await expect(search).toBeVisible();
+  await expect(toolbar).toHaveCSS('position', 'sticky');
+  await expect.poll(async () => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight), {
+    timeout: 5_000,
+  }).toBeGreaterThan(400);
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight / 2));
+  await expect.poll(async () => toolbar.evaluate((el) => Math.round(el.getBoundingClientRect().top)), {
+    timeout: 5_000,
+  }).toBeLessThanOrEqual(4);
+  const pinnedGeometry = await toolbar.evaluate((el) => {
+    const rect = el.getBoundingClientRect();
+    const inputRect = el.querySelector('[data-testid="mission-control-search"]')?.getBoundingClientRect();
+    return {
+      top: Math.round(rect.top),
+      bottom: Math.round(rect.bottom),
+      inputTop: Math.round(inputRect?.top ?? -1),
+      inputBottom: Math.round(inputRect?.bottom ?? -1),
+      inputWidth: Math.round(inputRect?.width ?? 0),
+      viewportHeight: window.innerHeight,
+    };
+  });
+
+  expect(pinnedGeometry.top).toBeGreaterThanOrEqual(0);
+  expect(pinnedGeometry.bottom).toBeLessThan(pinnedGeometry.viewportHeight);
+  expect(pinnedGeometry.inputTop).toBeGreaterThanOrEqual(pinnedGeometry.top);
+  expect(pinnedGeometry.inputBottom).toBeLessThanOrEqual(pinnedGeometry.bottom);
+  expect(pinnedGeometry.inputWidth).toBeGreaterThan(220);
+
+  await search.fill('gruppe 8');
+  await expect(scoresPane.getByRole('heading', { name: 'Gruppe 8 6 Matches' })).toBeVisible();
+  await expect(scoresPane.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).toHaveCount(0);
+  await keyframe(page, testInfo, 'mission_control_scores_search_pinned');
+});
+
 test('Mission Control saves independent beamer display controls instantly', async ({ context, page }, testInfo) => {
   await injectAuth(context);
   await page.setViewportSize({ width: 1440, height: 1000 });
