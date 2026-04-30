@@ -1,5 +1,5 @@
 import { test, expect, Page, devices } from '@playwright/test';
-import { installBeamerEffectSpies, waitForBeamerEffect } from '../helpers/beamer-audio';
+import { countBeamerEffects, installBeamerEffectSpies, waitForBeamerEffect } from '../helpers/beamer-audio';
 import { waitForActionCableSubscription } from '../helpers/action-cable';
 import { keyframe } from '../helpers/screenshot';
 import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
@@ -355,7 +355,7 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
 
   const finishedText = page.locator('[class*="timerFinished"]');
   await expect(finishedText).toBeVisible({ timeout: 15_000 });
-  await waitForBeamerEffect(page, 'confetti');
+  await waitForBeamerEffect(page, 'confetti', undefined, 3);
   await keyframe(page, testInfo, 'timer_finished_confetti');
 
   const effectEvents = await page.evaluate(() => (window as any).__beamerTimerEffects.events);
@@ -389,6 +389,40 @@ test('Beamer timer syncs sound files and fires confetti on finish', async ({ pag
   const confetti = effectEvents.find((event) => event.type === 'confetti');
   expect(finishStop).toBeFalsy();
   expect(confetti).toBeTruthy();
+  const confettiBursts = effectEvents.filter((event) => event.type === 'confetti');
+  expect(confettiBursts.length).toBeGreaterThanOrEqual(3);
+  expect(confettiBursts.every((event) => event.style === 'firework')).toBe(true);
+  expect(confettiBursts.every((event) =>
+    event.origin &&
+    event.origin.x >= 0 &&
+    event.origin.x <= 1 &&
+    event.origin.y >= 0 &&
+    event.origin.y <= 1,
+  )).toBe(true);
+  const uniqueOrigins = new Set(confettiBursts.map((event) =>
+    `${event.origin.x.toFixed(3)}:${event.origin.y.toFixed(3)}`,
+  ));
+  expect(uniqueOrigins.size).toBeGreaterThan(1);
+});
+
+test('Beamer confetti does not fire when expired timer loads', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await installBeamerEffectSpies(page);
+
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(4, {
+    beamerName: 'timer-only-expired',
+    displayState: 'timer_only',
+    timerSeconds: 1,
+  });
+
+  await page.waitForTimeout(1_500);
+
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+  await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/Spiel vorbei!/)).toBeVisible({ timeout: 5_000 });
+  await page.waitForTimeout(1_000);
+  expect(await countBeamerEffects(page, 'confetti')).toBe(0);
 });
 
 test('Timer-only beamer renders urgent timer without matches and keeps sound active', async ({ page }, testInfo) => {
