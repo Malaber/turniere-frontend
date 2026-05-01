@@ -551,23 +551,30 @@ test('Mission Control keeps Ergebnisse search pinned while scrolling scores', as
     timeout: 5_000,
   }).toBeGreaterThan(400);
 
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight / 2));
-  await expect.poll(async () => toolbar.evaluate((el) => {
-    const navbar = document.querySelector('.navbar.sticky-top');
-    const navbarBottom = navbar?.getBoundingClientRect().bottom ?? 0;
-    return Math.round(el.getBoundingClientRect().top - navbarBottom);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(async () => page.evaluate(() => {
+    window.scrollBy(0, Math.max(200, Math.round(window.innerHeight / 2)));
+    const toolbarElement = document.querySelector('.tab-pane.active .mission-match-toolbar');
+    if (!toolbarElement) {
+      return Number.POSITIVE_INFINITY;
+    }
+    const toolbarTop = toolbarElement.getBoundingClientRect().top;
+    const stickyTop = Number.parseFloat(window.getComputedStyle(toolbarElement).top);
+    return Math.abs(Math.round(toolbarTop - stickyTop));
   }), {
     timeout: 5_000,
-  }).toBeGreaterThanOrEqual(4);
+  }).toBeLessThanOrEqual(2);
   const pinnedGeometry = await toolbar.evaluate((el) => {
     const navbar = document.querySelector('.navbar.sticky-top');
     const navbarBottom = navbar?.getBoundingClientRect().bottom ?? 0;
     const rect = el.getBoundingClientRect();
+    const stickyTop = Number.parseFloat(window.getComputedStyle(el).top);
     const inputRect = el.querySelector('[data-testid="mission-control-search"]')?.getBoundingClientRect();
     return {
       top: Math.round(rect.top),
       bottom: Math.round(rect.bottom),
       navbarBottom: Math.round(navbarBottom),
+      stickyTop: Math.round(stickyTop),
       inputTop: Math.round(inputRect?.top ?? -1),
       inputBottom: Math.round(inputRect?.bottom ?? -1),
       inputWidth: Math.round(inputRect?.width ?? 0),
@@ -575,8 +582,10 @@ test('Mission Control keeps Ergebnisse search pinned while scrolling scores', as
     };
   });
 
-  expect(pinnedGeometry.top).toBeGreaterThanOrEqual(pinnedGeometry.navbarBottom + 4);
-  expect(pinnedGeometry.top).toBeLessThanOrEqual(pinnedGeometry.navbarBottom + 24);
+  expect(pinnedGeometry.top).toBeGreaterThanOrEqual(pinnedGeometry.stickyTop - 2);
+  expect(pinnedGeometry.top).toBeLessThanOrEqual(pinnedGeometry.stickyTop + 2);
+  expect(pinnedGeometry.stickyTop).toBeGreaterThanOrEqual(pinnedGeometry.navbarBottom + 4);
+  expect(pinnedGeometry.stickyTop).toBeLessThanOrEqual(pinnedGeometry.navbarBottom + 24);
   expect(pinnedGeometry.bottom).toBeLessThan(pinnedGeometry.viewportHeight);
   expect(pinnedGeometry.inputTop).toBeGreaterThanOrEqual(pinnedGeometry.top);
   expect(pinnedGeometry.inputBottom).toBeLessThanOrEqual(pinnedGeometry.bottom);
