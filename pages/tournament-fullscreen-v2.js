@@ -17,6 +17,7 @@ import {BetweenGamesView} from '../js/components/fullscreen/BetweenGamesView';
 import {BeamerTimerEffects} from '../js/components/fullscreen/BeamerTimerEffects';
 import {TimerOnlyView} from '../js/components/fullscreen/TimerOnlyView';
 import {WerbungView} from '../js/components/fullscreen/WerbungView';
+import {NextMatchesView} from '../js/components/fullscreen/NextMatchesView';
 import {
     beamerMediaImageForKey,
     selectedWerbungImages,
@@ -25,6 +26,8 @@ import {
     werbungRotationMs
 } from '../js/utils/beamerMedia';
 
+
+const NEXT_MATCHES_DISPLAY_MODE = 'next_matches';
 
 const DISPLAY_STATE_LABELS = {
     'matches_all': 'alle',
@@ -36,6 +39,7 @@ const DISPLAY_STATE_LABELS = {
     'group_tables': 'Gruppenstand',
     'between_games': 'Zwischen den Spielen',
     'during_game': 'Während dem Spiel',
+    'next_matches': 'Nächste Spiele',
     'timer_only': 'Nur Timer',
     'static_image': 'Statisches Bild',
     'werbung': 'Werbung'
@@ -49,6 +53,7 @@ const DEFAULT_DISPLAY_STATE_FILTERS = {
     'matches_finished': {state: 'finished'},
     'during_game': {state: 'in_progress'},
     'between_games': {},
+    'next_matches': {},
     'timer_only': {},
     'groups': {},
     'group_tables': {},
@@ -101,6 +106,9 @@ function displayStateForBeamer(beamer) {
     }
     if (beamer && beamer.config && beamer.config.display_mode === 'timer_only') {
         return 'timer_only';
+    }
+    if (beamer && beamer.config && beamer.config.display_mode === NEXT_MATCHES_DISPLAY_MODE) {
+        return 'next_matches';
     }
     if (beamer && beamer.config && beamer.config.display_mode === WERBUNG_DISPLAY_MODE) {
         return 'werbung';
@@ -537,6 +545,10 @@ class Main extends React.Component {
             return <BetweenGamesView
                 tournamentMeta={tournamentMeta}
                 matches={this.state.loadedMatches ? matches : null}
+                timerState={timerState}/>;
+        case 'next_matches':
+            return <NextMatchesView
+                tournament={tournament}
                 timerState={timerState}/>;
         case 'static_image':
             return <div className="fullscreen-static-image">

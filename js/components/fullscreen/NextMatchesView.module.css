@@ -1,0 +1,114 @@
+.page {
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    inset: 0;
+    max-height: 100vh;
+    padding: 1.2rem 1.5rem;
+    position: fixed;
+    width: 100vw;
+}
+
+.header {
+    align-items: flex-start;
+    border-bottom: 3px solid #0055b8;
+    display: flex;
+    flex-shrink: 0;
+    gap: 1.5rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    min-height: 4.8rem;
+    padding-bottom: 0.65rem;
+}
+
+.title {
+    color: #0b1f33;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: clamp(1.8rem, 2.7vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: 0;
+    line-height: 1.05;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.headerTimer {
+    align-items: flex-end;
+    color: #0b1f33;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    gap: 0.15rem;
+    line-height: 1;
+    max-width: 38vw;
+    text-align: right;
+}
+
+.timerReason {
+    color: rgba(11, 31, 51, 0.72);
+    font-size: clamp(0.8rem, 1.1vw, 1.25rem);
+    font-weight: 700;
+    letter-spacing: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.timerValue {
+    color: #0055b8;
+    font-size: clamp(1.6rem, 2.6vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+.matchGrid {
+    display: grid;
+    flex: 1;
+    gap: 0.5rem;
+    grid-auto-flow: column;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(8, minmax(0, 1fr));
+    min-height: 0;
+}
+
+.loading,
+.empty {
+    align-items: center;
+    color: rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex: 1;
+    font-size: 1.1rem;
+    justify-content: center;
+    min-height: 0;
+}
+
+.empty {
+    font-style: italic;
+}
+
+@media (max-aspect-ratio: 3 / 4) {
+    .page {
+        padding: 0.85rem 0.75rem;
+    }
+
+    .header {
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+        min-height: 4.1rem;
+        padding-bottom: 0.5rem;
+    }
+
+    .headerTimer {
+        max-width: 44vw;
+    }
+
+    .matchGrid {
+        gap: 0.35rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(16, minmax(0, 1fr));
+    }
+}

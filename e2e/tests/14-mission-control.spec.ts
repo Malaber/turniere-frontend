@@ -205,6 +205,44 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
   }, { timeout: 20_000 }).toEqual(expect.arrayContaining(defaultImageKeys));
 });
 
+test('Mission Control configures Next Matches beamer mode', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = await loggedInClient();
+
+  const beamer = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
+    name: 'next-control',
+    display_state: 'during_game',
+    config: { match_filter: 'state:finished' },
+  });
+  expectStatus(beamer, 201, 'create next-control beamer');
+
+  await page.goto(`/t/${tournament.id}/mission-control#beamer`);
+  const card = page.getByTestId(`mission-beamer-card-${beamer.json.id}`);
+  await expect(card).toBeVisible({ timeout: 20_000 });
+
+  await card.getByTestId(`mission-beamer-mode-${beamer.json.id}`).selectOption('next_matches');
+
+  await expect.poll(async () => {
+    const beamers = await client.get<Array<{
+      id: number;
+      display_state: string;
+      config: { display_mode?: string; match_filter?: string };
+    }>>(`/tournaments/${tournament.id}/beamers`);
+    expectStatus(beamers, 200, 'fetch beamers after next matches mode change');
+    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
+    return {
+      displayState: updated?.display_state,
+      displayMode: updated?.config.display_mode,
+      matchFilter: updated?.config.match_filter ?? null,
+    };
+  }, { timeout: 20_000 }).toEqual({
+    displayState: 'between_games',
+    displayMode: 'next_matches',
+    matchFilter: null,
+  });
+});
+
 test('Mission Control loads transaction log lazily in Verlauf tab', async ({ context, page }) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(2, 4, 4);
