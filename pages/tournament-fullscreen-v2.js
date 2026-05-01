@@ -212,6 +212,22 @@ class Main extends React.Component {
         this.onMatchesMessage = this.onMatchesMessage.bind(this);
     }
 
+    shouldResetMatchesFor(nextDisplayState, nextConfig) {
+        if (!displayStateUsesMatches(nextDisplayState)) {
+            return false;
+        }
+        if (!this.state.loadedMatches) {
+            return true;
+        }
+        if (nextDisplayState !== this.state.displayState) {
+            return true;
+        }
+
+        const currentFilterKey = filterKey(filtersForDisplayState(this.state.displayState, this.state.beamerConfig));
+        const nextFilterKey = filterKey(filtersForDisplayState(nextDisplayState, nextConfig));
+        return currentFilterKey !== nextFilterKey;
+    }
+
     componentDidMount() {
         document.body.classList.add('hide-cursor');
         const code = this.props.query.code;
@@ -362,11 +378,15 @@ class Main extends React.Component {
     refreshBeamerConfig(code, beamerName) {
         getBeamerByName(code, beamerName,
             (status, beamer) => {
+                const nextDisplayState = displayStateForBeamer(beamer);
+                const nextConfig = beamer.config || null;
                 this.setState({
-                    displayState: displayStateForBeamer(beamer),
-                    beamerConfig: beamer.config || null,
+                    displayState: nextDisplayState,
+                    beamerConfig: nextConfig,
                     beamerName: beamer.name,
-                    loadedMatches: false
+                    loadedMatches: this.shouldResetMatchesFor(nextDisplayState, nextConfig) ?
+                        false :
+                        this.state.loadedMatches
                 }, () => {
                     this.connectBeamerSocket(beamer.name);
                     this.updateMatches();
@@ -401,11 +421,15 @@ class Main extends React.Component {
         }
 
         const reconnectNeeded = this.state.beamerName !== beamer.name;
+        const nextDisplayState = displayStateForBeamer(beamer);
+        const nextConfig = beamer.config || null;
         this.setState({
-            displayState: displayStateForBeamer(beamer),
-            beamerConfig: beamer.config || null,
+            displayState: nextDisplayState,
+            beamerConfig: nextConfig,
             beamerName: beamer.name,
-            loadedMatches: false
+            loadedMatches: this.shouldResetMatchesFor(nextDisplayState, nextConfig) ?
+                false :
+                this.state.loadedMatches
         }, () => {
             if (reconnectNeeded) {
                 this.connectBeamerSocket(beamer.name);

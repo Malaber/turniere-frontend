@@ -429,6 +429,24 @@ test('Next matches beamer shows static 32-card 1080p layout and live updates', a
   await expect(cards.first()).toContainText('G1-S1');
   await expect(cards.first()).toContainText('G1-S2');
 
+  await page.evaluate(() => {
+    const counts: number[] = [];
+    (window as any).__nextMatchesCardCounts = counts;
+    const root = document.querySelector('[data-testid="next-matches-view"]');
+    const record = () => {
+      counts.push(document.querySelectorAll('[data-testid="fullscreen-match-card"]').length);
+    };
+    record();
+    if (root) {
+      new MutationObserver(record).observe(root, { childList: true, subtree: true });
+    }
+  });
+  await page.waitForTimeout(3_500);
+  const minimumCardCountDuringPoll = await page.evaluate(() => (
+    Math.min(...((window as any).__nextMatchesCardCounts || []))
+  ));
+  expect(minimumCardCountDuringPoll).toBe(32);
+
   const firstBadge = cards.first().getByTestId('fullscreen-match-badge');
   await expect(firstBadge).toHaveText('1');
   await expect(firstBadge).toHaveAttribute('data-match-badge-kind', 'group');
