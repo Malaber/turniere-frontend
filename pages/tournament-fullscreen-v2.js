@@ -96,7 +96,8 @@ function displayStateUsesMatches(displayState) {
         'matches_not_started',
         'matches_finished',
         'during_game',
-        'between_games'
+        'between_games',
+        'next_matches'
     ].indexOf(displayState) !== -1;
 }
 
@@ -548,7 +549,7 @@ class Main extends React.Component {
                 timerState={timerState}/>;
         case 'next_matches':
             return <NextMatchesView
-                tournament={tournament}
+                matches={this.state.loadedMatches ? matches : null}
                 timerState={timerState}/>;
         case 'static_image':
             return <div className="fullscreen-static-image">

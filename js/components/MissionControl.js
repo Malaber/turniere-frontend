@@ -945,7 +945,6 @@ class MissionBeamer extends React.Component {
         } else if (mode.configDisplayMode) {
             config.display_mode = mode.configDisplayMode;
             delete config.show_timer_reason;
-            delete config.match_filter;
         } else {
             delete config.display_mode;
             delete config.show_timer_reason;
@@ -958,7 +957,9 @@ class MissionBeamer extends React.Component {
 
     updateMatchSelection(beamer, value) {
         const config = Object.assign({}, beamer.config || {}, {match_filter: value});
-        delete config.display_mode;
+        if (beamerModeFor(beamer) !== 'next_matches') {
+            delete config.display_mode;
+        }
         delete config.show_timer_reason;
         this.update(beamer, {
             config
@@ -1109,7 +1110,8 @@ class MissionBeamer extends React.Component {
                                         </Input>
                                     </FormGroup>
 
-                                    {(mode === 'during_game' || mode === 'between_games') &&
+                                    {(mode === 'during_game' || mode === 'between_games' ||
+                                        mode === 'next_matches') &&
                                         <FormGroup>
                                             <Label for={'missionBeamerMatch' + beamer.id}>Matchauswahl</Label>
                                             <Input

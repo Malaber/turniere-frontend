@@ -407,7 +407,7 @@ test('Next matches beamer shows static 32-card 1080p layout and live updates', a
   const beamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
     name: 'next-matches',
     display_state: 'between_games',
-    config: { display_mode: 'next_matches' },
+    config: { display_mode: 'next_matches', match_filter: 'state:not_started' },
   });
   expectStatus(beamer, 201, 'create next matches beamer');
 
@@ -448,8 +448,9 @@ test('Next matches beamer shows static 32-card 1080p layout and live updates', a
   await keyframe(page, testInfo, 'next_matches_32_cards_1080p');
 
   await waitForActionCableSubscription(page, {
-    channel: 'TournamentChannel',
+    channel: 'TournamentMatchesChannel',
     tournament_id: tournament.id,
+    state: 'not_started',
   });
 
   const firstMatchId = await cards.first().getAttribute('data-match-id');
@@ -472,7 +473,7 @@ test('Next matches beamer shows static 32-card 1080p layout and live updates', a
   const playoffBeamer = await client.post(`/tournaments/${playoffTournament.id}/beamers`, {
     name: 'next-playoff',
     display_state: 'between_games',
-    config: { display_mode: 'next_matches' },
+    config: { display_mode: 'next_matches', match_filter: 'state:not_started' },
   });
   expectStatus(playoffBeamer, 201, 'create next playoff beamer');
 
@@ -482,6 +483,67 @@ test('Next matches beamer shows static 32-card 1080p layout and live updates', a
   const playoffBadge = playoffCard.getByTestId('fullscreen-match-badge');
   await expect(playoffBadge).toHaveText(String(playoffMatch!.position + 1));
   await expect(playoffBadge).toHaveAttribute('data-match-badge-kind', 'position');
+});
+
+test('Next matches beamer honors filters for running and finished cards', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(1, 4, 2);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const matches = await client.get<ApiMatchForBadge[]>(`/tournaments/${tournament.id}/matches`);
+  expectStatus(matches, 200, 'fetch next matches filter candidates');
+  const candidates = matches.json.filter((match) =>
+    match.state === 'not_started' && match.match_scores.length === 2
+  );
+  expect(candidates.length).toBeGreaterThanOrEqual(2);
+  const runningMatch = candidates[0];
+  const finishedMatch = candidates[1];
+
+  const running = await client.patch(`/matches/${runningMatch.id}`, { state: 'in_progress' });
+  expectStatus(running, 200, 'start running next match');
+
+  const startFinished = await client.patch(`/matches/${finishedMatch.id}`, { state: 'in_progress' });
+  expectStatus(startFinished, 200, 'start finished next match');
+  for (const [index, score] of finishedMatch.match_scores.entries()) {
+    const scored = await client.patch(`/match_scores/${score.id}`, { points: index === 0 ? 10 : 2 });
+    expectStatus(scored, 200, `score finished next match ${score.id}`);
+  }
+  const finished = await client.patch(`/matches/${finishedMatch.id}`, { state: 'finished' });
+  expectStatus(finished, 200, 'finish next match');
+
+  const runningBeamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'next-running',
+    display_state: 'between_games',
+    config: { display_mode: 'next_matches', match_filter: 'state:in_progress' },
+  });
+  expectStatus(runningBeamer, 201, 'create running next matches beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=next-running`);
+  const runningCard = page.locator(`[data-match-id="${runningMatch.id}"]`);
+  await expect(runningCard).toBeVisible({ timeout: 20_000 });
+  await expect(runningCard).toHaveAttribute('data-match-state', 'in_progress');
+  await expect.poll(async () => runningCard.evaluate((node) => (
+    window.getComputedStyle(node).backgroundColor
+  )), { timeout: 10_000 }).toBe('rgb(255, 243, 205)');
+  await keyframe(page, testInfo, 'next_matches_running_filter');
+
+  const finishedBeamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'next-finished',
+    display_state: 'between_games',
+    config: { display_mode: 'next_matches', match_filter: 'state:finished' },
+  });
+  expectStatus(finishedBeamer, 201, 'create finished next matches beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=next-finished`);
+  const finishedCard = page.locator(`[data-match-id="${finishedMatch.id}"]`);
+  await expect(finishedCard).toBeVisible({ timeout: 20_000 });
+  await expect(finishedCard).toHaveAttribute('data-match-state', 'finished');
+  await expect.poll(async () => finishedCard.evaluate((node) => (
+    window.getComputedStyle(node).backgroundColor
+  )), { timeout: 10_000 }).toBe('rgb(209, 231, 221)');
+  await keyframe(page, testInfo, 'next_matches_finished_filter');
 });
 
 test('Fullscreen match list receives live match snapshots', async ({ page }, testInfo) => {

@@ -239,7 +239,31 @@ test('Mission Control configures Next Matches beamer mode', async ({ context, pa
   }, { timeout: 20_000 }).toEqual({
     displayState: 'between_games',
     displayMode: 'next_matches',
-    matchFilter: null,
+    matchFilter: 'state:finished',
+  });
+
+  const matchSelect = card.getByTestId(`mission-beamer-match-${beamer.json.id}`);
+  await expect(matchSelect).toBeVisible({ timeout: 20_000 });
+  await expect(matchSelect).toHaveValue('state:finished');
+  await matchSelect.selectOption('state:in_progress');
+
+  await expect.poll(async () => {
+    const beamers = await client.get<Array<{
+      id: number;
+      display_state: string;
+      config: { display_mode?: string; match_filter?: string };
+    }>>(`/tournaments/${tournament.id}/beamers`);
+    expectStatus(beamers, 200, 'fetch beamers after next matches filter change');
+    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
+    return {
+      displayState: updated?.display_state,
+      displayMode: updated?.config.display_mode,
+      matchFilter: updated?.config.match_filter ?? null,
+    };
+  }, { timeout: 20_000 }).toEqual({
+    displayState: 'between_games',
+    displayMode: 'next_matches',
+    matchFilter: 'state:in_progress',
   });
 });
 

@@ -10,32 +10,6 @@ import styles from './NextMatchesView.module.css';
 const MAX_MATCHES = 32;
 
 
-function hasTwoTeams(match) {
-    return match && match.team1 && match.team2 &&
-        match.team1.name && match.team2.name &&
-        match.team1.name !== 'TBD' && match.team2.name !== 'TBD';
-}
-
-function nextGroupStageMatches(tournament) {
-    const groups = tournament && tournament.groupStage && tournament.groupStage.state !== 'finished' ?
-        tournament.groupStage.groups :
-        [];
-
-    return (groups || [])
-        .flatMap(group => (group.matches || []).map(match => ({
-            ...match,
-            group: match.group || {id: group.id, number: group.number}
-        })));
-}
-
-function nextPlayoffMatches(tournament) {
-    return (tournament && tournament.playoffStages ? tournament.playoffStages : [])
-        .flatMap(stage => (stage.matches || []).map(match => ({
-            ...match,
-            stageLevel: stage.level
-        })));
-}
-
 function sortNextMatches(left, right) {
     const leftGroup = left.group ? left.group.number : null;
     const rightGroup = right.group ? right.group.number : null;
@@ -54,18 +28,13 @@ function sortNextMatches(left, right) {
     return sortMatchesByPositionAscending()(left, right);
 }
 
-export function nextMatchesForTournament(tournament) {
-    if (!tournament) {
+export function visibleNextMatches(matches) {
+    if (!Array.isArray(matches)) {
         return null;
     }
 
-    const groupMatches = nextGroupStageMatches(tournament);
-    const sourceMatches = groupMatches.length > 0 ?
-        groupMatches :
-        nextPlayoffMatches(tournament);
-
-    return sourceMatches
-        .filter(match => match.state === 'not_started' && hasTwoTeams(match))
+    return matches
+        .slice()
         .sort(sortNextMatches)
         .slice(0, MAX_MATCHES);
 }
@@ -85,10 +54,10 @@ function HeaderTimer({timerState}) {
     );
 }
 
-export function NextMatchesView({tournament, timerState}) {
-    const matches = nextMatchesForTournament(tournament);
+export function NextMatchesView({matches, timerState}) {
+    const visibleMatches = visibleNextMatches(matches);
 
-    if (matches === null) {
+    if (visibleMatches === null) {
         return (
             <div className={styles.page}>
                 <div className={styles.loading}>
@@ -109,13 +78,13 @@ export function NextMatchesView({tournament, timerState}) {
                 <HeaderTimer timerState={timerState}/>
             </div>
 
-            {matches.length === 0 ? (
+            {visibleMatches.length === 0 ? (
                 <div className={styles.empty}>
                     keine Matches
                 </div>
             ) : (
                 <div className={styles.matchGrid} data-testid="next-matches-grid">
-                    {matches.map((match, index) => (
+                    {visibleMatches.map((match, index) => (
                         <FullscreenMatchCard
                             key={match.id}
                             match={match}
