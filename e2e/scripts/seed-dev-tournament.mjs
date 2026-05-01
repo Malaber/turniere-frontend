@@ -172,6 +172,7 @@ async function main() {
   // Create beamers for all display states
   const beamers = [
     { name: 'between', display_state: 'between_games' },
+    { name: 'next', display_state: 'between_games', config: { display_mode: 'next_matches' } },
     { name: 'during', display_state: 'during_game' },
     { name: 'timer', display_state: 'during_game', config: { display_mode: 'timer_only' } },
     { name: 'groups', display_state: 'group_tables' },
@@ -207,6 +208,7 @@ async function main() {
   console.log(`  Mission Control:   ${frontendUrl}/t/${tournamentId}/mission-control`);
   console.log(`  Fullscreen:        ${frontendUrl}/t/${tournamentId}/fullscreen`);
   console.log(`  Between games:     ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=between`);
+  console.log(`  Next matches:      ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=next`);
   console.log(`  During game:       ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=during`);
   console.log(`  Timer only:        ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=timer`);
   console.log(`  Groups:            ${frontendUrl}/t/${tournamentId}/fullscreen?beamer=groups`);

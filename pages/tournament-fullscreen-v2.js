@@ -17,6 +17,7 @@ import {BetweenGamesView} from '../js/components/fullscreen/BetweenGamesView';
 import {BeamerTimerEffects} from '../js/components/fullscreen/BeamerTimerEffects';
 import {TimerOnlyView} from '../js/components/fullscreen/TimerOnlyView';
 import {WerbungView} from '../js/components/fullscreen/WerbungView';
+import {NextMatchesView} from '../js/components/fullscreen/NextMatchesView';
 import {
     beamerMediaImageForKey,
     selectedWerbungImages,
@@ -25,6 +26,8 @@ import {
     werbungRotationMs
 } from '../js/utils/beamerMedia';
 
+
+const NEXT_MATCHES_DISPLAY_MODE = 'next_matches';
 
 const DISPLAY_STATE_LABELS = {
     'matches_all': 'alle',
@@ -36,6 +39,7 @@ const DISPLAY_STATE_LABELS = {
     'group_tables': 'Gruppenstand',
     'between_games': 'Zwischen den Spielen',
     'during_game': 'Während dem Spiel',
+    'next_matches': 'Nächste Spiele',
     'timer_only': 'Nur Timer',
     'static_image': 'Statisches Bild',
     'werbung': 'Werbung'
@@ -49,6 +53,7 @@ const DEFAULT_DISPLAY_STATE_FILTERS = {
     'matches_finished': {state: 'finished'},
     'during_game': {state: 'in_progress'},
     'between_games': {},
+    'next_matches': {},
     'timer_only': {},
     'groups': {},
     'group_tables': {},
@@ -91,7 +96,8 @@ function displayStateUsesMatches(displayState) {
         'matches_not_started',
         'matches_finished',
         'during_game',
-        'between_games'
+        'between_games',
+        'next_matches'
     ].indexOf(displayState) !== -1;
 }
 
@@ -101,6 +107,9 @@ function displayStateForBeamer(beamer) {
     }
     if (beamer && beamer.config && beamer.config.display_mode === 'timer_only') {
         return 'timer_only';
+    }
+    if (beamer && beamer.config && beamer.config.display_mode === NEXT_MATCHES_DISPLAY_MODE) {
+        return 'next_matches';
     }
     if (beamer && beamer.config && beamer.config.display_mode === WERBUNG_DISPLAY_MODE) {
         return 'werbung';
@@ -201,6 +210,22 @@ class Main extends React.Component {
         this.onTimerMessage = this.onTimerMessage.bind(this);
         this.onTournamentMessage = this.onTournamentMessage.bind(this);
         this.onMatchesMessage = this.onMatchesMessage.bind(this);
+    }
+
+    shouldResetMatchesFor(nextDisplayState, nextConfig) {
+        if (!displayStateUsesMatches(nextDisplayState)) {
+            return false;
+        }
+        if (!this.state.loadedMatches) {
+            return true;
+        }
+        if (nextDisplayState !== this.state.displayState) {
+            return true;
+        }
+
+        const currentFilterKey = filterKey(filtersForDisplayState(this.state.displayState, this.state.beamerConfig));
+        const nextFilterKey = filterKey(filtersForDisplayState(nextDisplayState, nextConfig));
+        return currentFilterKey !== nextFilterKey;
     }
 
     componentDidMount() {
@@ -353,11 +378,15 @@ class Main extends React.Component {
     refreshBeamerConfig(code, beamerName) {
         getBeamerByName(code, beamerName,
             (status, beamer) => {
+                const nextDisplayState = displayStateForBeamer(beamer);
+                const nextConfig = beamer.config || null;
                 this.setState({
-                    displayState: displayStateForBeamer(beamer),
-                    beamerConfig: beamer.config || null,
+                    displayState: nextDisplayState,
+                    beamerConfig: nextConfig,
                     beamerName: beamer.name,
-                    loadedMatches: false
+                    loadedMatches: this.shouldResetMatchesFor(nextDisplayState, nextConfig) ?
+                        false :
+                        this.state.loadedMatches
                 }, () => {
                     this.connectBeamerSocket(beamer.name);
                     this.updateMatches();
@@ -392,11 +421,15 @@ class Main extends React.Component {
         }
 
         const reconnectNeeded = this.state.beamerName !== beamer.name;
+        const nextDisplayState = displayStateForBeamer(beamer);
+        const nextConfig = beamer.config || null;
         this.setState({
-            displayState: displayStateForBeamer(beamer),
-            beamerConfig: beamer.config || null,
+            displayState: nextDisplayState,
+            beamerConfig: nextConfig,
             beamerName: beamer.name,
-            loadedMatches: false
+            loadedMatches: this.shouldResetMatchesFor(nextDisplayState, nextConfig) ?
+                false :
+                this.state.loadedMatches
         }, () => {
             if (reconnectNeeded) {
                 this.connectBeamerSocket(beamer.name);
@@ -536,6 +569,10 @@ class Main extends React.Component {
         case 'between_games':
             return <BetweenGamesView
                 tournamentMeta={tournamentMeta}
+                matches={this.state.loadedMatches ? matches : null}
+                timerState={timerState}/>;
+        case 'next_matches':
+            return <NextMatchesView
                 matches={this.state.loadedMatches ? matches : null}
                 timerState={timerState}/>;
         case 'static_image':

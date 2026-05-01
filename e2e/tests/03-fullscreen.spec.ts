@@ -1,7 +1,11 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
-import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
+import {
+  seedAndPlayGroupStage,
+  seedGroupStageTournament,
+  seedPlayoffTournament,
+} from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 import { waitForActionCableSubscription } from '../helpers/action-cable';
 
@@ -385,6 +389,179 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
   await expectGroupTablesQrCode(page);
   await expectGroupTablesLogo(page);
   await keyframe(page, testInfo, 'live_beamer_group_tables');
+});
+
+test('Next matches beamer shows static 32-card 1080p layout and live updates', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(8, 4, 16);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const timerRes = await client.patch(
+    `/tournaments/${tournament.id}/timer`,
+    { timestamp_seconds: 20 * 60 },
+  );
+  expectStatus(timerRes, 200, 'set next matches timer');
+
+  const beamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'next-matches',
+    display_state: 'between_games',
+    config: { display_mode: 'next_matches', match_filter: 'state:not_started' },
+  });
+  expectStatus(beamer, 201, 'create next matches beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=next-matches`);
+  await expect(page.getByTestId('next-matches-view')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('next-matches-title')).toHaveText('> Nächste Spiele');
+
+  const timer = page.getByTestId('next-matches-timer');
+  await expect(timer).toBeVisible({ timeout: 10_000 });
+  await expect(timer).toContainText(/\d{1,2}:[0-5][0-9]/);
+
+  const timerBox = await timer.boundingBox();
+  expect(timerBox).toBeTruthy();
+  expect(timerBox!.x).toBeGreaterThan(1920 * 0.6);
+  expect(timerBox!.y).toBeLessThan(120);
+
+  const cards = page.getByTestId('fullscreen-match-card');
+  await expect(cards).toHaveCount(32, { timeout: 20_000 });
+  await expect(cards.first()).toContainText('G1-S1');
+  await expect(cards.first()).toContainText('G1-S2');
+
+  await page.evaluate(() => {
+    const counts: number[] = [];
+    (window as any).__nextMatchesCardCounts = counts;
+    const root = document.querySelector('[data-testid="next-matches-view"]');
+    const record = () => {
+      counts.push(document.querySelectorAll('[data-testid="fullscreen-match-card"]').length);
+    };
+    record();
+    if (root) {
+      new MutationObserver(record).observe(root, { childList: true, subtree: true });
+    }
+  });
+  await page.waitForTimeout(3_500);
+  const minimumCardCountDuringPoll = await page.evaluate(() => (
+    Math.min(...((window as any).__nextMatchesCardCounts || []))
+  ));
+  expect(minimumCardCountDuringPoll).toBe(32);
+
+  const firstBadge = cards.first().getByTestId('fullscreen-match-badge');
+  await expect(firstBadge).toHaveText('1');
+  await expect(firstBadge).toHaveAttribute('data-match-badge-kind', 'group');
+
+  const viewportFit = await page.getByTestId('fullscreen-match-card').evaluateAll((nodes) => (
+    nodes.every((node) => {
+      const box = node.getBoundingClientRect();
+      return box.left >= 0 &&
+        box.top >= 0 &&
+        box.right <= window.innerWidth &&
+        box.bottom <= window.innerHeight &&
+        box.width > 0 &&
+        box.height > 0;
+    })
+  ));
+  expect(viewportFit).toBe(true);
+  await keyframe(page, testInfo, 'next_matches_32_cards_1080p');
+
+  await waitForActionCableSubscription(page, {
+    channel: 'TournamentMatchesChannel',
+    tournament_id: tournament.id,
+    state: 'not_started',
+  });
+
+  const firstMatchId = await cards.first().getAttribute('data-match-id');
+  expect(firstMatchId).toBeTruthy();
+  const started = await client.patch(`/matches/${firstMatchId}`, { state: 'in_progress' });
+  expectStatus(started, 200, 'start first next match');
+
+  await expect(page.locator(`[data-match-id="${firstMatchId}"]`)).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByTestId('fullscreen-match-card')).toHaveCount(32);
+  await keyframe(page, testInfo, 'next_matches_live_update');
+
+  const { tournament: playoffTournament } = await seedPlayoffTournament(8);
+  const playoffMatches = await client.get<ApiMatchForBadge[]>(`/tournaments/${playoffTournament.id}/matches`);
+  expectStatus(playoffMatches, 200, 'fetch playoff next matches');
+  const playoffMatch = playoffMatches.json.find((match) =>
+    !match.group && match.state === 'not_started' && match.match_scores.length === 2
+  );
+  expect(playoffMatch).toBeTruthy();
+
+  const playoffBeamer = await client.post(`/tournaments/${playoffTournament.id}/beamers`, {
+    name: 'next-playoff',
+    display_state: 'between_games',
+    config: { display_mode: 'next_matches', match_filter: 'state:not_started' },
+  });
+  expectStatus(playoffBeamer, 201, 'create next playoff beamer');
+
+  await page.goto(`/t/${playoffTournament.id}/fullscreen?beamer=next-playoff`);
+  const playoffCard = page.locator(`[data-match-id="${playoffMatch!.id}"]`);
+  await expect(playoffCard).toBeVisible({ timeout: 20_000 });
+  const playoffBadge = playoffCard.getByTestId('fullscreen-match-badge');
+  await expect(playoffBadge).toHaveText(String(playoffMatch!.position + 1));
+  await expect(playoffBadge).toHaveAttribute('data-match-badge-kind', 'position');
+});
+
+test('Next matches beamer honors filters for running and finished cards', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(1, 4, 2);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const matches = await client.get<ApiMatchForBadge[]>(`/tournaments/${tournament.id}/matches`);
+  expectStatus(matches, 200, 'fetch next matches filter candidates');
+  const candidates = matches.json.filter((match) =>
+    match.state === 'not_started' && match.match_scores.length === 2
+  );
+  expect(candidates.length).toBeGreaterThanOrEqual(2);
+  const runningMatch = candidates[0];
+  const finishedMatch = candidates[1];
+
+  const running = await client.patch(`/matches/${runningMatch.id}`, { state: 'in_progress' });
+  expectStatus(running, 200, 'start running next match');
+
+  const startFinished = await client.patch(`/matches/${finishedMatch.id}`, { state: 'in_progress' });
+  expectStatus(startFinished, 200, 'start finished next match');
+  for (const [index, score] of finishedMatch.match_scores.entries()) {
+    const scored = await client.patch(`/match_scores/${score.id}`, { points: index === 0 ? 10 : 2 });
+    expectStatus(scored, 200, `score finished next match ${score.id}`);
+  }
+  const finished = await client.patch(`/matches/${finishedMatch.id}`, { state: 'finished' });
+  expectStatus(finished, 200, 'finish next match');
+
+  const runningBeamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'next-running',
+    display_state: 'between_games',
+    config: { display_mode: 'next_matches', match_filter: 'state:in_progress' },
+  });
+  expectStatus(runningBeamer, 201, 'create running next matches beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=next-running`);
+  const runningCard = page.locator(`[data-match-id="${runningMatch.id}"]`);
+  await expect(runningCard).toBeVisible({ timeout: 20_000 });
+  await expect(runningCard).toHaveAttribute('data-match-state', 'in_progress');
+  await expect.poll(async () => runningCard.evaluate((node) => (
+    window.getComputedStyle(node).backgroundColor
+  )), { timeout: 10_000 }).toBe('rgb(255, 243, 205)');
+  await keyframe(page, testInfo, 'next_matches_running_filter');
+
+  const finishedBeamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'next-finished',
+    display_state: 'between_games',
+    config: { display_mode: 'next_matches', match_filter: 'state:finished' },
+  });
+  expectStatus(finishedBeamer, 201, 'create finished next matches beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=next-finished`);
+  const finishedCard = page.locator(`[data-match-id="${finishedMatch.id}"]`);
+  await expect(finishedCard).toBeVisible({ timeout: 20_000 });
+  await expect(finishedCard).toHaveAttribute('data-match-state', 'finished');
+  await expect.poll(async () => finishedCard.evaluate((node) => (
+    window.getComputedStyle(node).backgroundColor
+  )), { timeout: 10_000 }).toBe('rgb(209, 231, 221)');
+  await keyframe(page, testInfo, 'next_matches_finished_filter');
 });
 
 test('Fullscreen match list receives live match snapshots', async ({ page }, testInfo) => {
