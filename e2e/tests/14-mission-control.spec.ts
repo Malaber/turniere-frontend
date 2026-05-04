@@ -7,6 +7,7 @@ import {
   LONG_TEAM_NAME_SINGLE_WORD,
   longGroupStageTeamName,
   seedAndPlayGroupStage,
+  seedGroupStageAndRunToBeforeFinal,
   seedGroupStageTournament,
 } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
@@ -806,6 +807,42 @@ test('Mission Control soundboard controls beamer audio with timer priority', asy
   await keyframe(page, testInfo, 'beamer_soundboard');
 });
 
+test('Mission Control collapses finished score stages below active stages', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageAndRunToBeforeFinal(2, 4, 4);
+  const semifinal = tournament.stages.find((stage) => stage.level === 1);
+  expect(semifinal).toBeTruthy();
+
+  await page.goto(`/t/${tournament.id}/mission-control#scores`);
+  await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  const scoresPane = page.locator('.tab-pane.active');
+  const finalHeading = scoresPane.getByRole('heading', { name: /Finale \d+ Matches/ });
+  await expect(finalHeading).toBeVisible();
+
+  const groupDetails = scoresPane.getByTestId('mission-finished-stage-group-stage');
+  const semifinalDetails = scoresPane.getByTestId(`mission-finished-stage-stage-${semifinal!.id}`);
+  await expect(groupDetails).toBeVisible();
+  await expect(semifinalDetails).toBeVisible();
+  await expect(groupDetails.getByTestId('mission-finished-stage-chevron')).toBeVisible();
+  await expect(groupDetails).not.toHaveAttribute('open', '');
+  await expect(semifinalDetails).not.toHaveAttribute('open', '');
+  await expect(groupDetails.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).not.toBeVisible();
+  await expect(semifinalDetails.getByRole('heading', { name: 'Halbfinale 2 Matches' })).not.toBeVisible();
+
+  const finalTop = await finalHeading.evaluate((element) => element.getBoundingClientRect().top);
+  const groupDetailsTop = await groupDetails.evaluate((element) => element.getBoundingClientRect().top);
+  expect(finalTop).toBeLessThan(groupDetailsTop);
+
+  await groupDetails.getByTestId('mission-finished-stage-summary').click();
+  await expect(groupDetails).toHaveAttribute('open', '');
+  await expect(groupDetails.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).toBeVisible();
+  await expect(groupDetails.getByTestId('mission-match-card').filter({ hasText: 'G1-S1' }).first()).toBeVisible();
+
+  await semifinalDetails.getByTestId('mission-finished-stage-summary').click();
+  await expect(semifinalDetails).toHaveAttribute('open', '');
+  await expect(semifinalDetails.getByRole('heading', { name: 'Halbfinale 2 Matches' })).toBeVisible();
+});
+
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({
   context,
   page,
@@ -919,6 +956,11 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   await expect(scoresPane.getByText('Tisch 1 -> Tisch 1').first()).toBeVisible();
   await keyframe(page, testInfo, 'scores_wide_match_control');
 
+  await scoresPane.getByTestId('mission-control-search').fill('');
+  const finishedGroupStage = scoresPane.getByTestId('mission-finished-stage-group-stage');
+  await expect(finishedGroupStage).toBeVisible();
+  await finishedGroupStage.getByTestId('mission-finished-stage-summary').click();
+  await expect(finishedGroupStage).toHaveAttribute('open', '');
   await scoresPane.getByTestId('mission-control-search').fill('G2-S1');
   await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G2-S1' }).first()).toBeVisible();
   await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G1-S4' })).toHaveCount(0);

@@ -616,8 +616,64 @@
     margin-bottom: 1.25rem;
 }
 
-.mission-stage-badge {
+.mission-finished-stage-details {
+    border: 1px solid #dde3ea;
+    border-radius: 0.45rem;
+    background: #fff;
+    margin-bottom: 1rem;
+}
+
+.mission-finished-stage-summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    list-style: none;
+    padding: 1rem;
+    font-weight: 600;
+}
+
+.mission-finished-stage-summary::-webkit-details-marker {
+    display: none;
+}
+
+.mission-finished-stage-chevron {
+    color: #607080;
+    flex: 0 0 auto;
+    transition: transform 0.15s ease;
+}
+
+.mission-finished-stage-details[open] .mission-finished-stage-chevron {
+    transform: rotate(90deg);
+}
+
+.mission-finished-stage-title {
     color: #25313f;
+}
+
+.mission-finished-stage-state {
+    color: #607080;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+.mission-finished-stage-body {
+    padding: 0 1rem 1rem;
+}
+
+.mission-match-stage-nested {
+    background: #f8fafc;
+    margin-bottom: 0.75rem;
+}
+
+.mission-match-stage-nested:last-child {
+    margin-bottom: 0;
+}
+
+.mission-stage-badge {
+    background-color: #eef2f6 !important;
+    color: #25313f !important;
     margin-left: 0.65rem;
 }
 

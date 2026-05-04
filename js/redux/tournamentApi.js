@@ -204,6 +204,7 @@ function convertPlayoffStage(apiStage) {
     return {
         id: apiStage.id,
         level: apiStage.level,
+        state: apiStage.state,
         matches: apiStage.matches.sort(
             sortMatchesByPositionAscending()
         ).map(
