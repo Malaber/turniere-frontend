@@ -33,6 +33,7 @@ interface TeamActionList {
   key: string;
   name: string;
   action_name: string;
+  created_at?: string;
   team_action_items: TeamActionItem[];
 }
 
@@ -162,6 +163,59 @@ test('Team action list renders with metadata and item checkboxes', async ({ cont
   await expect(page.getByText(list.action_name)).toBeVisible();
   await expect(checklistsPane.locator('.form-check-input[type="checkbox"]')).toHaveCount(list.team_action_items.length);
   await keyframe(page, testInfo, 'team_action_lists_render');
+});
+
+test('Mission Control searches and sorts team action lists', async ({ context, page }, testInfo) => {
+  await injectAuth(context, loadAuthState());
+  const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
+  const client = await makeOwnerClient();
+  const zeta = await ensureTeamActionList(client, tournament.id, {
+    name: 'Zulu Materialausgabe',
+    key: randomKey('zulu_material'),
+    action_name: 'Material abgegeben',
+    source: 'group_stage_survivors'
+  });
+  const alpha = await ensureTeamActionList(client, tournament.id, {
+    name: 'Alpha Tokenrunde',
+    key: randomKey('alpha_token'),
+    action_name: 'Token abgegeben',
+    source: 'group_stage_survivors'
+  });
+  const alphaTeamName = alpha.team_action_items[0]?.team?.name;
+  if (!alphaTeamName) {
+    throw new Error('expected alpha checklist item with team name');
+  }
+
+  await page.goto(`/t/${tournament.id}/mission-control#checklists`);
+  await page.waitForLoadState('networkidle');
+
+  const checklistsPane = page.getByTestId('mission-checklists-control');
+  await expect(checklistsPane).toBeVisible();
+  const search = checklistsPane.getByTestId('mission-control-search');
+  await expect(search).toBeVisible();
+  await expect(checklistsPane.getByText('Cmd+K')).toBeVisible();
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
+  await expect(search).toBeFocused();
+
+  const cards = checklistsPane.getByTestId('team-action-list-card');
+  await expect(cards).toHaveCount(2);
+  await expect(cards.nth(0).getByRole('heading', { name: alpha.name })).toBeVisible();
+  await expect(cards.nth(1).getByRole('heading', { name: zeta.name })).toBeVisible();
+
+  await search.fill(alpha.key);
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText(alpha.name);
+  await expect(cards.first()).not.toContainText(zeta.name);
+
+  await search.fill(alphaTeamName);
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first().locator('.form-check-input[type="checkbox"]')).toHaveCount(1);
+  await expect(cards.nth(1).locator('.form-check-input[type="checkbox"]')).toHaveCount(1);
+
+  await checklistsPane.getByRole('button', { name: /Filter zurücksetzen/ }).click();
+  await expect(search).toHaveValue('');
+  await expect(cards).toHaveCount(2);
+  await keyframe(page, testInfo, 'team_action_lists_search_sort');
 });
 
 test('Owner can create a new team action list and other viewer receives it live', async ({

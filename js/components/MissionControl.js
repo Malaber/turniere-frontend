@@ -99,7 +99,7 @@ const BEAMER_MATCH_STATES = [
 ];
 
 const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'checklists', 'teams', 'history', 'settings'];
-const SEARCH_TAB_IDS = ['scores', 'teams'];
+const SEARCH_TAB_IDS = ['scores', 'teams', 'checklists'];
 
 function tabFromLocation() {
     if (typeof window === 'undefined') {
@@ -629,6 +629,9 @@ export class MissionControl extends React.Component {
                                 <MissionChecklists
                                     tournamentId={tournament.id}
                                     teamActionLists={tournament.teamActionLists}
+                                    search={this.state.search}
+                                    onSearchChange={this.setSearch}
+                                    searchInputRef={this.searchInput}
                                     disabled={!canControl}
                                     onSetTeamActionItemState={this.props.onSetTeamActionItemState}
                                     onCreateTeamActionList={this.props.onCreateTeamActionList}
@@ -1247,6 +1250,82 @@ function MissionTournamentSettings(props) {
     );
 }
 
+function compareTeamActionLists(left, right) {
+    const nameResult = (left.name || '').localeCompare(right.name || '', 'de', {
+        numeric: true,
+        sensitivity: 'base'
+    });
+    if (nameResult !== 0) {
+        return nameResult;
+    }
+    const leftDate = left.createdAt instanceof Date ? left.createdAt.getTime() : 0;
+    const rightDate = right.createdAt instanceof Date ? right.createdAt.getTime() : 0;
+    if (leftDate !== rightDate) {
+        return leftDate - rightDate;
+    }
+    return String(left.id || '').localeCompare(String(right.id || ''), 'de', {numeric: true});
+}
+
+function compareTeamActionItems(left, right) {
+    const leftName = left.team ? left.team.name : 'Unbekanntes Team';
+    const rightName = right.team ? right.team.name : 'Unbekanntes Team';
+    const nameResult = leftName.localeCompare(rightName, 'de', {
+        numeric: true,
+        sensitivity: 'base'
+    });
+    if (nameResult !== 0) {
+        return nameResult;
+    }
+    return String(left.id || '').localeCompare(String(right.id || ''), 'de', {numeric: true});
+}
+
+function teamActionListMatchesSearch(list, search) {
+    if (!search) {
+        return true;
+    }
+    const haystack = [
+        list.name,
+        list.key,
+        list.actionName,
+        list.source
+    ].join(' ').toLowerCase();
+    return haystack.indexOf(search) !== -1;
+}
+
+function teamActionItemMatchesSearch(list, item, search) {
+    if (!search) {
+        return true;
+    }
+    const completedAt = item.completedAt ? formatTeamActionCompletedAt(item.completedAt) : '';
+    const haystack = [
+        list.name,
+        list.key,
+        list.actionName,
+        list.source,
+        item.team ? item.team.name : 'Unbekanntes Team',
+        item.completed === true ? 'erledigt completed' : 'offen open',
+        completedAt
+    ].join(' ').toLowerCase();
+    return haystack.indexOf(search) !== -1;
+}
+
+function searchableTeamActionLists(teamActionLists, search) {
+    const normalizedSearch = (search || '').trim().toLowerCase();
+    return teamActionLists
+        .slice()
+        .sort(compareTeamActionLists)
+        .map(list => {
+            const teamActionItems = Array.isArray(list.teamActionItems) ? list.teamActionItems : [];
+            const sortedItems = teamActionItems.slice().sort(compareTeamActionItems);
+            const items = teamActionListMatchesSearch(list, normalizedSearch) ?
+                sortedItems :
+                sortedItems.filter(item => teamActionItemMatchesSearch(list, item, normalizedSearch));
+            return Object.assign({}, list, {teamActionItems: items});
+        })
+        .filter(list => !normalizedSearch || teamActionListMatchesSearch(list, normalizedSearch) ||
+            list.teamActionItems.length > 0);
+}
+
 class MissionChecklists extends React.Component {
     constructor(props) {
         super(props);
@@ -1291,7 +1370,9 @@ class MissionChecklists extends React.Component {
     }
 
     render() {
-        const teamActionLists = Array.isArray(this.props.teamActionLists) ? this.props.teamActionLists : [];
+        const allTeamActionLists = Array.isArray(this.props.teamActionLists) ? this.props.teamActionLists : [];
+        const teamActionLists = searchableTeamActionLists(allTeamActionLists, this.props.search);
+        const hasSearch = (this.props.search || '').trim().length > 0;
         const canMutate = !this.props.disabled;
 
         return (<section className='mission-control-section' data-testid='mission-checklists-control'>
@@ -1299,6 +1380,13 @@ class MissionChecklists extends React.Component {
             <p className='text-muted mb-3'>
                 Team-Checklisten werden live synchronisiert, zum Beispiel für Token, Unterlagen oder Material.
             </p>
+            <MissionSearchToolbar
+                value={this.props.search}
+                onChange={this.props.onSearchChange}
+                inputRef={this.props.searchInputRef}
+                placeholder='Checklisten, Teams, Schlüssel suchen...'
+                ariaLabel='Checklisten suchen'
+            />
             {canMutate &&
                 <CreateTeamActionListForm
                     tournamentId={this.props.tournamentId}
@@ -1312,9 +1400,13 @@ class MissionChecklists extends React.Component {
                 <Alert color='danger' className='mb-3'>
                     {this.state.errorMessage}
                 </Alert>}
-            {teamActionLists.length === 0 &&
+            {allTeamActionLists.length === 0 &&
                 <Alert color='light' className='mb-0'>
                     Keine Checklisten verfügbar.
+                </Alert>}
+            {allTeamActionLists.length > 0 && teamActionLists.length === 0 &&
+                <Alert color='light' className='mb-0'>
+                    {hasSearch ? 'Keine Checklisten gefunden.' : 'Keine Checklisten verfügbar.'}
                 </Alert>}
             {teamActionLists.map(list => (
                 <div key={list.id} className='mission-control-panel mb-3' data-testid='team-action-list-card'>
@@ -2022,28 +2114,13 @@ function MissionMatches(props) {
 
     return (
         <section className='mission-control-section mission-pane-scores' data-testid='mission-score-control'>
-            <div className='mission-match-toolbar'>
-                <div className='mission-match-search'>
-                    <FaSearch aria-hidden='true' />
-                    <Input
-                        type='search'
-                        value={props.search}
-                        onChange={props.onSearchChange}
-                        placeholder='Gruppen, Teams, Matches suchen...'
-                        aria-label='Scores suchen'
-                        title='Mit Cmd+K oder Ctrl+K fokussieren'
-                        innerRef={props.searchInputRef}
-                        data-testid='mission-control-search'
-                    />
-                </div>
-                <div className='mission-search-hint'>
-                    <FaKeyboard aria-hidden='true' /> Cmd+K
-                </div>
-                <Button color='link' className='mission-filter-reset'
-                    onClick={() => props.onSearchChange({target: {value: ''}})}>
-                    x Filter zurücksetzen
-                </Button>
-            </div>
+            <MissionSearchToolbar
+                value={props.search}
+                onChange={props.onSearchChange}
+                inputRef={props.searchInputRef}
+                placeholder='Gruppen, Teams, Matches suchen...'
+                ariaLabel='Scores suchen'
+            />
             {rows.map(row => (
                 <MissionStageBlock
                     key={row.key}
@@ -2056,6 +2133,33 @@ function MissionMatches(props) {
                 />
             ))}
         </section>
+    );
+}
+
+function MissionSearchToolbar(props) {
+    return (
+        <div className='mission-search-toolbar mission-match-toolbar'>
+            <div className='mission-match-search'>
+                <FaSearch aria-hidden='true' />
+                <Input
+                    type='search'
+                    value={props.value}
+                    onChange={props.onChange}
+                    placeholder={props.placeholder}
+                    aria-label={props.ariaLabel}
+                    title='Mit Cmd+K oder Ctrl+K fokussieren'
+                    innerRef={props.inputRef}
+                    data-testid='mission-control-search'
+                />
+            </div>
+            <div className='mission-search-hint'>
+                <FaKeyboard aria-hidden='true' /> Cmd+K
+            </div>
+            <Button color='link' className='mission-filter-reset'
+                onClick={() => props.onChange({target: {value: ''}})}>
+                x Filter zurücksetzen
+            </Button>
+        </div>
     );
 }
 
