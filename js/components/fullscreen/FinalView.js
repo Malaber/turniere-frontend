@@ -162,6 +162,7 @@ function MatchPanel({match, label, primary = false, testId}) {
                     match={match}
                     index={0}
                     fillHeight
+                    hero={primary}
                     showScores
                     animateEntry={false}
                 />

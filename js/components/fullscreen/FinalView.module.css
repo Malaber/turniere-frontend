@@ -151,10 +151,10 @@
     border-left: 4px solid #198754;
     border-radius: 4px;
     display: flex;
-    flex: 0 0 clamp(5.5rem, 12vh, 8.5rem);
+    flex: 0 0 clamp(6.5rem, 14vh, 9.5rem);
     gap: clamp(0.75rem, 1.5vw, 1.5rem);
     justify-content: flex-start;
-    margin-top: 0.75rem;
+    margin-top: clamp(1.2rem, 2vh, 1.8rem);
     min-height: 0;
     padding: clamp(0.65rem, 1.25vw, 1.2rem);
     text-align: left;
