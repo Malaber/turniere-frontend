@@ -1394,6 +1394,7 @@ function MissionCollapsibleDetails(props) {
     const className = ['mission-collapsible-details', props.className].filter(Boolean).join(' ');
     const summaryClassName = ['mission-collapsible-summary', props.summaryClassName].filter(Boolean).join(' ');
     const bodyClassName = ['mission-collapsible-body', props.bodyClassName].filter(Boolean).join(' ');
+    const chevronClassName = ['mission-collapsible-chevron', props.chevronClassName].filter(Boolean).join(' ');
     const detailsProps = {
         className,
         'data-testid': props.testId
@@ -1405,8 +1406,10 @@ function MissionCollapsibleDetails(props) {
 
     return (
         <details {...detailsProps}>
-            <summary className={summaryClassName} title={props.title}>
-                <FaChevronRight className='mission-collapsible-chevron' aria-hidden='true' />
+            <summary className={summaryClassName} title={props.title} data-testid={props.summaryTestId}>
+                <FaChevronRight className={chevronClassName}
+                    data-testid={props.chevronTestId}
+                    aria-hidden='true' />
                 {props.summary}
             </summary>
             <div className={bodyClassName}>
@@ -2219,25 +2222,79 @@ class MissionStartConfirmButton extends React.Component {
     }
 }
 
-function MissionMatches(props) {
-    const rows = [];
-    if (props.tournament.groupStage) {
-        props.tournament.groupStage.groups.forEach(group => {
-            rows.push({
-                key: 'group-' + group.id,
-                name: 'Gruppe ' + group.number,
-                group: group,
-                matches: group.matches
-            });
+function isPlayoffStageFinished(stage) {
+    return stage.matches.length > 0 && stage.matches.every(match => match.state === 'finished');
+}
+
+function missionStageRowsForGroupStage(groupStage) {
+    return groupStage.groups.map(group => ({
+        key: 'group-' + group.id,
+        name: 'Gruppe ' + group.number,
+        group: group,
+        matches: group.matches
+    }));
+}
+
+function missionScoreSections(tournament) {
+    const sections = [];
+    if (tournament.groupStage) {
+        sections.push({
+            key: 'group-stage',
+            name: 'Gruppenphase',
+            finished: tournament.groupStage.state === 'finished',
+            rows: missionStageRowsForGroupStage(tournament.groupStage)
         });
     }
-    props.tournament.playoffStages.forEach(stage => {
-        rows.push({
+    tournament.playoffStages.forEach(stage => {
+        sections.push({
             key: 'stage-' + stage.id,
             name: stageName(stage.level),
-            matches: stage.matches
+            finished: isPlayoffStageFinished(stage),
+            rows: [{
+                key: 'stage-' + stage.id,
+                name: stageName(stage.level),
+                matches: stage.matches
+            }]
         });
     });
+    return sections;
+}
+
+function missionMatchPassesSearch(title, match, search) {
+    if (!search) {
+        return true;
+    }
+    const haystack = [
+        title,
+        match.team1.name,
+        match.team2.name,
+        match.state,
+        matchStateLabel(match.state),
+        'spiel ' + match.position,
+        'sp. ' + match.position,
+        'tisch ' + match.position,
+        match.group ? 'gruppe ' + match.group.number : '',
+        match.group ? 'g' + match.group.number : '',
+        'g' + (match.group ? match.group.number : Math.max(1, match.position)) + '-s' + match.position
+    ].join(' ').toLowerCase();
+    return haystack.indexOf(search) !== -1;
+}
+
+function missionStageMatches(title, matches, search) {
+    const normalizedSearch = search.trim().toLowerCase();
+    return matches
+        .filter(match => missionMatchPassesSearch(title, match, normalizedSearch))
+        .sort(sortMatchesByPositionAscending());
+}
+
+function missionSectionMatchCount(rows, search) {
+    return rows.reduce((total, row) => total + missionStageMatches(row.name, row.matches, search).length, 0);
+}
+
+function MissionMatches(props) {
+    const sections = missionScoreSections(props.tournament);
+    const activeSections = sections.filter(section => !section.finished);
+    const finishedSections = sections.filter(section => section.finished);
 
     return (
         <section className='mission-control-section mission-pane-scores' data-testid='mission-score-control'>
@@ -2248,12 +2305,27 @@ function MissionMatches(props) {
                 placeholder='Gruppen, Teams, Matches suchen...'
                 ariaLabel='Scores suchen'
             />
-            {rows.map(row => (
-                <MissionStageBlock
-                    key={row.key}
-                    title={row.name}
-                    group={row.group}
-                    matches={row.matches}
+            {activeSections.map(section => (
+                <React.Fragment key={section.key}>
+                    {section.rows.map(row => (
+                        <MissionStageBlock
+                            key={row.key}
+                            title={row.name}
+                            group={row.group}
+                            matches={row.matches}
+                            search={props.search}
+                            disabled={props.disabled}
+                            onTournamentChange={props.onTournamentChange}
+                        />
+                    ))}
+                </React.Fragment>
+            ))}
+            {finishedSections.map(section => (
+                <MissionFinishedStageDetails
+                    key={section.key}
+                    stageKey={section.key}
+                    title={section.name}
+                    rows={section.rows}
                     search={props.search}
                     disabled={props.disabled}
                     onTournamentChange={props.onTournamentChange}
@@ -2290,36 +2362,52 @@ function MissionSearchToolbar(props) {
     );
 }
 
+function MissionFinishedStageDetails(props) {
+    const matchCount = missionSectionMatchCount(props.rows, props.search);
+    if (matchCount === 0) {
+        return null;
+    }
+
+    return (
+        <MissionCollapsibleDetails className='mission-finished-stage-details'
+            summaryClassName='mission-finished-stage-summary'
+            bodyClassName='mission-finished-stage-body'
+            testId={'mission-finished-stage-' + props.stageKey}
+            summaryTestId='mission-finished-stage-summary'
+            chevronClassName='mission-finished-stage-chevron'
+            chevronTestId='mission-finished-stage-chevron'
+            summary={<>
+                <span className='mission-finished-stage-title'>{props.title}</span>
+                <Badge color='light' className='mission-stage-badge'>{matchCount} Matches</Badge>
+                <span className='mission-finished-stage-state'>abgeschlossen</span>
+            </>}>
+            {props.rows.map(row => (
+                <MissionStageBlock
+                    key={row.key}
+                    title={row.name}
+                    group={row.group}
+                    matches={row.matches}
+                    search={props.search}
+                    disabled={props.disabled}
+                    onTournamentChange={props.onTournamentChange}
+                    nested
+                />
+            ))}
+        </MissionCollapsibleDetails>
+    );
+}
+
 function MissionStageBlock(props) {
-    const search = props.search.trim().toLowerCase();
-    const matches = props.matches
-        .filter(match => {
-            if (!search) {
-                return true;
-            }
-            const haystack = [
-                props.title,
-                match.team1.name,
-                match.team2.name,
-                match.state,
-                matchStateLabel(match.state),
-                'spiel ' + match.position,
-                'sp. ' + match.position,
-                'tisch ' + match.position,
-                match.group ? 'gruppe ' + match.group.number : '',
-                match.group ? 'g' + match.group.number : '',
-                'g' + (match.group ? match.group.number : Math.max(1, match.position)) + '-s' + match.position
-            ].join(' ').toLowerCase();
-            return haystack.indexOf(search) !== -1;
-        })
-        .sort(sortMatchesByPositionAscending());
+    const matches = missionStageMatches(props.title, props.matches, props.search);
 
     if (matches.length === 0) {
         return null;
     }
 
+    const className = 'mission-match-stage' + (props.nested ? ' mission-match-stage-nested' : '');
+
     return (
-        <div className='mission-match-stage'>
+        <div className={className} data-testid='mission-stage-block' data-stage-title={props.title}>
             <h3 className='h5 mission-pane-heading'>
                 {props.title}
                 <Badge color='light' className='mission-stage-badge'>{matches.length} Matches</Badge>
