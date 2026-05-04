@@ -569,8 +569,23 @@
     display: flex;
     align-items: center;
     gap: 0.65rem;
+    list-style: none;
     padding: 1rem;
     font-weight: 600;
+}
+
+.mission-finished-stage-summary::-webkit-details-marker {
+    display: none;
+}
+
+.mission-finished-stage-chevron {
+    color: #607080;
+    flex: 0 0 auto;
+    transition: transform 0.15s ease;
+}
+
+.mission-finished-stage-details[open] .mission-finished-stage-chevron {
+    transform: rotate(90deg);
 }
 
 .mission-finished-stage-title {

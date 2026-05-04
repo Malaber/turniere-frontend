@@ -4,8 +4,8 @@ import {
     Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
 } from 'reactstrap';
 import {
-    FaClock, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaSyncAlt, FaTrash, FaUser,
-    FaUsers
+    FaChevronRight, FaClock, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaSyncAlt,
+    FaTrash, FaUser, FaUsers
 } from 'react-icons/fa';
 import {notify} from './Notifications';
 import {
@@ -2141,6 +2141,8 @@ function MissionFinishedStageDetails(props) {
         <details className='mission-finished-stage-details'
             data-testid={'mission-finished-stage-' + props.stageKey}>
             <summary className='mission-finished-stage-summary' data-testid='mission-finished-stage-summary'>
+                <FaChevronRight className='mission-finished-stage-chevron'
+                    data-testid='mission-finished-stage-chevron' aria-hidden='true' />
                 <span className='mission-finished-stage-title'>{props.title}</span>
                 <Badge color='light' className='mission-stage-badge'>{matchCount} Matches</Badge>
                 <span className='mission-finished-stage-state'>abgeschlossen</span>

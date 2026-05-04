@@ -823,6 +823,7 @@ test('Mission Control collapses finished score stages below active stages', asyn
   const semifinalDetails = scoresPane.getByTestId(`mission-finished-stage-stage-${semifinal!.id}`);
   await expect(groupDetails).toBeVisible();
   await expect(semifinalDetails).toBeVisible();
+  await expect(groupDetails.getByTestId('mission-finished-stage-chevron')).toBeVisible();
   await expect(groupDetails).not.toHaveAttribute('open', '');
   await expect(semifinalDetails).not.toHaveAttribute('open', '');
   await expect(groupDetails.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).not.toBeVisible();
