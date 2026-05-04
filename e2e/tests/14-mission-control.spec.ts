@@ -956,7 +956,9 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   await expect(scoresPane.getByText('Tisch 1 -> Tisch 1').first()).toBeVisible();
   await keyframe(page, testInfo, 'scores_wide_match_control');
 
+  await scoresPane.getByTestId('mission-control-search').fill('');
   const finishedGroupStage = scoresPane.getByTestId('mission-finished-stage-group-stage');
+  await expect(finishedGroupStage).toBeVisible();
   await finishedGroupStage.getByTestId('mission-finished-stage-summary').click();
   await expect(finishedGroupStage).toHaveAttribute('open', '');
   await scoresPane.getByTestId('mission-control-search').fill('G2-S1');

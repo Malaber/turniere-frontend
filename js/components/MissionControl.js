@@ -2223,9 +2223,6 @@ class MissionStartConfirmButton extends React.Component {
 }
 
 function isPlayoffStageFinished(stage) {
-    if (stage.state === 'finished') {
-        return true;
-    }
     return stage.matches.length > 0 && stage.matches.every(match => match.state === 'finished');
 }
 
