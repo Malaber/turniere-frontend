@@ -185,6 +185,15 @@ test('Mission Control searches and sorts team action lists', async ({ context, p
   if (!alphaTeamName) {
     throw new Error('expected alpha checklist item with team name');
   }
+  const zetaCompletedItem = zeta.team_action_items[0];
+  if (!zetaCompletedItem) {
+    throw new Error('expected zeta checklist item');
+  }
+  const completeResponse = await client.patch<TeamActionItem>(
+    `/team_action_items/${zetaCompletedItem.id}`,
+    { completed: true }
+  );
+  expectStatus(completeResponse, 200, 'complete zeta checklist item for sort coverage');
 
   await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
@@ -192,7 +201,9 @@ test('Mission Control searches and sorts team action lists', async ({ context, p
   const checklistsPane = page.getByTestId('mission-checklists-control');
   await expect(checklistsPane).toBeVisible();
   const search = checklistsPane.getByTestId('mission-control-search');
+  const sortSelect = checklistsPane.getByTestId('mission-checklists-sort');
   await expect(search).toBeVisible();
+  await expect(sortSelect).toBeVisible();
   await expect(checklistsPane.getByText('Cmd+K')).toBeVisible();
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
   await expect(search).toBeFocused();
@@ -201,6 +212,19 @@ test('Mission Control searches and sorts team action lists', async ({ context, p
   await expect(cards).toHaveCount(2);
   await expect(cards.nth(0).getByRole('heading', { name: alpha.name })).toBeVisible();
   await expect(cards.nth(1).getByRole('heading', { name: zeta.name })).toBeVisible();
+
+  await expect(cards.first().locator('summary')).toContainText(`0/${alpha.team_action_items.length} erledigt`);
+  await cards.first().locator('summary').click();
+  await expect(cards.first().locator('.form-check-input[type="checkbox"]').first()).toBeHidden();
+  await cards.first().locator('summary').click();
+  await expect(cards.first().locator('.form-check-input[type="checkbox"]').first()).toBeVisible();
+
+  await sortSelect.selectOption('checked');
+  await expect(cards.nth(0).getByRole('heading', { name: zeta.name })).toBeVisible();
+  await sortSelect.selectOption('unchecked');
+  await expect(cards.nth(0).getByRole('heading', { name: alpha.name })).toBeVisible();
+  await sortSelect.selectOption('name');
+  await expect(cards.nth(0).getByRole('heading', { name: alpha.name })).toBeVisible();
 
   await search.fill(alpha.key);
   await expect(cards).toHaveCount(1);

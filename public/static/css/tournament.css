@@ -235,6 +235,37 @@
     margin-bottom: 1rem;
 }
 
+.mission-checklist-sort {
+    max-width: 16rem;
+}
+
+.mission-checklist-details {
+    height: auto;
+}
+
+.mission-checklist-summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style-position: outside;
+}
+
+.mission-checklist-summary h4 {
+    display: inline-flex;
+}
+
+.mission-checklist-count {
+    color: #607080;
+    font-size: 0.85rem;
+    margin-left: auto;
+}
+
+.mission-checklist-body {
+    padding-top: 0.85rem;
+}
+
 .mission-bulk-start-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));

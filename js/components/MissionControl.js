@@ -100,6 +100,12 @@ const BEAMER_MATCH_STATES = [
 
 const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'checklists', 'teams', 'history', 'settings'];
 const SEARCH_TAB_IDS = ['scores', 'teams', 'checklists'];
+const TEAM_ACTION_LIST_SORT_OPTIONS = [
+    {value: 'name', label: 'Name'},
+    {value: 'date', label: 'Datum'},
+    {value: 'unchecked', label: 'Offen zuerst'},
+    {value: 'checked', label: 'Erledigt zuerst'}
+];
 
 function tabFromLocation() {
     if (typeof window === 'undefined') {
@@ -1250,7 +1256,7 @@ function MissionTournamentSettings(props) {
     );
 }
 
-function compareTeamActionLists(left, right) {
+function compareTeamActionListsByName(left, right) {
     const nameResult = (left.name || '').localeCompare(right.name || '', 'de', {
         numeric: true,
         sensitivity: 'base'
@@ -1266,7 +1272,7 @@ function compareTeamActionLists(left, right) {
     return String(left.id || '').localeCompare(String(right.id || ''), 'de', {numeric: true});
 }
 
-function compareTeamActionItems(left, right) {
+function compareTeamActionItemsByName(left, right) {
     const leftName = left.team ? left.team.name : 'Unbekanntes Team';
     const rightName = right.team ? right.team.name : 'Unbekanntes Team';
     const nameResult = leftName.localeCompare(rightName, 'de', {
@@ -1277,6 +1283,56 @@ function compareTeamActionItems(left, right) {
         return nameResult;
     }
     return String(left.id || '').localeCompare(String(right.id || ''), 'de', {numeric: true});
+}
+
+function teamActionListCompletedCount(list) {
+    const items = Array.isArray(list.teamActionItems) ? list.teamActionItems : [];
+    return items.filter(item => item.completed === true).length;
+}
+
+function teamActionListUncheckedCount(list) {
+    const items = Array.isArray(list.teamActionItems) ? list.teamActionItems : [];
+    return items.filter(item => item.completed !== true).length;
+}
+
+function compareTeamActionLists(left, right, sortMode) {
+    if (sortMode === 'date') {
+        const leftDate = left.createdAt instanceof Date ? left.createdAt.getTime() : 0;
+        const rightDate = right.createdAt instanceof Date ? right.createdAt.getTime() : 0;
+        if (leftDate !== rightDate) {
+            return rightDate - leftDate;
+        }
+    }
+    if (sortMode === 'checked') {
+        const countResult = teamActionListCompletedCount(right) - teamActionListCompletedCount(left);
+        if (countResult !== 0) {
+            return countResult;
+        }
+    }
+    if (sortMode === 'unchecked') {
+        const countResult = teamActionListUncheckedCount(right) - teamActionListUncheckedCount(left);
+        if (countResult !== 0) {
+            return countResult;
+        }
+    }
+    return compareTeamActionListsByName(left, right);
+}
+
+function compareTeamActionItems(left, right, sortMode) {
+    if (sortMode === 'date') {
+        const leftDate = left.completedAt instanceof Date ? left.completedAt.getTime() : 0;
+        const rightDate = right.completedAt instanceof Date ? right.completedAt.getTime() : 0;
+        if (leftDate !== rightDate) {
+            return rightDate - leftDate;
+        }
+    }
+    if (sortMode === 'checked' && left.completed !== right.completed) {
+        return left.completed === true ? -1 : 1;
+    }
+    if (sortMode === 'unchecked' && left.completed !== right.completed) {
+        return left.completed === true ? 1 : -1;
+    }
+    return compareTeamActionItemsByName(left, right);
 }
 
 function teamActionListMatchesSearch(list, search) {
@@ -1309,14 +1365,16 @@ function teamActionItemMatchesSearch(list, item, search) {
     return haystack.indexOf(search) !== -1;
 }
 
-function searchableTeamActionLists(teamActionLists, search) {
+function searchableTeamActionLists(teamActionLists, search, sortMode) {
     const normalizedSearch = (search || '').trim().toLowerCase();
     return teamActionLists
         .slice()
-        .sort(compareTeamActionLists)
+        .sort((left, right) => compareTeamActionLists(left, right, sortMode))
         .map(list => {
             const teamActionItems = Array.isArray(list.teamActionItems) ? list.teamActionItems : [];
-            const sortedItems = teamActionItems.slice().sort(compareTeamActionItems);
+            const sortedItems = teamActionItems
+                .slice()
+                .sort((left, right) => compareTeamActionItems(left, right, sortMode));
             const items = teamActionListMatchesSearch(list, normalizedSearch) ?
                 sortedItems :
                 sortedItems.filter(item => teamActionItemMatchesSearch(list, item, normalizedSearch));
@@ -1331,9 +1389,11 @@ class MissionChecklists extends React.Component {
         super(props);
         this.state = {
             pendingByItemKey: {},
-            errorMessage: ''
+            errorMessage: '',
+            sortMode: 'name'
         };
         this.onChange = this.onChange.bind(this);
+        this.setSortMode = this.setSortMode.bind(this);
     }
 
     onChange(list, item, event) {
@@ -1369,9 +1429,13 @@ class MissionChecklists extends React.Component {
         });
     }
 
+    setSortMode(event) {
+        this.setState({sortMode: event.target.value});
+    }
+
     render() {
         const allTeamActionLists = Array.isArray(this.props.teamActionLists) ? this.props.teamActionLists : [];
-        const teamActionLists = searchableTeamActionLists(allTeamActionLists, this.props.search);
+        const teamActionLists = searchableTeamActionLists(allTeamActionLists, this.props.search, this.state.sortMode);
         const hasSearch = (this.props.search || '').trim().length > 0;
         const canMutate = !this.props.disabled;
 
@@ -1387,6 +1451,18 @@ class MissionChecklists extends React.Component {
                 placeholder='Checklisten, Teams, Schlüssel suchen...'
                 ariaLabel='Checklisten suchen'
             />
+            <div className='mission-checklist-sort mb-3'>
+                <Label className='mb-1' for='mission-checklists-sort'>Sortierung</Label>
+                <Input id='mission-checklists-sort'
+                    type='select'
+                    value={this.state.sortMode}
+                    onChange={this.setSortMode}
+                    data-testid='mission-checklists-sort'>
+                    {TEAM_ACTION_LIST_SORT_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                </Input>
+            </div>
             {canMutate &&
                 <CreateTeamActionListForm
                     tournamentId={this.props.tournamentId}
@@ -1409,36 +1485,42 @@ class MissionChecklists extends React.Component {
                     {hasSearch ? 'Keine Checklisten gefunden.' : 'Keine Checklisten verfügbar.'}
                 </Alert>}
             {teamActionLists.map(list => (
-                <div key={list.id} className='mission-control-panel mb-3' data-testid='team-action-list-card'>
-                    <div className='d-flex align-items-center gap-2 flex-wrap mb-2'>
+                <details key={list.id} className='mission-control-panel mission-checklist-details mb-3'
+                    data-testid='team-action-list-card' open>
+                    <summary className='mission-checklist-summary'>
                         <h4 className='h6 mb-0'>{list.name}</h4>
                         <Badge color='info' pill>{list.key}</Badge>
+                        <span className='mission-checklist-count'>
+                            {teamActionListCompletedCount(list)}/{list.teamActionItems.length} erledigt
+                        </span>
+                    </summary>
+                    <div className='mission-checklist-body'>
+                        <div className='text-muted small mb-2'>{list.actionName}</div>
+                        {list.teamActionItems.map(item => {
+                            const pendingKey = buildTeamActionItemPendingKey(list.key, item);
+                            const disabled = !canMutate || this.state.pendingByItemKey[pendingKey] === true;
+                            return (
+                                <div key={item.id || pendingKey} className='form-check mb-2'>
+                                    <input
+                                        id={'team-action-item-' + pendingKey}
+                                        className='form-check-input'
+                                        type='checkbox'
+                                        checked={item.completed === true}
+                                        disabled={disabled}
+                                        onChange={event => this.onChange(list, item, event)}
+                                    />
+                                    <label className='form-check-label' htmlFor={'team-action-item-' + pendingKey}>
+                                        {item.team ? <TeamName name={item.team.name} inline /> : 'Unbekanntes Team'}
+                                        {item.completedAt &&
+                                            <span className='text-muted ms-2'>
+                                                ({formatTeamActionCompletedAt(item.completedAt)})
+                                            </span>}
+                                    </label>
+                                </div>
+                            );
+                        })}
                     </div>
-                    <div className='text-muted small mb-2'>{list.actionName}</div>
-                    {list.teamActionItems.map(item => {
-                        const pendingKey = buildTeamActionItemPendingKey(list.key, item);
-                        const disabled = !canMutate || this.state.pendingByItemKey[pendingKey] === true;
-                        return (
-                            <div key={item.id || pendingKey} className='form-check mb-2'>
-                                <input
-                                    id={'team-action-item-' + pendingKey}
-                                    className='form-check-input'
-                                    type='checkbox'
-                                    checked={item.completed === true}
-                                    disabled={disabled}
-                                    onChange={event => this.onChange(list, item, event)}
-                                />
-                                <label className='form-check-label' htmlFor={'team-action-item-' + pendingKey}>
-                                    {item.team ? <TeamName name={item.team.name} inline /> : 'Unbekanntes Team'}
-                                    {item.completedAt &&
-                                        <span className='text-muted ms-2'>
-                                            ({formatTeamActionCompletedAt(item.completedAt)})
-                                        </span>}
-                                </label>
-                            </div>
-                        );
-                    })}
-                </div>
+                </details>
             ))}
         </section>);
     }
