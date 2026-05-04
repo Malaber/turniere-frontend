@@ -557,6 +557,46 @@
     margin-bottom: 1.25rem;
 }
 
+.mission-finished-stage-details {
+    border: 1px solid #dde3ea;
+    border-radius: 0.45rem;
+    background: #fff;
+    margin-bottom: 1rem;
+}
+
+.mission-finished-stage-summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 1rem;
+    font-weight: 600;
+}
+
+.mission-finished-stage-title {
+    color: #25313f;
+}
+
+.mission-finished-stage-state {
+    color: #607080;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+.mission-finished-stage-body {
+    padding: 0 1rem 1rem;
+}
+
+.mission-match-stage-nested {
+    background: #f8fafc;
+    margin-bottom: 0.75rem;
+}
+
+.mission-match-stage-nested:last-child {
+    margin-bottom: 0;
+}
+
 .mission-stage-badge {
     color: #25313f;
     margin-left: 0.65rem;
