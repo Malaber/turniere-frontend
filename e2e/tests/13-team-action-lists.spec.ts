@@ -185,15 +185,16 @@ test('Mission Control searches and sorts team action lists', async ({ context, p
   if (!alphaTeamName) {
     throw new Error('expected alpha checklist item with team name');
   }
-  const zetaCompletedItem = zeta.team_action_items[0];
-  if (!zetaCompletedItem) {
+  if (zeta.team_action_items.length === 0) {
     throw new Error('expected zeta checklist item');
   }
-  const completeResponse = await client.patch<TeamActionItem>(
-    `/team_action_items/${zetaCompletedItem.id}`,
-    { completed: true }
-  );
-  expectStatus(completeResponse, 200, 'complete zeta checklist item for sort coverage');
+  for (const item of zeta.team_action_items) {
+    const completeResponse = await client.patch<TeamActionItem>(
+      `/team_action_items/${item.id}`,
+      { completed: true }
+    );
+    expectStatus(completeResponse, 200, 'complete zeta checklist item for sort coverage');
+  }
 
   await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
@@ -218,6 +219,12 @@ test('Mission Control searches and sorts team action lists', async ({ context, p
   await expect(cards.first().locator('.form-check-input[type="checkbox"]').first()).toBeHidden();
   await cards.first().locator('summary').click();
   await expect(cards.first().locator('.form-check-input[type="checkbox"]').first()).toBeVisible();
+  await expect(cards.nth(1).locator('summary')).toContainText(
+    `${zeta.team_action_items.length}/${zeta.team_action_items.length} erledigt`
+  );
+  await expect(cards.nth(1).locator('.form-check-input[type="checkbox"]').first()).toBeHidden();
+  await cards.nth(1).locator('summary').click();
+  await expect(cards.nth(1).locator('.form-check-input[type="checkbox"]').first()).toBeVisible();
 
   await sortSelect.selectOption('checked');
   await expect(cards.nth(0).getByRole('heading', { name: zeta.name })).toBeVisible();
@@ -253,7 +260,11 @@ test('Owner can create a new team action list and other viewer receives it live'
   await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
 
-  await expect(page.getByTestId('create-team-action-list-form')).toBeVisible();
+  const createForm = page.getByTestId('create-team-action-list-form');
+  await expect(createForm).toBeVisible();
+  await expect(createForm.locator('#team-action-list-name')).toBeHidden();
+  await createForm.locator('summary').click();
+  await expect(createForm.locator('#team-action-list-name')).toBeVisible();
 
   const viewerContext = await browser.newContext();
   await injectAuth(viewerContext, loadAuthState());
@@ -296,6 +307,11 @@ test('Create list form enforces required inputs and duplicate keys', async ({ co
 
   await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
+
+  const createForm = page.getByTestId('create-team-action-list-form');
+  await expect(createForm.locator('#team-action-list-name')).toBeHidden();
+  await createForm.locator('summary').click();
+  await expect(createForm.locator('#team-action-list-name')).toBeVisible();
 
   await page.getByTestId('create-team-action-list-button').click();
   await expect(page.getByText('Bitte Name, Schlüssel und Aktionsname ausfüllen.')).toBeVisible();

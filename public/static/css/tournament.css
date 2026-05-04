@@ -235,8 +235,21 @@
     margin-bottom: 1rem;
 }
 
-.mission-checklist-sort {
+.mission-checklist-list-controls {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    height: auto;
+    max-width: none;
+    padding: 0.85rem 1rem;
+}
+
+.mission-checklist-list-controls select {
     max-width: 16rem;
+}
+
+.mission-checklist-list-controls + .mission-checklist-details {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
 }
 
 .mission-checklist-details {
@@ -249,16 +262,48 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    list-style-position: outside;
+    list-style: none;
+}
+
+.mission-checklist-summary::-webkit-details-marker {
+    display: none;
 }
 
 .mission-checklist-summary h4 {
     display: inline-flex;
+    margin-bottom: 0;
 }
 
 .mission-checklist-count {
     color: #607080;
     font-size: 0.85rem;
+    margin-left: auto;
+}
+
+.mission-checklist-toggle {
+    align-items: center;
+    border: 1px solid #aeb9c5;
+    border-radius: 999px;
+    color: #4d5b6b;
+    display: inline-flex;
+    font-size: 1rem;
+    font-weight: 700;
+    height: 1.45rem;
+    justify-content: center;
+    line-height: 1;
+    margin-left: 0.25rem;
+    width: 1.45rem;
+}
+
+.mission-checklist-toggle::before {
+    content: '+';
+}
+
+.mission-checklist-details[open] > .mission-checklist-summary .mission-checklist-toggle::before {
+    content: '-';
+}
+
+.mission-create-checklist-details .mission-checklist-toggle {
     margin-left: auto;
 }
 

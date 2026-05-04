@@ -1375,10 +1375,16 @@ function searchableTeamActionLists(teamActionLists, search, sortMode) {
             const sortedItems = teamActionItems
                 .slice()
                 .sort((left, right) => compareTeamActionItems(left, right, sortMode));
+            const completedCount = sortedItems.filter(item => item.completed === true).length;
             const items = teamActionListMatchesSearch(list, normalizedSearch) ?
                 sortedItems :
                 sortedItems.filter(item => teamActionItemMatchesSearch(list, item, normalizedSearch));
-            return Object.assign({}, list, {teamActionItems: items});
+            return Object.assign({}, list, {
+                teamActionItems: items,
+                completedCount,
+                totalCount: sortedItems.length,
+                allCompleted: sortedItems.length > 0 && completedCount === sortedItems.length
+            });
         })
         .filter(list => !normalizedSearch || teamActionListMatchesSearch(list, normalizedSearch) ||
             list.teamActionItems.length > 0);
@@ -1451,18 +1457,6 @@ class MissionChecklists extends React.Component {
                 placeholder='Checklisten, Teams, Schlüssel suchen...'
                 ariaLabel='Checklisten suchen'
             />
-            <div className='mission-checklist-sort mb-3'>
-                <Label className='mb-1' for='mission-checklists-sort'>Sortierung</Label>
-                <Input id='mission-checklists-sort'
-                    type='select'
-                    value={this.state.sortMode}
-                    onChange={this.setSortMode}
-                    data-testid='mission-checklists-sort'>
-                    {TEAM_ACTION_LIST_SORT_OPTIONS.map(option => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                </Input>
-            </div>
             {canMutate &&
                 <CreateTeamActionListForm
                     tournamentId={this.props.tournamentId}
@@ -1484,15 +1478,30 @@ class MissionChecklists extends React.Component {
                 <Alert color='light' className='mb-0'>
                     {hasSearch ? 'Keine Checklisten gefunden.' : 'Keine Checklisten verfügbar.'}
                 </Alert>}
+            {allTeamActionLists.length > 0 &&
+                <div className='mission-control-panel mission-checklist-list-controls mb-0'
+                    data-testid='mission-checklists-list-controls'>
+                    <Label className='mb-1' for='mission-checklists-sort'>Sortierung</Label>
+                    <Input id='mission-checklists-sort'
+                        type='select'
+                        value={this.state.sortMode}
+                        onChange={this.setSortMode}
+                        data-testid='mission-checklists-sort'>
+                        {TEAM_ACTION_LIST_SORT_OPTIONS.map(option => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </Input>
+                </div>}
             {teamActionLists.map(list => (
                 <details key={list.id} className='mission-control-panel mission-checklist-details mb-3'
-                    data-testid='team-action-list-card' open>
-                    <summary className='mission-checklist-summary'>
+                    data-testid='team-action-list-card' open={!list.allCompleted}>
+                    <summary className='mission-checklist-summary' title='Checkliste ein- oder ausklappen'>
                         <h4 className='h6 mb-0'>{list.name}</h4>
                         <Badge color='info' pill>{list.key}</Badge>
                         <span className='mission-checklist-count'>
-                            {teamActionListCompletedCount(list)}/{list.teamActionItems.length} erledigt
+                            {list.completedCount}/{list.totalCount} erledigt
                         </span>
+                        <span className='mission-checklist-toggle' aria-hidden='true' />
                     </summary>
                     <div className='mission-checklist-body'>
                         <div className='text-muted small mb-2'>{list.actionName}</div>
@@ -1575,52 +1584,62 @@ class CreateTeamActionListForm extends React.Component {
     }
 
     render() {
-        return (<form className='mission-control-panel mb-3' onSubmit={this.onCreate}
+        const detailsClassName = 'mission-control-panel mission-checklist-details ' +
+            'mission-create-checklist-details mb-3';
+
+        return (<details className={detailsClassName}
             data-testid='create-team-action-list-form'>
-            <h4 className='h6 mb-3'>Neue Checkliste anlegen</h4>
-            {this.state.errorMessage &&
-                <Alert color='danger' className='mb-3'>
-                    {this.state.errorMessage}
-                </Alert>}
-            <Row className='g-2'>
-                <Col xs='12' md='4'>
-                    <Label className='mb-1' for='team-action-list-name'>Name</Label>
-                    <Input id='team-action-list-name'
-                        value={this.state.name}
-                        onChange={event => this.setState({name: event.target.value})}
-                        placeholder='Playoff-Tokens einsammeln' />
-                </Col>
-                <Col xs='12' md='4'>
-                    <Label className='mb-1' for='team-action-list-key'>Schlüssel</Label>
-                    <Input id='team-action-list-key'
-                        value={this.state.key}
-                        onChange={event => this.setState({key: event.target.value})}
-                        placeholder='playoff_tokens_einsammeln' />
-                </Col>
-                <Col xs='12' md='4'>
-                    <Label className='mb-1' for='team-action-list-action-name'>Aktionsname</Label>
-                    <Input id='team-action-list-action-name'
-                        value={this.state.actionName}
-                        onChange={event => this.setState({actionName: event.target.value})}
-                        placeholder='Token abgegeben' />
-                </Col>
-                <Col xs='12' md='6'>
-                    <Label className='mb-1' for='team-action-list-source'>Quelle</Label>
-                    <Input id='team-action-list-source' type='select'
-                        value={this.state.source}
-                        onChange={event => this.setState({source: event.target.value})}>
-                        <option value='group_stage_survivors'>Teams aus der Gruppenphase (Playoff-Teilnehmer)</option>
-                    </Input>
-                </Col>
-                <Col xs='12' md='6' className='d-flex align-items-end'>
-                    <Button type='submit' color='primary' className='w-100'
-                        disabled={this.state.creating}
-                        data-testid='create-team-action-list-button'>
-                        {this.state.creating ? 'Erstellt...' : 'Checkliste anlegen'}
-                    </Button>
-                </Col>
-            </Row>
-        </form>);
+            <summary className='mission-checklist-summary' title='Formular ein- oder ausklappen'>
+                <h4 className='h6 mb-0'>Neue Checkliste anlegen</h4>
+                <span className='mission-checklist-toggle' aria-hidden='true' />
+            </summary>
+            <form className='mission-checklist-body' onSubmit={this.onCreate}>
+                {this.state.errorMessage &&
+                    <Alert color='danger' className='mb-3'>
+                        {this.state.errorMessage}
+                    </Alert>}
+                <Row className='g-2'>
+                    <Col xs='12' md='4'>
+                        <Label className='mb-1' for='team-action-list-name'>Name</Label>
+                        <Input id='team-action-list-name'
+                            value={this.state.name}
+                            onChange={event => this.setState({name: event.target.value})}
+                            placeholder='Playoff-Tokens einsammeln' />
+                    </Col>
+                    <Col xs='12' md='4'>
+                        <Label className='mb-1' for='team-action-list-key'>Schlüssel</Label>
+                        <Input id='team-action-list-key'
+                            value={this.state.key}
+                            onChange={event => this.setState({key: event.target.value})}
+                            placeholder='playoff_tokens_einsammeln' />
+                    </Col>
+                    <Col xs='12' md='4'>
+                        <Label className='mb-1' for='team-action-list-action-name'>Aktionsname</Label>
+                        <Input id='team-action-list-action-name'
+                            value={this.state.actionName}
+                            onChange={event => this.setState({actionName: event.target.value})}
+                            placeholder='Token abgegeben' />
+                    </Col>
+                    <Col xs='12' md='6'>
+                        <Label className='mb-1' for='team-action-list-source'>Quelle</Label>
+                        <Input id='team-action-list-source' type='select'
+                            value={this.state.source}
+                            onChange={event => this.setState({source: event.target.value})}>
+                            <option value='group_stage_survivors'>
+                                Teams aus der Gruppenphase (Playoff-Teilnehmer)
+                            </option>
+                        </Input>
+                    </Col>
+                    <Col xs='12' md='6' className='d-flex align-items-end'>
+                        <Button type='submit' color='primary' className='w-100'
+                            disabled={this.state.creating}
+                            data-testid='create-team-action-list-button'>
+                            {this.state.creating ? 'Erstellt...' : 'Checkliste anlegen'}
+                        </Button>
+                    </Col>
+                </Row>
+            </form>
+        </details>);
     }
 }
 
