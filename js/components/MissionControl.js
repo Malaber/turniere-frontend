@@ -4,8 +4,8 @@ import {
     Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
 } from 'reactstrap';
 import {
-    FaClock, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaSyncAlt, FaTrash, FaUser,
-    FaUsers
+    FaChevronRight, FaClock, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaSyncAlt,
+    FaTrash, FaUser, FaUsers
 } from 'react-icons/fa';
 import {notify} from './Notifications';
 import {
@@ -1390,6 +1390,32 @@ function searchableTeamActionLists(teamActionLists, search, sortMode) {
             list.teamActionItems.length > 0);
 }
 
+function MissionCollapsibleDetails(props) {
+    const className = ['mission-collapsible-details', props.className].filter(Boolean).join(' ');
+    const summaryClassName = ['mission-collapsible-summary', props.summaryClassName].filter(Boolean).join(' ');
+    const bodyClassName = ['mission-collapsible-body', props.bodyClassName].filter(Boolean).join(' ');
+    const detailsProps = {
+        className,
+        'data-testid': props.testId
+    };
+
+    if (props.defaultOpen === true) {
+        detailsProps.open = true;
+    }
+
+    return (
+        <details {...detailsProps}>
+            <summary className={summaryClassName} title={props.title}>
+                <FaChevronRight className='mission-collapsible-chevron' aria-hidden='true' />
+                {props.summary}
+            </summary>
+            <div className={bodyClassName}>
+                {props.children}
+            </div>
+        </details>
+    );
+}
+
 class MissionChecklists extends React.Component {
     constructor(props) {
         super(props);
@@ -1493,43 +1519,44 @@ class MissionChecklists extends React.Component {
                     </Input>
                 </div>}
             {teamActionLists.map(list => (
-                <details key={list.id} className='mission-control-panel mission-checklist-details mb-3'
-                    data-testid='team-action-list-card' open={!list.allCompleted}>
-                    <summary className='mission-checklist-summary' title='Checkliste ein- oder ausklappen'>
+                <MissionCollapsibleDetails key={list.id}
+                    className='mission-control-panel mission-checklist-details mb-3'
+                    bodyClassName='mission-checklist-body'
+                    defaultOpen={!list.allCompleted}
+                    testId='team-action-list-card'
+                    title='Checkliste ein- oder ausklappen'
+                    summary={<>
                         <h4 className='h6 mb-0'>{list.name}</h4>
                         <Badge color='info' pill>{list.key}</Badge>
                         <span className='mission-checklist-count'>
                             {list.completedCount}/{list.totalCount} erledigt
                         </span>
-                        <span className='mission-checklist-toggle' aria-hidden='true' />
-                    </summary>
-                    <div className='mission-checklist-body'>
-                        <div className='text-muted small mb-2'>{list.actionName}</div>
-                        {list.teamActionItems.map(item => {
-                            const pendingKey = buildTeamActionItemPendingKey(list.key, item);
-                            const disabled = !canMutate || this.state.pendingByItemKey[pendingKey] === true;
-                            return (
-                                <div key={item.id || pendingKey} className='form-check mb-2'>
-                                    <input
-                                        id={'team-action-item-' + pendingKey}
-                                        className='form-check-input'
-                                        type='checkbox'
-                                        checked={item.completed === true}
-                                        disabled={disabled}
-                                        onChange={event => this.onChange(list, item, event)}
-                                    />
-                                    <label className='form-check-label' htmlFor={'team-action-item-' + pendingKey}>
-                                        {item.team ? <TeamName name={item.team.name} inline /> : 'Unbekanntes Team'}
-                                        {item.completedAt &&
-                                            <span className='text-muted ms-2'>
-                                                ({formatTeamActionCompletedAt(item.completedAt)})
-                                            </span>}
-                                    </label>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </details>
+                    </>}>
+                    <div className='text-muted small mb-2'>{list.actionName}</div>
+                    {list.teamActionItems.map(item => {
+                        const pendingKey = buildTeamActionItemPendingKey(list.key, item);
+                        const disabled = !canMutate || this.state.pendingByItemKey[pendingKey] === true;
+                        return (
+                            <div key={item.id || pendingKey} className='form-check mb-2'>
+                                <input
+                                    id={'team-action-item-' + pendingKey}
+                                    className='form-check-input'
+                                    type='checkbox'
+                                    checked={item.completed === true}
+                                    disabled={disabled}
+                                    onChange={event => this.onChange(list, item, event)}
+                                />
+                                <label className='form-check-label' htmlFor={'team-action-item-' + pendingKey}>
+                                    {item.team ? <TeamName name={item.team.name} inline /> : 'Unbekanntes Team'}
+                                    {item.completedAt &&
+                                        <span className='text-muted ms-2'>
+                                            ({formatTeamActionCompletedAt(item.completedAt)})
+                                        </span>}
+                                </label>
+                            </div>
+                        );
+                    })}
+                </MissionCollapsibleDetails>
             ))}
         </section>);
     }
@@ -1587,13 +1614,12 @@ class CreateTeamActionListForm extends React.Component {
         const detailsClassName = 'mission-control-panel mission-checklist-details ' +
             'mission-create-checklist-details mb-3';
 
-        return (<details className={detailsClassName}
-            data-testid='create-team-action-list-form'>
-            <summary className='mission-checklist-summary' title='Formular ein- oder ausklappen'>
-                <h4 className='h6 mb-0'>Neue Checkliste anlegen</h4>
-                <span className='mission-checklist-toggle' aria-hidden='true' />
-            </summary>
-            <form className='mission-checklist-body' onSubmit={this.onCreate}>
+        return (<MissionCollapsibleDetails className={detailsClassName}
+            bodyClassName='mission-checklist-body'
+            testId='create-team-action-list-form'
+            title='Formular ein- oder ausklappen'
+            summary={<h4 className='h6 mb-0'>Neue Checkliste anlegen</h4>}>
+            <form onSubmit={this.onCreate}>
                 {this.state.errorMessage &&
                     <Alert color='danger' className='mb-3'>
                         {this.state.errorMessage}
@@ -1639,7 +1665,7 @@ class CreateTeamActionListForm extends React.Component {
                     </Col>
                 </Row>
             </form>
-        </details>);
+        </MissionCollapsibleDetails>);
     }
 }
 

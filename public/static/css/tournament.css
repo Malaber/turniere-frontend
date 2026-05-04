@@ -256,7 +256,7 @@
     height: auto;
 }
 
-.mission-checklist-summary {
+.mission-collapsible-summary {
     align-items: center;
     cursor: pointer;
     display: flex;
@@ -265,45 +265,28 @@
     list-style: none;
 }
 
-.mission-checklist-summary::-webkit-details-marker {
+.mission-collapsible-summary::-webkit-details-marker {
     display: none;
 }
 
-.mission-checklist-summary h4 {
+.mission-collapsible-summary h4 {
     display: inline-flex;
     margin-bottom: 0;
+}
+
+.mission-collapsible-chevron {
+    color: #607080;
+    flex: 0 0 auto;
+    transition: transform 0.15s ease;
+}
+
+.mission-collapsible-details[open] > .mission-collapsible-summary .mission-collapsible-chevron {
+    transform: rotate(90deg);
 }
 
 .mission-checklist-count {
     color: #607080;
     font-size: 0.85rem;
-    margin-left: auto;
-}
-
-.mission-checklist-toggle {
-    align-items: center;
-    border: 1px solid #aeb9c5;
-    border-radius: 999px;
-    color: #4d5b6b;
-    display: inline-flex;
-    font-size: 1rem;
-    font-weight: 700;
-    height: 1.45rem;
-    justify-content: center;
-    line-height: 1;
-    margin-left: 0.25rem;
-    width: 1.45rem;
-}
-
-.mission-checklist-toggle::before {
-    content: '+';
-}
-
-.mission-checklist-details[open] > .mission-checklist-summary .mission-checklist-toggle::before {
-    content: '-';
-}
-
-.mission-create-checklist-details .mission-checklist-toggle {
     margin-left: auto;
 }
 
