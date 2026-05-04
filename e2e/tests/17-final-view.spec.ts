@@ -143,7 +143,8 @@ test('Final beamer shows timer, final, and optional third-place match', async ({
   await expect(page.getByTestId('final-timer')).toContainText(/Playoff-Start/);
   await expect(page.getByTestId('final-match-card')).toBeVisible();
   await expect(page.getByTestId('third-place-match-card')).toBeVisible();
-  await expect(page.getByTestId('final-title')).toContainText(tournament.name);
+  await expect(page.getByTestId('final-title')).toContainText('Finale');
+  await expect(page.getByTestId('final-subtitle')).toContainText(tournament.name);
 
   const [finalBox, thirdBox] = await Promise.all([
     page.getByTestId('final-match-card').boundingBox(),

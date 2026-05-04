@@ -1,15 +1,14 @@
 import React from 'react';
 import {Spinner} from 'reactstrap';
 import {confetti} from '@tsparticles/confetti';
-import {TeamName} from '../TeamName';
 import {Timer} from '../Timer';
 import {getTimerReasonLabel} from '../../utils/timerState';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
+import {FullscreenMatchCard} from './FullscreenMatchCard';
 import styles from './FinalView.module.css';
 
 
-const FINAL_FIREWORK_BURSTS = 18;
-const FINAL_FIREWORK_INTERVAL_MS = 170;
+const FINAL_FIREWORK_INTERVAL_MS = 900;
 
 
 function joinClasses(...classes) {
@@ -64,12 +63,13 @@ function emitFinalEvent(type, payload) {
 
 function randomFireworkOrigin() {
     return {
-        x: 0.08 + (Math.random() * 0.84),
-        y: 0.1 + (Math.random() * 0.58)
+        x: 0.1 + (Math.random() * 0.8),
+        y: 0.08 + (Math.random() * 0.58)
     };
 }
 
-function fireFinalConfetti(origin, burstIndex) {
+function fireFinalConfetti(burstIndex) {
+    const origin = randomFireworkOrigin();
     emitFinalEvent('confetti', {
         burstIndex,
         style: 'firework',
@@ -77,12 +77,12 @@ function fireFinalConfetti(origin, burstIndex) {
     });
 
     Promise.resolve(confetti({
-        particleCount: 90 + Math.floor(Math.random() * 50),
+        particleCount: 90,
         spread: 360,
-        startVelocity: 32 + (Math.random() * 24),
+        startVelocity: 34,
         decay: 0.91,
         gravity: 0.8,
-        scalar: 1 + (Math.random() * 0.45),
+        scalar: 1.05,
         origin,
         zIndex: 2147483647
     })).catch(error => {
@@ -90,24 +90,34 @@ function fireFinalConfetti(origin, burstIndex) {
     });
 }
 
-function triggerFinalFireworks() {
-    emitFinalEvent('confetti-scheduled', {bursts: FINAL_FIREWORK_BURSTS});
-
-    for (let burstIndex = 0; burstIndex < FINAL_FIREWORK_BURSTS; burstIndex++) {
-        const fire = () => fireFinalConfetti(randomFireworkOrigin(), burstIndex);
-        if (burstIndex === 0) {
-            fire();
-            continue;
+function useSteadyFireworks(active, sessionKey) {
+    React.useEffect(() => {
+        if (!active || typeof window === 'undefined') {
+            return undefined;
         }
-        window.setTimeout(fire, burstIndex * FINAL_FIREWORK_INTERVAL_MS);
-    }
+
+        let burstIndex = 0;
+        emitFinalEvent('confetti-started', {
+            intervalMs: FINAL_FIREWORK_INTERVAL_MS,
+            sessionKey
+        });
+        fireFinalConfetti(burstIndex);
+        burstIndex += 1;
+
+        const intervalId = window.setInterval(() => {
+            fireFinalConfetti(burstIndex);
+            burstIndex += 1;
+        }, FINAL_FIREWORK_INTERVAL_MS);
+
+        return () => window.clearInterval(intervalId);
+    }, [active, sessionKey]);
 }
 
 function HeaderTimer({timerState}) {
     if (!timerState || !timerState.mode) return null;
 
     return (
-        <div className={styles.timer} data-testid="final-timer">
+        <div className={styles.headerTimer} data-testid="final-timer">
             <span className={styles.timerReason}>
                 {getTimerReasonLabel(timerState)}
             </span>
@@ -121,77 +131,47 @@ function HeaderTimer({timerState}) {
 function MatchPanel({match, label, primary = false, testId}) {
     if (!match) {
         return (
-            <div
+            <section
                 className={joinClasses(
                     styles.matchPanel,
-                    primary ? styles.matchPanelPrimary : styles.matchPanelThird
+                    primary ? styles.matchPanelPrimary : styles.matchPanelSecondary
                 )}
                 data-testid={testId}
             >
+                <div className={styles.panelTitle}>{label}</div>
                 <div className={styles.placeholder}>
                     Match noch nicht bereit
                 </div>
-            </div>
+            </section>
         );
     }
-
-    const finalFinished = isFinalFinished(match);
-    const matchWinner = winnerTeam(match);
-    const rows = [
-        {team: match.team1, winner: matchWinner && match.team1.id === matchWinner.id},
-        {team: match.team2, winner: matchWinner && match.team2.id === matchWinner.id}
-    ];
 
     return (
         <section
             className={joinClasses(
                 styles.matchPanel,
-                primary ? styles.matchPanelPrimary : styles.matchPanelThird,
-                finalFinished ? styles.matchPanelFinished : ''
+                primary ? styles.matchPanelPrimary : styles.matchPanelSecondary
             )}
             data-testid={testId}
             data-match-id={match.id}
             data-match-state={match.state}
         >
-            <div className={styles.matchLabel}>
-                <span>{label}</span>
-                <span className={styles.matchBadge}>#{match.position}</span>
-            </div>
-            <div className={styles.matchBody}>
-                {rows.map(({team, winner}, index) => (
-                    <div
-                        key={(team.id || team.name) + '-' + index}
-                        className={joinClasses(
-                            styles.teamRow,
-                            winner ? styles.teamRowWinner : ''
-                        )}
-                        data-testid={primary ? 'final-team-row' : 'third-place-team-row'}
-                    >
-                        <TeamName
-                            name={team.name}
-                            className={joinClasses(
-                                styles.teamName,
-                                primary ? '' : styles.thirdTeamName
-                            )}
-                            testId={primary ? 'final-team-name' : 'third-place-team-name'}
-                        />
-                        <span
-                            className={joinClasses(
-                                styles.score,
-                                primary ? '' : styles.thirdScore
-                            )}
-                            data-testid={primary ? 'final-team-score' : 'third-place-team-score'}
-                        >
-                            {scoreFor(match, team)}
-                        </span>
-                    </div>
-                ))}
+            <div className={styles.panelTitle}>{label}</div>
+            <div className={styles.matchFrame}>
+                <FullscreenMatchCard
+                    match={match}
+                    index={0}
+                    fillHeight
+                    showScores
+                    animateEntry={false}
+                />
             </div>
         </section>
     );
 }
 
-function WinnerPanel({winner}) {
+function WinnerCelebration({winner, sessionKey}) {
+    useSteadyFireworks(Boolean(winner), sessionKey);
     if (!winner) return null;
 
     return (
@@ -202,11 +182,9 @@ function WinnerPanel({winner}) {
                 alt=""
                 data-testid="final-winner-medal"
             />
-            <div className={styles.winnerText}>
-                <div className={styles.winnerLabel}>Turniersieger</div>
-                <div className={styles.winnerName} data-testid="final-winner-name">
-                    {winner.name}
-                </div>
+            <div className={styles.winnerLabel}>Turniersieger</div>
+            <div className={styles.winnerName} data-testid="final-winner-name">
+                {winner.name}
             </div>
         </section>
     );
@@ -229,8 +207,6 @@ export function FinalView({tournamentMeta, matches, timerState, showThirdPlace =
     const finalMatch = finalMatches ? finalMatches.finalMatch : null;
     const thirdPlaceMatch = finalMatches ? finalMatches.thirdPlaceMatch : null;
     const winner = winnerTeam(finalMatch);
-    const firedKeyRef = React.useRef(null);
-    const viewportHeightRef = React.useRef(null);
     const [viewportHeight, setViewportHeight] = React.useState(null);
 
     React.useEffect(() => {
@@ -240,18 +216,8 @@ export function FinalView({tournamentMeta, matches, timerState, showThirdPlace =
         return () => window.removeEventListener('resize', update);
     }, []);
 
-    React.useEffect(() => {
-        if (!winner || !finalMatch) return;
-
-        const key = finalMatch.id + ':' + winner.id + ':' + finalMatch.state;
-        if (firedKeyRef.current === key) return;
-        firedKeyRef.current = key;
-        triggerFinalFireworks();
-    }, [finalMatch, winner]);
-
-    viewportHeightRef.current = viewportHeight;
-    const rootStyle = viewportHeightRef.current ?
-        {'--final-height': viewportHeightRef.current + 'px'} :
+    const rootStyle = viewportHeight ?
+        {'--final-height': viewportHeight + 'px'} :
         undefined;
 
     if (matches == null) {
@@ -266,16 +232,32 @@ export function FinalView({tournamentMeta, matches, timerState, showThirdPlace =
         );
     }
 
+    if (winner) {
+        return (
+            <div className={styles.page} style={rootStyle} data-testid="final-view">
+                <WinnerCelebration
+                    winner={winner}
+                    sessionKey={finalMatch.id + ':' + winner.id + ':' + finalMatch.state}
+                />
+                <GlobalFullscreenStyles/>
+            </div>
+        );
+    }
+
     const showSide = showThirdPlace && thirdPlaceMatch;
 
     return (
         <div className={styles.page} style={rootStyle} data-testid="final-view">
             <header className={styles.header}>
                 <div className={styles.titleGroup}>
-                    <div className={styles.eyebrow}>Finale</div>
                     <div className={styles.title} data-testid="final-title">
-                        {tournamentMeta ? tournamentMeta.name : 'turnie.re'}
+                        &gt; Finale
                     </div>
+                    {tournamentMeta && (
+                        <div className={styles.subtitle} data-testid="final-subtitle">
+                            {tournamentMeta.name}
+                        </div>
+                    )}
                 </div>
                 <HeaderTimer timerState={timerState}/>
             </header>
@@ -286,15 +268,12 @@ export function FinalView({tournamentMeta, matches, timerState, showThirdPlace =
                     showSide ? '' : styles.stageFinalOnly
                 )}
             >
-                <div className={styles.finalStack}>
-                    <MatchPanel
-                        match={finalMatch}
-                        label="Finale"
-                        primary
-                        testId="final-match-card"
-                    />
-                    <WinnerPanel winner={winner}/>
-                </div>
+                <MatchPanel
+                    match={finalMatch}
+                    label="Finale"
+                    primary
+                    testId="final-match-card"
+                />
 
                 {showSide && (
                     <aside className={styles.sideStack}>
