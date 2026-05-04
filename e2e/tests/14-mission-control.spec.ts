@@ -810,12 +810,8 @@ test('Mission Control soundboard controls beamer audio with timer priority', asy
 test('Mission Control collapses finished score stages below active stages', async ({ context, page }) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageAndRunToBeforeFinal(2, 4, 4);
-  const client = await loggedInClient();
   const semifinal = tournament.stages.find((stage) => stage.level === 1);
   expect(semifinal).toBeTruthy();
-
-  const finished = await client.patch(`/stages/${semifinal!.id}`, { state: 'finished' });
-  expectStatus(finished, 200, 'finish semifinal stage');
 
   await page.goto(`/t/${tournament.id}/mission-control#scores`);
   await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });

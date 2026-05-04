@@ -598,7 +598,8 @@
 }
 
 .mission-stage-badge {
-    color: #25313f;
+    background-color: #eef2f6 !important;
+    color: #25313f !important;
     margin-left: 0.65rem;
 }
 

@@ -2004,7 +2004,7 @@ function isPlayoffStageFinished(stage) {
     if (stage.state === 'finished') {
         return true;
     }
-    return !stage.state && stage.matches.length > 0 && stage.matches.every(match => match.state === 'finished');
+    return stage.matches.length > 0 && stage.matches.every(match => match.state === 'finished');
 }
 
 function missionStageRowsForGroupStage(groupStage) {
