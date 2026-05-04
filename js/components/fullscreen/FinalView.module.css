@@ -99,6 +99,7 @@
 .sideStack {
     display: flex;
     flex-direction: column;
+    gap: 0.75rem;
     min-height: 0;
 }
 
@@ -146,38 +147,41 @@
 
 .winnerPanel {
     align-items: center;
+    background: #d1e7dd;
+    border-left: 4px solid #198754;
+    border-radius: 4px;
     display: flex;
-    flex: 1;
+    flex: 0 0 clamp(12rem, 28vh, 19rem);
     flex-direction: column;
     justify-content: center;
     min-height: 0;
-    padding: 1.5rem;
+    padding: clamp(0.75rem, 1.6vw, 1.5rem);
     text-align: center;
 }
 
 .winnerMedal {
     flex-shrink: 0;
-    height: clamp(10rem, 28vh, 21rem);
-    margin-bottom: clamp(1.2rem, 3vh, 2.4rem);
-    width: clamp(10rem, 28vh, 21rem);
+    height: clamp(4.5rem, 11vh, 8rem);
+    margin-bottom: clamp(0.5rem, 1.2vh, 0.9rem);
+    width: clamp(4.5rem, 11vh, 8rem);
 }
 
 .winnerLabel {
-    color: #0055b8;
+    color: #0b1f33;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: clamp(1.8rem, 4vw, 5rem);
+    font-size: clamp(1rem, 1.5vw, 1.8rem);
     font-weight: 900;
     letter-spacing: 0;
     line-height: 1;
-    margin-bottom: clamp(0.8rem, 2vh, 1.5rem);
+    margin-bottom: 0.35rem;
 }
 
 .winnerName {
-    color: #0b1f33;
+    color: #0055b8;
     font-family: Halt, sans-serif;
-    font-size: clamp(4rem, 11vw, 14rem);
-    line-height: 0.95;
-    max-width: 96vw;
+    font-size: clamp(2rem, 4.1vw, 5rem);
+    line-height: 1;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -209,12 +213,11 @@
     }
 
     .winnerMedal {
-        height: clamp(8rem, 22vh, 15rem);
-        width: clamp(8rem, 22vh, 15rem);
+        height: clamp(4rem, 10vh, 7rem);
+        width: clamp(4rem, 10vh, 7rem);
     }
 
     .winnerName {
-        font-size: clamp(3rem, 14vw, 8rem);
-        white-space: normal;
+        font-size: clamp(1.8rem, 8vw, 4rem);
     }
 }

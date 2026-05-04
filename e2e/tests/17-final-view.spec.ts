@@ -195,6 +195,7 @@ test('Final beamer fires fireworks and shows winner medal when final ends', asyn
 
   const winnerName = await finishFinalMatch(client, finalMatch);
 
+  await expect(page.getByTestId('final-match-card')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('final-winner-panel')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId('final-winner-name')).toHaveText(winnerName);
   await expect(page.getByTestId('final-winner-medal')).toHaveAttribute(

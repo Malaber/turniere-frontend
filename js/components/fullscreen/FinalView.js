@@ -232,19 +232,10 @@ export function FinalView({tournamentMeta, matches, timerState, showThirdPlace =
         );
     }
 
-    if (winner) {
-        return (
-            <div className={styles.page} style={rootStyle} data-testid="final-view">
-                <WinnerCelebration
-                    winner={winner}
-                    sessionKey={finalMatch.id + ':' + winner.id + ':' + finalMatch.state}
-                />
-                <GlobalFullscreenStyles/>
-            </div>
-        );
-    }
-
-    const showSide = showThirdPlace && thirdPlaceMatch;
+    const winnerSessionKey = winner && finalMatch ?
+        finalMatch.id + ':' + winner.id + ':' + finalMatch.state :
+        null;
+    const showSide = Boolean(winner) || (showThirdPlace && thirdPlaceMatch);
 
     return (
         <div className={styles.page} style={rootStyle} data-testid="final-view">
@@ -277,11 +268,19 @@ export function FinalView({tournamentMeta, matches, timerState, showThirdPlace =
 
                 {showSide && (
                     <aside className={styles.sideStack}>
-                        <MatchPanel
-                            match={thirdPlaceMatch}
-                            label="Spiel um Platz 3"
-                            testId="third-place-match-card"
-                        />
+                        {winner && (
+                            <WinnerCelebration
+                                winner={winner}
+                                sessionKey={winnerSessionKey}
+                            />
+                        )}
+                        {showThirdPlace && thirdPlaceMatch && (
+                            <MatchPanel
+                                match={thirdPlaceMatch}
+                                label="Spiel um Platz 3"
+                                testId="third-place-match-card"
+                            />
+                        )}
                     </aside>
                 )}
             </main>
