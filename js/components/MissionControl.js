@@ -49,6 +49,7 @@ import {
 } from '../utils/beamerMedia';
 
 const NEXT_MATCHES_DISPLAY_MODE = 'next_matches';
+const FINAL_DISPLAY_MODE = 'final';
 
 function stageName(level) {
     const names = ['Finale', 'Halbfinale', 'Viertelfinale', 'Achtelfinale'];
@@ -74,6 +75,7 @@ const DISPLAY_STATES = [
     {value: 'between_games', label: 'Zwischen den Spielen'},
     {value: 'during_game', label: 'Während dem Spiel'},
     {value: 'next_matches', label: 'Nächste Spiele'},
+    {value: 'final', label: 'Finale'},
     {value: 'timer_only', label: 'Nur Timer'},
     {value: 'group_tables', label: 'Gruppenstand'},
     {value: 'static_image', label: 'Statisches Bild'},
@@ -85,6 +87,7 @@ const BEAMER_MODES = [
     {value: 'during_game', label: 'Matches with Timer', displayState: 'during_game'},
     {value: 'next_matches', label: 'Next Matches', displayState: 'between_games',
         configDisplayMode: NEXT_MATCHES_DISPLAY_MODE},
+    {value: 'final', label: 'Final View', displayState: 'between_games', configDisplayMode: FINAL_DISPLAY_MODE},
     {value: 'timer_only', label: 'Timer Only', displayState: 'during_game', configDisplayMode: 'timer_only'},
     {value: 'between_games', label: 'Matches Only', displayState: 'between_games'},
     {value: 'static_image', label: 'Static Image', displayState: 'static_image'},
@@ -141,6 +144,9 @@ function beamerDisplayStateFor(beamer) {
     }
     if (beamer.config && beamer.config.display_mode === NEXT_MATCHES_DISPLAY_MODE) {
         return 'next_matches';
+    }
+    if (beamer.config && beamer.config.display_mode === FINAL_DISPLAY_MODE) {
+        return 'final';
     }
     if (beamer.config && beamer.config.display_mode === WERBUNG_DISPLAY_MODE) {
         return 'werbung';

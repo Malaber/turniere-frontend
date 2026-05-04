@@ -329,6 +329,16 @@ async function routeRequest(req, res) {
         return;
     }
 
+    const finalBeamerMatch = pathname.match(/^\/t\/([^/]+)\/final$/);
+    if (req.method === 'GET' && finalBeamerMatch) {
+        await app.render(req, res, '/tournament-fullscreen-v2', {
+            code: safeDecode(finalBeamerMatch[1]),
+            beamer: parsedUrl.searchParams.get('beamer') || 'default',
+            display: 'final'
+        });
+        return;
+    }
+
     const editMatch = pathname.match(/^\/t\/(\d+)\/edit$/);
     if (req.method === 'GET' && editMatch) {
         redirect(res, `/t/${editMatch[1]}/mission-control`);

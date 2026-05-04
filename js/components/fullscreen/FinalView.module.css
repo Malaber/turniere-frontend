@@ -1,0 +1,281 @@
+.page {
+    --final-height: 100vh;
+    background: linear-gradient(135deg, #fff8e1 0%, #ffffff 46%, #eaf4ff 100%);
+    color: #111827;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1rem, 2vh, 1.6rem);
+    height: var(--final-height);
+    max-height: var(--final-height);
+    min-height: 0;
+    overflow: hidden;
+    padding: clamp(1rem, 2vw, 2.2rem);
+}
+
+.header {
+    align-items: center;
+    display: flex;
+    flex-shrink: 0;
+    gap: 1rem;
+    justify-content: space-between;
+    min-height: clamp(4.8rem, 10vh, 7rem);
+}
+
+.titleGroup {
+    min-width: 0;
+}
+
+.eyebrow {
+    color: #8a5a00;
+    font-size: clamp(1.05rem, 1.6vw, 1.9rem);
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.title {
+    font-family: Halt, sans-serif;
+    font-size: clamp(2.3rem, 5.2vw, 6rem);
+    line-height: 1;
+    margin-top: 0.2rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.timer {
+    align-items: center;
+    background: #111827;
+    border: 3px solid #f4c430;
+    border-radius: 8px;
+    color: #ffffff;
+    display: flex;
+    flex-shrink: 0;
+    gap: clamp(0.55rem, 1vw, 1rem);
+    padding: clamp(0.55rem, 1vw, 1rem) clamp(0.75rem, 1.4vw, 1.4rem);
+}
+
+.timerReason {
+    color: #f8d467;
+    font-size: clamp(0.9rem, 1.25vw, 1.55rem);
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.timerValue {
+    font-family: Halt, sans-serif;
+    font-size: clamp(1.6rem, 3.1vw, 3.7rem);
+    line-height: 1;
+    min-width: 4ch;
+    text-align: right;
+}
+
+.stage {
+    display: grid;
+    flex: 1 1 auto;
+    gap: clamp(1rem, 1.6vw, 1.8rem);
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 25vw);
+    min-height: 0;
+}
+
+.stageFinalOnly {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.finalStack,
+.sideStack {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1rem, 1.6vw, 1.8rem);
+    min-height: 0;
+}
+
+.matchPanel {
+    --match-border: #0d6efd;
+    --match-panel-bg: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(8px);
+    background: var(--match-panel-bg);
+    border: 4px solid var(--match-border);
+    border-radius: 8px;
+    box-shadow: 0 1rem 2.5rem rgba(17, 24, 39, 0.12);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.matchPanelPrimary {
+    flex: 1 1 auto;
+}
+
+.matchPanelThird {
+    --match-border: #198754;
+    flex: 0 0 min(38vh, 24rem);
+}
+
+.matchPanelFinished {
+    --match-border: #f4c430;
+}
+
+.matchLabel {
+    align-items: center;
+    background: var(--match-border);
+    color: #ffffff;
+    display: flex;
+    flex-shrink: 0;
+    font-size: clamp(1rem, 1.8vw, 2.4rem);
+    font-weight: 900;
+    justify-content: space-between;
+    padding: clamp(0.55rem, 1vw, 1rem) clamp(0.8rem, 1.5vw, 1.6rem);
+}
+
+.matchBadge {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 999px;
+    padding: 0.05em 0.45em;
+}
+
+.matchBody {
+    display: grid;
+    flex: 1 1 auto;
+    gap: clamp(0.7rem, 1.5vh, 1.3rem);
+    grid-template-rows: 1fr 1fr;
+    min-height: 0;
+    padding: clamp(0.9rem, 1.8vw, 2rem);
+}
+
+.teamRow {
+    align-items: center;
+    background: #ffffff;
+    border: 3px solid #d1d5db;
+    border-radius: 8px;
+    display: grid;
+    gap: clamp(0.75rem, 1.5vw, 1.5rem);
+    grid-template-columns: minmax(0, 1fr) minmax(4.5rem, 12vw);
+    min-height: 0;
+    padding: clamp(0.6rem, 1.4vw, 1.5rem);
+}
+
+.teamRowWinner {
+    background: linear-gradient(90deg, #fff4bf, #ffffff);
+    border-color: #f4c430;
+}
+
+.teamName {
+    color: #111827;
+    font-size: clamp(2.2rem, 7.2vh, 7.2rem);
+    font-weight: 900;
+    line-height: 1.05;
+}
+
+.thirdTeamName {
+    font-size: clamp(1.2rem, 3.2vh, 2.6rem);
+}
+
+.score {
+    color: #0d6efd;
+    font-family: Halt, sans-serif;
+    font-size: clamp(2.4rem, 9vh, 8rem);
+    line-height: 1;
+    text-align: right;
+}
+
+.thirdScore {
+    font-size: clamp(1.3rem, 4vh, 3rem);
+}
+
+.winnerPanel {
+    align-items: center;
+    background: #111827;
+    border: 4px solid #f4c430;
+    border-radius: 8px;
+    box-shadow: 0 1rem 2.5rem rgba(17, 24, 39, 0.18);
+    color: #ffffff;
+    display: grid;
+    flex: 0 0 clamp(10rem, 24vh, 17rem);
+    gap: clamp(0.75rem, 1.4vw, 1.5rem);
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 0;
+    padding: clamp(0.9rem, 1.8vw, 2rem);
+}
+
+.winnerMedal {
+    height: clamp(7rem, 18vh, 13rem);
+    width: clamp(7rem, 18vh, 13rem);
+}
+
+.winnerText {
+    min-width: 0;
+}
+
+.winnerLabel {
+    color: #f8d467;
+    font-size: clamp(1rem, 1.8vw, 2.2rem);
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.winnerName {
+    font-family: Halt, sans-serif;
+    font-size: clamp(2.2rem, 6.5vw, 7.4rem);
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.placeholder,
+.loading {
+    align-items: center;
+    color: #4b5563;
+    display: flex;
+    flex: 1 1 auto;
+    font-size: clamp(1.4rem, 2.8vw, 3.2rem);
+    font-weight: 800;
+    justify-content: center;
+    text-align: center;
+}
+
+@media (max-aspect-ratio: 4 / 3) {
+    .page {
+        padding: clamp(0.75rem, 2vw, 1.2rem);
+    }
+
+    .header {
+        align-items: flex-start;
+        flex-direction: column;
+        min-height: auto;
+    }
+
+    .title {
+        white-space: normal;
+    }
+
+    .timer {
+        width: 100%;
+    }
+
+    .timerValue {
+        margin-left: auto;
+    }
+
+    .stage {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .matchPanelThird {
+        flex-basis: clamp(8rem, 24vh, 14rem);
+    }
+
+    .teamName {
+        font-size: clamp(1.5rem, 5.6vh, 4rem);
+    }
+
+    .score {
+        font-size: clamp(1.7rem, 7vh, 4.6rem);
+    }
+
+    .winnerPanel {
+        flex-basis: clamp(8rem, 20vh, 12rem);
+    }
+}
