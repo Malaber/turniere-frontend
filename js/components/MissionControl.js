@@ -4,8 +4,8 @@ import {
     Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
 } from 'reactstrap';
 import {
-    FaClock, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaSyncAlt, FaTrash, FaUser,
-    FaUsers
+    FaChevronRight, FaClock, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaSyncAlt,
+    FaTrash, FaUser, FaUsers
 } from 'react-icons/fa';
 import {notify} from './Notifications';
 import {
@@ -102,7 +102,13 @@ const BEAMER_MATCH_STATES = [
 ];
 
 const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'checklists', 'teams', 'history', 'settings'];
-const SEARCH_TAB_IDS = ['scores', 'teams'];
+const SEARCH_TAB_IDS = ['scores', 'teams', 'checklists'];
+const TEAM_ACTION_LIST_SORT_OPTIONS = [
+    {value: 'name', label: 'Name'},
+    {value: 'date', label: 'Datum'},
+    {value: 'unchecked', label: 'Offen zuerst'},
+    {value: 'checked', label: 'Erledigt zuerst'}
+];
 
 function tabFromLocation() {
     if (typeof window === 'undefined') {
@@ -635,6 +641,9 @@ export class MissionControl extends React.Component {
                                 <MissionChecklists
                                     tournamentId={tournament.id}
                                     teamActionLists={tournament.teamActionLists}
+                                    search={this.state.search}
+                                    onSearchChange={this.setSearch}
+                                    searchInputRef={this.searchInput}
                                     disabled={!canControl}
                                     onSetTeamActionItemState={this.props.onSetTeamActionItemState}
                                     onCreateTeamActionList={this.props.onCreateTeamActionList}
@@ -1253,14 +1262,176 @@ function MissionTournamentSettings(props) {
     );
 }
 
+function compareTeamActionListsByName(left, right) {
+    const nameResult = (left.name || '').localeCompare(right.name || '', 'de', {
+        numeric: true,
+        sensitivity: 'base'
+    });
+    if (nameResult !== 0) {
+        return nameResult;
+    }
+    const leftDate = left.createdAt instanceof Date ? left.createdAt.getTime() : 0;
+    const rightDate = right.createdAt instanceof Date ? right.createdAt.getTime() : 0;
+    if (leftDate !== rightDate) {
+        return leftDate - rightDate;
+    }
+    return String(left.id || '').localeCompare(String(right.id || ''), 'de', {numeric: true});
+}
+
+function compareTeamActionItemsByName(left, right) {
+    const leftName = left.team ? left.team.name : 'Unbekanntes Team';
+    const rightName = right.team ? right.team.name : 'Unbekanntes Team';
+    const nameResult = leftName.localeCompare(rightName, 'de', {
+        numeric: true,
+        sensitivity: 'base'
+    });
+    if (nameResult !== 0) {
+        return nameResult;
+    }
+    return String(left.id || '').localeCompare(String(right.id || ''), 'de', {numeric: true});
+}
+
+function teamActionListCompletedCount(list) {
+    const items = Array.isArray(list.teamActionItems) ? list.teamActionItems : [];
+    return items.filter(item => item.completed === true).length;
+}
+
+function teamActionListUncheckedCount(list) {
+    const items = Array.isArray(list.teamActionItems) ? list.teamActionItems : [];
+    return items.filter(item => item.completed !== true).length;
+}
+
+function compareTeamActionLists(left, right, sortMode) {
+    if (sortMode === 'date') {
+        const leftDate = left.createdAt instanceof Date ? left.createdAt.getTime() : 0;
+        const rightDate = right.createdAt instanceof Date ? right.createdAt.getTime() : 0;
+        if (leftDate !== rightDate) {
+            return rightDate - leftDate;
+        }
+    }
+    if (sortMode === 'checked') {
+        const countResult = teamActionListCompletedCount(right) - teamActionListCompletedCount(left);
+        if (countResult !== 0) {
+            return countResult;
+        }
+    }
+    if (sortMode === 'unchecked') {
+        const countResult = teamActionListUncheckedCount(right) - teamActionListUncheckedCount(left);
+        if (countResult !== 0) {
+            return countResult;
+        }
+    }
+    return compareTeamActionListsByName(left, right);
+}
+
+function compareTeamActionItems(left, right, sortMode) {
+    if (sortMode === 'date') {
+        const leftDate = left.completedAt instanceof Date ? left.completedAt.getTime() : 0;
+        const rightDate = right.completedAt instanceof Date ? right.completedAt.getTime() : 0;
+        if (leftDate !== rightDate) {
+            return rightDate - leftDate;
+        }
+    }
+    if (sortMode === 'checked' && left.completed !== right.completed) {
+        return left.completed === true ? -1 : 1;
+    }
+    if (sortMode === 'unchecked' && left.completed !== right.completed) {
+        return left.completed === true ? 1 : -1;
+    }
+    return compareTeamActionItemsByName(left, right);
+}
+
+function teamActionListMatchesSearch(list, search) {
+    if (!search) {
+        return true;
+    }
+    const haystack = [
+        list.name,
+        list.key,
+        list.actionName,
+        list.source
+    ].join(' ').toLowerCase();
+    return haystack.indexOf(search) !== -1;
+}
+
+function teamActionItemMatchesSearch(list, item, search) {
+    if (!search) {
+        return true;
+    }
+    const completedAt = item.completedAt ? formatTeamActionCompletedAt(item.completedAt) : '';
+    const haystack = [
+        list.name,
+        list.key,
+        list.actionName,
+        list.source,
+        item.team ? item.team.name : 'Unbekanntes Team',
+        item.completed === true ? 'erledigt completed' : 'offen open',
+        completedAt
+    ].join(' ').toLowerCase();
+    return haystack.indexOf(search) !== -1;
+}
+
+function searchableTeamActionLists(teamActionLists, search, sortMode) {
+    const normalizedSearch = (search || '').trim().toLowerCase();
+    return teamActionLists
+        .slice()
+        .sort((left, right) => compareTeamActionLists(left, right, sortMode))
+        .map(list => {
+            const teamActionItems = Array.isArray(list.teamActionItems) ? list.teamActionItems : [];
+            const sortedItems = teamActionItems
+                .slice()
+                .sort((left, right) => compareTeamActionItems(left, right, sortMode));
+            const completedCount = sortedItems.filter(item => item.completed === true).length;
+            const items = teamActionListMatchesSearch(list, normalizedSearch) ?
+                sortedItems :
+                sortedItems.filter(item => teamActionItemMatchesSearch(list, item, normalizedSearch));
+            return Object.assign({}, list, {
+                teamActionItems: items,
+                completedCount,
+                totalCount: sortedItems.length,
+                allCompleted: sortedItems.length > 0 && completedCount === sortedItems.length
+            });
+        })
+        .filter(list => !normalizedSearch || teamActionListMatchesSearch(list, normalizedSearch) ||
+            list.teamActionItems.length > 0);
+}
+
+function MissionCollapsibleDetails(props) {
+    const className = ['mission-collapsible-details', props.className].filter(Boolean).join(' ');
+    const summaryClassName = ['mission-collapsible-summary', props.summaryClassName].filter(Boolean).join(' ');
+    const bodyClassName = ['mission-collapsible-body', props.bodyClassName].filter(Boolean).join(' ');
+    const detailsProps = {
+        className,
+        'data-testid': props.testId
+    };
+
+    if (props.defaultOpen === true) {
+        detailsProps.open = true;
+    }
+
+    return (
+        <details {...detailsProps}>
+            <summary className={summaryClassName} title={props.title}>
+                <FaChevronRight className='mission-collapsible-chevron' aria-hidden='true' />
+                {props.summary}
+            </summary>
+            <div className={bodyClassName}>
+                {props.children}
+            </div>
+        </details>
+    );
+}
+
 class MissionChecklists extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
             pendingByItemKey: {},
-            errorMessage: ''
+            errorMessage: '',
+            sortMode: 'name'
         };
         this.onChange = this.onChange.bind(this);
+        this.setSortMode = this.setSortMode.bind(this);
     }
 
     onChange(list, item, event) {
@@ -1296,8 +1467,14 @@ class MissionChecklists extends React.Component {
         });
     }
 
+    setSortMode(event) {
+        this.setState({sortMode: event.target.value});
+    }
+
     render() {
-        const teamActionLists = Array.isArray(this.props.teamActionLists) ? this.props.teamActionLists : [];
+        const allTeamActionLists = Array.isArray(this.props.teamActionLists) ? this.props.teamActionLists : [];
+        const teamActionLists = searchableTeamActionLists(allTeamActionLists, this.props.search, this.state.sortMode);
+        const hasSearch = (this.props.search || '').trim().length > 0;
         const canMutate = !this.props.disabled;
 
         return (<section className='mission-control-section' data-testid='mission-checklists-control'>
@@ -1305,6 +1482,13 @@ class MissionChecklists extends React.Component {
             <p className='text-muted mb-3'>
                 Team-Checklisten werden live synchronisiert, zum Beispiel für Token, Unterlagen oder Material.
             </p>
+            <MissionSearchToolbar
+                value={this.props.search}
+                onChange={this.props.onSearchChange}
+                inputRef={this.props.searchInputRef}
+                placeholder='Checklisten, Teams, Schlüssel suchen...'
+                ariaLabel='Checklisten suchen'
+            />
             {canMutate &&
                 <CreateTeamActionListForm
                     tournamentId={this.props.tournamentId}
@@ -1318,16 +1502,42 @@ class MissionChecklists extends React.Component {
                 <Alert color='danger' className='mb-3'>
                     {this.state.errorMessage}
                 </Alert>}
-            {teamActionLists.length === 0 &&
+            {allTeamActionLists.length === 0 &&
                 <Alert color='light' className='mb-0'>
                     Keine Checklisten verfügbar.
                 </Alert>}
+            {allTeamActionLists.length > 0 && teamActionLists.length === 0 &&
+                <Alert color='light' className='mb-0'>
+                    {hasSearch ? 'Keine Checklisten gefunden.' : 'Keine Checklisten verfügbar.'}
+                </Alert>}
+            {allTeamActionLists.length > 0 &&
+                <div className='mission-control-panel mission-checklist-list-controls mb-0'
+                    data-testid='mission-checklists-list-controls'>
+                    <Label className='mb-1' for='mission-checklists-sort'>Sortierung</Label>
+                    <Input id='mission-checklists-sort'
+                        type='select'
+                        value={this.state.sortMode}
+                        onChange={this.setSortMode}
+                        data-testid='mission-checklists-sort'>
+                        {TEAM_ACTION_LIST_SORT_OPTIONS.map(option => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </Input>
+                </div>}
             {teamActionLists.map(list => (
-                <div key={list.id} className='mission-control-panel mb-3' data-testid='team-action-list-card'>
-                    <div className='d-flex align-items-center gap-2 flex-wrap mb-2'>
+                <MissionCollapsibleDetails key={list.id}
+                    className='mission-control-panel mission-checklist-details mb-3'
+                    bodyClassName='mission-checklist-body'
+                    defaultOpen={!list.allCompleted}
+                    testId='team-action-list-card'
+                    title='Checkliste ein- oder ausklappen'
+                    summary={<>
                         <h4 className='h6 mb-0'>{list.name}</h4>
                         <Badge color='info' pill>{list.key}</Badge>
-                    </div>
+                        <span className='mission-checklist-count'>
+                            {list.completedCount}/{list.totalCount} erledigt
+                        </span>
+                    </>}>
                     <div className='text-muted small mb-2'>{list.actionName}</div>
                     {list.teamActionItems.map(item => {
                         const pendingKey = buildTeamActionItemPendingKey(list.key, item);
@@ -1352,7 +1562,7 @@ class MissionChecklists extends React.Component {
                             </div>
                         );
                     })}
-                </div>
+                </MissionCollapsibleDetails>
             ))}
         </section>);
     }
@@ -1407,52 +1617,61 @@ class CreateTeamActionListForm extends React.Component {
     }
 
     render() {
-        return (<form className='mission-control-panel mb-3' onSubmit={this.onCreate}
-            data-testid='create-team-action-list-form'>
-            <h4 className='h6 mb-3'>Neue Checkliste anlegen</h4>
-            {this.state.errorMessage &&
-                <Alert color='danger' className='mb-3'>
-                    {this.state.errorMessage}
-                </Alert>}
-            <Row className='g-2'>
-                <Col xs='12' md='4'>
-                    <Label className='mb-1' for='team-action-list-name'>Name</Label>
-                    <Input id='team-action-list-name'
-                        value={this.state.name}
-                        onChange={event => this.setState({name: event.target.value})}
-                        placeholder='Playoff-Tokens einsammeln' />
-                </Col>
-                <Col xs='12' md='4'>
-                    <Label className='mb-1' for='team-action-list-key'>Schlüssel</Label>
-                    <Input id='team-action-list-key'
-                        value={this.state.key}
-                        onChange={event => this.setState({key: event.target.value})}
-                        placeholder='playoff_tokens_einsammeln' />
-                </Col>
-                <Col xs='12' md='4'>
-                    <Label className='mb-1' for='team-action-list-action-name'>Aktionsname</Label>
-                    <Input id='team-action-list-action-name'
-                        value={this.state.actionName}
-                        onChange={event => this.setState({actionName: event.target.value})}
-                        placeholder='Token abgegeben' />
-                </Col>
-                <Col xs='12' md='6'>
-                    <Label className='mb-1' for='team-action-list-source'>Quelle</Label>
-                    <Input id='team-action-list-source' type='select'
-                        value={this.state.source}
-                        onChange={event => this.setState({source: event.target.value})}>
-                        <option value='group_stage_survivors'>Teams aus der Gruppenphase (Playoff-Teilnehmer)</option>
-                    </Input>
-                </Col>
-                <Col xs='12' md='6' className='d-flex align-items-end'>
-                    <Button type='submit' color='primary' className='w-100'
-                        disabled={this.state.creating}
-                        data-testid='create-team-action-list-button'>
-                        {this.state.creating ? 'Erstellt...' : 'Checkliste anlegen'}
-                    </Button>
-                </Col>
-            </Row>
-        </form>);
+        const detailsClassName = 'mission-control-panel mission-checklist-details ' +
+            'mission-create-checklist-details mb-3';
+
+        return (<MissionCollapsibleDetails className={detailsClassName}
+            bodyClassName='mission-checklist-body'
+            testId='create-team-action-list-form'
+            title='Formular ein- oder ausklappen'
+            summary={<h4 className='h6 mb-0'>Neue Checkliste anlegen</h4>}>
+            <form onSubmit={this.onCreate}>
+                {this.state.errorMessage &&
+                    <Alert color='danger' className='mb-3'>
+                        {this.state.errorMessage}
+                    </Alert>}
+                <Row className='g-2'>
+                    <Col xs='12' md='4'>
+                        <Label className='mb-1' for='team-action-list-name'>Name</Label>
+                        <Input id='team-action-list-name'
+                            value={this.state.name}
+                            onChange={event => this.setState({name: event.target.value})}
+                            placeholder='Playoff-Tokens einsammeln' />
+                    </Col>
+                    <Col xs='12' md='4'>
+                        <Label className='mb-1' for='team-action-list-key'>Schlüssel</Label>
+                        <Input id='team-action-list-key'
+                            value={this.state.key}
+                            onChange={event => this.setState({key: event.target.value})}
+                            placeholder='playoff_tokens_einsammeln' />
+                    </Col>
+                    <Col xs='12' md='4'>
+                        <Label className='mb-1' for='team-action-list-action-name'>Aktionsname</Label>
+                        <Input id='team-action-list-action-name'
+                            value={this.state.actionName}
+                            onChange={event => this.setState({actionName: event.target.value})}
+                            placeholder='Token abgegeben' />
+                    </Col>
+                    <Col xs='12' md='6'>
+                        <Label className='mb-1' for='team-action-list-source'>Quelle</Label>
+                        <Input id='team-action-list-source' type='select'
+                            value={this.state.source}
+                            onChange={event => this.setState({source: event.target.value})}>
+                            <option value='group_stage_survivors'>
+                                Teams aus der Gruppenphase (Playoff-Teilnehmer)
+                            </option>
+                        </Input>
+                    </Col>
+                    <Col xs='12' md='6' className='d-flex align-items-end'>
+                        <Button type='submit' color='primary' className='w-100'
+                            disabled={this.state.creating}
+                            data-testid='create-team-action-list-button'>
+                            {this.state.creating ? 'Erstellt...' : 'Checkliste anlegen'}
+                        </Button>
+                    </Col>
+                </Row>
+            </form>
+        </MissionCollapsibleDetails>);
     }
 }
 
@@ -2028,28 +2247,13 @@ function MissionMatches(props) {
 
     return (
         <section className='mission-control-section mission-pane-scores' data-testid='mission-score-control'>
-            <div className='mission-match-toolbar'>
-                <div className='mission-match-search'>
-                    <FaSearch aria-hidden='true' />
-                    <Input
-                        type='search'
-                        value={props.search}
-                        onChange={props.onSearchChange}
-                        placeholder='Gruppen, Teams, Matches suchen...'
-                        aria-label='Scores suchen'
-                        title='Mit Cmd+K oder Ctrl+K fokussieren'
-                        innerRef={props.searchInputRef}
-                        data-testid='mission-control-search'
-                    />
-                </div>
-                <div className='mission-search-hint'>
-                    <FaKeyboard aria-hidden='true' /> Cmd+K
-                </div>
-                <Button color='link' className='mission-filter-reset'
-                    onClick={() => props.onSearchChange({target: {value: ''}})}>
-                    x Filter zurücksetzen
-                </Button>
-            </div>
+            <MissionSearchToolbar
+                value={props.search}
+                onChange={props.onSearchChange}
+                inputRef={props.searchInputRef}
+                placeholder='Gruppen, Teams, Matches suchen...'
+                ariaLabel='Scores suchen'
+            />
             {rows.map(row => (
                 <MissionStageBlock
                     key={row.key}
@@ -2062,6 +2266,33 @@ function MissionMatches(props) {
                 />
             ))}
         </section>
+    );
+}
+
+function MissionSearchToolbar(props) {
+    return (
+        <div className='mission-search-toolbar mission-match-toolbar'>
+            <div className='mission-match-search'>
+                <FaSearch aria-hidden='true' />
+                <Input
+                    type='search'
+                    value={props.value}
+                    onChange={props.onChange}
+                    placeholder={props.placeholder}
+                    aria-label={props.ariaLabel}
+                    title='Mit Cmd+K oder Ctrl+K fokussieren'
+                    innerRef={props.inputRef}
+                    data-testid='mission-control-search'
+                />
+            </div>
+            <div className='mission-search-hint'>
+                <FaKeyboard aria-hidden='true' /> Cmd+K
+            </div>
+            <Button color='link' className='mission-filter-reset'
+                onClick={() => props.onChange({target: {value: ''}})}>
+                x Filter zurücksetzen
+            </Button>
+        </div>
     );
 }
 

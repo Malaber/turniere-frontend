@@ -235,6 +235,65 @@
     margin-bottom: 1rem;
 }
 
+.mission-checklist-list-controls {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    height: auto;
+    max-width: none;
+    padding: 0.85rem 1rem;
+}
+
+.mission-checklist-list-controls select {
+    max-width: 16rem;
+}
+
+.mission-checklist-list-controls + .mission-checklist-details {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.mission-checklist-details {
+    height: auto;
+}
+
+.mission-collapsible-summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+}
+
+.mission-collapsible-summary::-webkit-details-marker {
+    display: none;
+}
+
+.mission-collapsible-summary h4 {
+    display: inline-flex;
+    margin-bottom: 0;
+}
+
+.mission-collapsible-chevron {
+    color: #607080;
+    flex: 0 0 auto;
+    transition: transform 0.15s ease;
+}
+
+.mission-collapsible-details[open] > .mission-collapsible-summary .mission-collapsible-chevron {
+    transform: rotate(90deg);
+}
+
+.mission-checklist-count {
+    color: #607080;
+    font-size: 0.85rem;
+    margin-left: auto;
+}
+
+.mission-checklist-body {
+    padding-top: 0.85rem;
+}
+
 .mission-bulk-start-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
