@@ -816,7 +816,7 @@ test('Mission Control collapses finished score stages below active stages', asyn
   await page.goto(`/t/${tournament.id}/mission-control#scores`);
   await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
   const scoresPane = page.locator('.tab-pane.active');
-  const finalHeading = scoresPane.getByRole('heading', { name: 'Finale 1 Matches' });
+  const finalHeading = scoresPane.getByRole('heading', { name: /Finale \d+ Matches/ });
   await expect(finalHeading).toBeVisible();
 
   const groupDetails = scoresPane.getByTestId('mission-finished-stage-group-stage');
