@@ -8,6 +8,7 @@ import {
   longGroupStageTeamName,
   seedAndPlayGroupStage,
   seedGroupStageAndRunToBeforeFinal,
+  seedGroupStageReadyForPlayoffs,
   seedGroupStageTournament,
 } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
@@ -92,6 +93,32 @@ async function holdStartUntilConfirmOpen(page: Page, button: Locator) {
   await page.mouse.up();
 }
 
+async function playoffStageCount(client: ApiClient, tournamentId: number) {
+  const tournament = await client.get<{ stages: Array<{ level: number }> }>(`/tournaments/${tournamentId}`);
+  expectStatus(tournament, 200, `fetch tournament ${tournamentId}`);
+  return tournament.json.stages.filter((stage) => stage.level !== -1).length;
+}
+
+function responseErrorMessages(body: unknown): string[] {
+  if (!body || typeof body !== 'object') return [];
+  const record = body as {
+    error?: unknown;
+    errors?: unknown;
+    full_messages?: unknown;
+  };
+  if (typeof record.error === 'string') return [record.error];
+  if (Array.isArray(record.errors)) return record.errors.map(String);
+  if (
+    record.errors &&
+    typeof record.errors === 'object' &&
+    Array.isArray((record.errors as { full_messages?: unknown }).full_messages)
+  ) {
+    return ((record.errors as { full_messages: unknown[] }).full_messages).map(String);
+  }
+  if (Array.isArray(record.full_messages)) return record.full_messages.map(String);
+  return [];
+}
+
 async function holdMouseUntilUnlocked(page: Page, card: Locator) {
   const lock = card.getByTestId('mission-match-lock');
   await lock.hover();
@@ -143,6 +170,100 @@ async function expectUnlockProgressDrainsAndLocks(card: Locator, score: Locator)
   await expect(progress).toHaveAttribute('aria-valuenow', '0');
   await expect(card.getByRole('button', { name: /Locked/ })).toBeVisible();
 }
+
+test('Mission Control starts and deletes playoffs with modal result feedback', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageReadyForPlayoffs(2, 4, 4);
+  const client = await loggedInClient();
+
+  await page.goto(`/t/${tournament.id}/mission-control#starts`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(async () => playoffStageCount(client, tournament.id), { timeout: 20_000 }).toBe(0);
+
+  const playoffStart = page.getByTestId('mission-playoff-start');
+  await expect(playoffStart).toBeVisible();
+  await playoffStart.click();
+  await page.waitForTimeout(250);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await page.route(/\/stages\/\d+$/, async (route) => {
+    await page.waitForTimeout(350);
+    await route.continue();
+  });
+  await holdStartUntilConfirmOpen(page, playoffStart);
+  let dialog = page.getByTestId('mission-start-confirm-modal');
+  await expect(dialog.getByRole('heading', { name: 'Playoffs starten' })).toBeVisible();
+  await dialog.getByTestId('mission-start-confirm-ok').click();
+  await expect(dialog.getByTestId('mission-start-confirm-loading')).toContainText('Playoffs werden generiert');
+  await expect(dialog.getByTestId('mission-start-confirm-result')).toContainText('Playoffs wurden generiert.', {
+    timeout: 20_000,
+  });
+  await dialog.getByTestId('mission-start-result-ok').click();
+  await expect.poll(async () => playoffStageCount(client, tournament.id), { timeout: 20_000 }).toBeGreaterThan(0);
+
+  const playoffDelete = page.getByTestId('mission-playoff-delete');
+  await expect(playoffDelete).toBeVisible({ timeout: 20_000 });
+  await playoffDelete.click();
+  await page.waitForTimeout(250);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await page.route(/\/tournaments\/\d+\/playoffs$/, async (route) => {
+    await page.waitForTimeout(350);
+    await route.continue();
+  });
+  await holdStartUntilConfirmOpen(page, playoffDelete);
+  dialog = page.getByTestId('mission-start-confirm-modal');
+  await expect(dialog.getByRole('heading', { name: 'Playoffs löschen' })).toBeVisible();
+  const deleteResponse = page.waitForResponse((response) => (
+    response.request().method() === 'DELETE' &&
+    /\/tournaments\/\d+\/playoffs$/.test(response.url())
+  ));
+  await dialog.getByTestId('mission-start-confirm-ok').click();
+  await expect(dialog.getByTestId('mission-start-confirm-loading')).toContainText('Playoffs werden gelöscht');
+  expect((await deleteResponse).ok()).toBe(true);
+  await expect(dialog.getByTestId('mission-start-confirm-result')).toContainText('Playoffs wurden gelöscht.', {
+    timeout: 20_000,
+  });
+  await dialog.getByTestId('mission-start-result-ok').click();
+  await expect.poll(async () => playoffStageCount(client, tournament.id), { timeout: 20_000 }).toBe(0);
+});
+
+test('Mission Control keeps playoff deletion errors inside confirmation modal', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedAndPlayGroupStage(2, 4, 4);
+  const client = await loggedInClient();
+  const matches = await client.get<Array<{ id: number; state: string; group?: { id: number } | null }>>(
+    `/tournaments/${tournament.id}/matches`,
+  );
+  expectStatus(matches, 200, 'fetch matches for playoff deletion failure');
+  const playoffMatch = matches.json.find((match) => !match.group && match.state === 'not_started');
+  expect(playoffMatch).toBeTruthy();
+  const started = await client.patch(`/matches/${playoffMatch!.id}`, { state: 'in_progress' });
+  expectStatus(started, 200, 'start playoff match before deletion');
+
+  await page.goto(`/t/${tournament.id}/mission-control#starts`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  const playoffDelete = page.getByTestId('mission-playoff-delete');
+  await expect(playoffDelete).toBeVisible();
+  await holdStartUntilConfirmOpen(page, playoffDelete);
+  const dialog = page.getByTestId('mission-start-confirm-modal');
+  const deleteResponse = page.waitForResponse((response) => (
+    response.request().method() === 'DELETE' &&
+    /\/tournaments\/\d+\/playoffs$/.test(response.url())
+  ));
+  await dialog.getByTestId('mission-start-confirm-ok').click();
+  const response = await deleteResponse;
+  expect(response.ok()).toBe(false);
+  const body = await response.json().catch(() => ({}));
+  const messages = responseErrorMessages(body);
+  const result = dialog.getByTestId('mission-start-confirm-result');
+  await expect(result).toBeVisible({ timeout: 20_000 });
+  if (messages.length > 0) {
+    await expect(result).toContainText(messages[0]);
+  }
+  await expect(result).not.toContainText('Playoffs wurden gelöscht.');
+  expect(await playoffStageCount(client, tournament.id)).toBeGreaterThan(0);
+});
 
 test('Mission Control configures Werbung image checklist', async ({ context, page }) => {
   await injectAuth(context);

@@ -837,6 +837,21 @@ export function finishGroupStage(stageId, successCallback, errorCallback) {
     });
 }
 
+export function deletePlayoffs(tournamentId, successCallback, errorCallback) {
+    const currentState = getState();
+    deleteRequest(currentState, '/tournaments/' + tournamentId + '/playoffs').then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
+}
+
 export function setTournamentTimer(tournamentId, payload, successCallback, errorCallback) {
     __store.dispatch({
         type: actionTypesTournamentinfo.SET_TOURNAMENT_TIMER,

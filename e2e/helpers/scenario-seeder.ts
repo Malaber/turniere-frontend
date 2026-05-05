@@ -350,6 +350,28 @@ export async function seedAndPlayGroupStage(
 }
 
 /**
+ * Create a group-stage tournament and finish every group match, but leave
+ * playoff generation to the browser.
+ */
+export async function seedGroupStageReadyForPlayoffs(
+  groupCount = 4,
+  teamsPerGroup = 4,
+  playoffTeamsAmount = 8,
+): Promise<SeededTournament> {
+  const client = await makeClient();
+  const payload = groupStagePayload(groupCount, teamsPerGroup, playoffTeamsAmount);
+
+  const created = await client.post<Tournament>('/tournaments', payload);
+  expectStatus(created, 201, 'create group stage tournament');
+
+  let tournament = await fetchTournament(client, (created.json as { id: number }).id);
+  await finishGroupStageMatches(client, tournament);
+
+  tournament = await fetchTournament(client, tournament.id);
+  return { tournament, code: tournament.code };
+}
+
+/**
  * Finish an already-created group-stage tournament and return it with playoffs populated.
  */
 export async function finishGroupStageForTournament(tournamentId: number): Promise<SeededTournament> {
