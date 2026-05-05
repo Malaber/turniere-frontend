@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fa';
 import {notify} from './Notifications';
 import {
+    bulkUpdateMatchMetadata,
     createBeamer,
     deleteBeamer,
     endMatch,
@@ -22,6 +23,7 @@ import {
     stopMatch,
     submitDeciderMatchScores,
     submitMatchScores,
+    updateMatchMetadata,
     updateBeamer,
     updateTeamName
 } from '../api';
@@ -108,8 +110,8 @@ const BEAMER_MATCH_STATES = [
     {value: 'finished', label: 'Beendet'}
 ];
 
-const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'checklists', 'teams', 'history', 'settings'];
-const SEARCH_TAB_IDS = ['scores', 'teams', 'checklists'];
+const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'metadata', 'checklists', 'teams', 'history', 'settings'];
+const SEARCH_TAB_IDS = ['scores', 'metadata', 'teams', 'checklists'];
 const TEAM_ACTION_LIST_SORT_OPTIONS = [
     {value: 'name', label: 'Name'},
     {value: 'date', label: 'Datum'},
@@ -585,6 +587,15 @@ export class MissionControl extends React.Component {
                                 </NavLink>
                             </NavItem>
                             <NavItem>
+                                <NavLink href='#metadata' active={this.state.activeTab === 'metadata'}
+                                    onClick={event => {
+                                        event.preventDefault();
+                                        this.setActiveTab('metadata');
+                                    }}>
+                                    Match-Infos
+                                </NavLink>
+                            </NavItem>
+                            <NavItem>
                                 <NavLink href='#teams' active={this.state.activeTab === 'teams'}
                                     onClick={event => {
                                         event.preventDefault();
@@ -648,6 +659,17 @@ export class MissionControl extends React.Component {
 
                             <TabPane tabId='scores'>
                                 <MissionMatches
+                                    tournament={tournament}
+                                    search={this.state.search}
+                                    onSearchChange={this.setSearch}
+                                    searchInputRef={this.searchInput}
+                                    disabled={!canControl}
+                                    onTournamentChange={this.handleTournamentChange}
+                                />
+                            </TabPane>
+
+                            <TabPane tabId='metadata'>
+                                <MissionMatchMetadata
                                     tournament={tournament}
                                     search={this.state.search}
                                     onSearchChange={this.setSearch}
@@ -2467,6 +2489,144 @@ function missionScoreSections(tournament) {
     return sections;
 }
 
+function missionMetadataRows(tournament) {
+    const rows = [];
+    if (tournament.groupStage) {
+        tournament.groupStage.groups.forEach(group => {
+            group.matches.forEach(match => {
+                rows.push({
+                    key: 'group-' + group.id + '-' + match.id,
+                    title: 'Gruppe ' + group.number,
+                    group,
+                    match
+                });
+            });
+        });
+    }
+    tournament.playoffStages.forEach(stage => {
+        stage.matches.forEach(match => {
+            rows.push({
+                key: 'stage-' + stage.id + '-' + match.id,
+                title: stageName(stage.level),
+                stage,
+                match
+            });
+        });
+    });
+    return rows.sort((left, right) => {
+        const titleResult = left.title.localeCompare(right.title, 'de', {numeric: true});
+        if (titleResult !== 0) {
+            return titleResult;
+        }
+        return sortMatchesByPositionAscending()(left.match, right.match);
+    });
+}
+
+function metadataTextValue(value) {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    return String(value);
+}
+
+function metadataPayloadValue(value) {
+    const normalized = metadataTextValue(value).trim();
+    return normalized === '' ? null : normalized;
+}
+
+function metadataPayloadFromFields(fields, includeEmptyFields) {
+    const payload = {};
+    const location = metadataPayloadValue(fields.location);
+    const startTime = metadataPayloadValue(fields.startTime);
+    const notes = metadataPayloadValue(fields.notes);
+
+    if (includeEmptyFields || location !== null) {
+        payload.location = location;
+    }
+    if (includeEmptyFields || startTime !== null) {
+        payload.start_time = startTime;
+    }
+    if (includeEmptyFields || notes !== null) {
+        payload.notes = notes;
+    }
+
+    return payload;
+}
+
+function metadataPayloadHasFields(payload) {
+    return Object.prototype.hasOwnProperty.call(payload, 'location') ||
+        Object.prototype.hasOwnProperty.call(payload, 'start_time') ||
+        Object.prototype.hasOwnProperty.call(payload, 'notes');
+}
+
+function metadataMatchLabel(row) {
+    return row.title + ' · Spiel ' + row.match.position;
+}
+
+function uniqueSortedNumbers(values) {
+    return values
+        .filter(value => value !== null && value !== undefined && value !== '')
+        .map(value => Number(value))
+        .filter(value => Number.isFinite(value))
+        .filter((value, index, allValues) => allValues.indexOf(value) === index)
+        .sort((left, right) => left - right);
+}
+
+function groupStagePositionOptions(tournament) {
+    if (!tournament.groupStage) {
+        return [];
+    }
+    const positions = [];
+    tournament.groupStage.groups.forEach(group => {
+        group.matches.forEach(match => {
+            positions.push(match.backendPosition);
+        });
+    });
+    return uniqueSortedNumbers(positions).map(position => ({
+        value: String(position),
+        label: 'Gruppenphase Runde ' + (position + 1)
+    }));
+}
+
+function stageLevelOptions(tournament) {
+    return uniqueSortedNumbers(tournament.playoffStages.map(stage => stage.level)).map(level => ({
+        value: String(level),
+        label: stageName(level)
+    }));
+}
+
+function stageIdOptions(tournament) {
+    return tournament.playoffStages.map(stage => ({
+        value: String(stage.id),
+        label: stageName(stage.level) + ' #' + stage.id
+    }));
+}
+
+function matchPositionOptions(rows) {
+    return uniqueSortedNumbers(rows.map(row => row.match.backendPosition)).map(position => ({
+        value: String(position),
+        label: 'Position ' + (position + 1)
+    }));
+}
+
+const MATCH_METADATA_STATE_OPTIONS = [
+    {value: 'upcoming', label: 'Upcoming'},
+    {value: 'not_ready', label: 'Nicht bereit'},
+    {value: 'not_started', label: 'Nicht gestartet'},
+    {value: 'in_progress', label: 'Laufend'},
+    {value: 'finished', label: 'Beendet'}
+];
+
+const MATCH_METADATA_SELECTOR_TYPES = [
+    {value: 'all', label: 'Alle Matches'},
+    {value: 'match_ids', label: 'Ausgewählte Matches'},
+    {value: 'group_stage_position', label: 'Gruppenphase Runde'},
+    {value: 'stage_level', label: 'Playoff-Runde'},
+    {value: 'stage_id', label: 'Stage'},
+    {value: 'position', label: 'Position'},
+    {value: 'state', label: 'Status'}
+];
+
 function missionMatchPassesSearch(title, match, search) {
     if (!search) {
         return true;
@@ -2480,6 +2640,9 @@ function missionMatchPassesSearch(title, match, search) {
         'spiel ' + match.position,
         'sp. ' + match.position,
         'tisch ' + match.position,
+        match.location,
+        match.startTime,
+        match.notes,
         match.group ? 'gruppe ' + match.group.number : '',
         match.group ? 'g' + match.group.number : '',
         'g' + (match.group ? match.group.number : Math.max(1, match.position)) + '-s' + match.position
@@ -2496,6 +2659,433 @@ function missionStageMatches(title, matches, search) {
 
 function missionSectionMatchCount(rows, search) {
     return rows.reduce((total, row) => total + missionStageMatches(row.name, row.matches, search).length, 0);
+}
+
+function metadataSelectorValueOptions(selectorType, tournament, rows) {
+    switch (selectorType) {
+    case 'group_stage_position':
+        return groupStagePositionOptions(tournament);
+    case 'stage_level':
+        return stageLevelOptions(tournament);
+    case 'stage_id':
+        return stageIdOptions(tournament);
+    case 'position':
+        return matchPositionOptions(rows);
+    case 'state':
+        return MATCH_METADATA_STATE_OPTIONS;
+    default:
+        return [];
+    }
+}
+
+class MissionMatchMetadata extends React.Component {
+    render() {
+        const rows = missionMetadataRows(this.props.tournament);
+        const search = this.props.search.trim().toLowerCase();
+        const filteredRows = rows.filter(row => missionMatchPassesSearch(row.title, row.match, search));
+        const hasSearch = search.length > 0;
+
+        return (
+            <section className='mission-control-section mission-pane-metadata'
+                data-testid='mission-metadata-control'>
+                <MissionSearchToolbar
+                    value={this.props.search}
+                    onChange={this.props.onSearchChange}
+                    inputRef={this.props.searchInputRef}
+                    placeholder='Match-Infos, Teams, Orte suchen...'
+                    ariaLabel='Match-Infos suchen'
+                />
+                <MissionMatchMetadataBulkForm
+                    tournament={this.props.tournament}
+                    rows={rows}
+                    visibleRows={filteredRows}
+                    disabled={this.props.disabled}
+                    onTournamentChange={this.props.onTournamentChange}
+                />
+                {rows.length === 0 &&
+                    <Alert color='light' className='mb-0'>Keine Matches vorhanden.</Alert>}
+                {rows.length > 0 && filteredRows.length === 0 &&
+                    <Alert color='light' className='mb-0'>
+                        {hasSearch ? 'Keine Match-Infos gefunden.' : 'Keine Matches vorhanden.'}
+                    </Alert>}
+                {filteredRows.length > 0 &&
+                    <div className='mission-match-grid mission-metadata-grid'>
+                        {filteredRows.map(row => (
+                            <MissionMatchMetadataCard
+                                key={row.key}
+                                row={row}
+                                disabled={this.props.disabled}
+                                onTournamentChange={this.props.onTournamentChange}
+                            />
+                        ))}
+                    </div>}
+            </section>
+        );
+    }
+}
+
+class MissionMatchMetadataBulkForm extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = {
+            selectorType: 'all',
+            selectorValue: '',
+            selectedMatchIds: {},
+            location: '',
+            startTime: '',
+            notes: '',
+            saving: false
+        };
+        this.setSelectorType = this.setSelectorType.bind(this);
+        this.setSelectorValue = this.setSelectorValue.bind(this);
+        this.setField = this.setField.bind(this);
+        this.toggleMatchId = this.toggleMatchId.bind(this);
+        this.submit = this.submit.bind(this);
+        this.onSuccess = this.onSuccess.bind(this);
+        this.onError = this.onError.bind(this);
+    }
+
+    currentSelectorValue(options) {
+        if (options.some(option => option.value === this.state.selectorValue)) {
+            return this.state.selectorValue;
+        }
+        return options.length > 0 ? options[0].value : '';
+    }
+
+    setSelectorType(event) {
+        const selectorType = event.target.value;
+        const options = metadataSelectorValueOptions(selectorType, this.props.tournament, this.props.rows);
+        this.setState({
+            selectorType,
+            selectorValue: options.length > 0 ? options[0].value : '',
+            selectedMatchIds: selectorType === 'match_ids' ? this.state.selectedMatchIds : {}
+        });
+    }
+
+    setSelectorValue(event) {
+        this.setState({selectorValue: event.target.value});
+    }
+
+    setField(field, event) {
+        this.setState({[field]: event.target.value});
+    }
+
+    toggleMatchId(matchId, event) {
+        const checked = event.target.checked === true;
+        this.setState(prevState => ({
+            selectedMatchIds: Object.assign({}, prevState.selectedMatchIds, {[matchId]: checked})
+        }));
+    }
+
+    selectorPayload() {
+        const options = metadataSelectorValueOptions(this.state.selectorType, this.props.tournament, this.props.rows);
+        const selectorValue = this.currentSelectorValue(options);
+        switch (this.state.selectorType) {
+        case 'all':
+            return {all: true};
+        case 'match_ids': {
+            const ids = Object.keys(this.state.selectedMatchIds)
+                .filter(matchId => this.state.selectedMatchIds[matchId])
+                .map(matchId => Number(matchId))
+                .filter(matchId => Number.isFinite(matchId));
+            return ids.length > 0 ? {match_ids: ids} : null;
+        }
+        case 'group_stage_position':
+            return selectorValue !== '' ? {group_stage_position: Number(selectorValue)} : null;
+        case 'stage_level':
+            return selectorValue !== '' ? {stage_level: Number(selectorValue)} : null;
+        case 'stage_id':
+            return selectorValue !== '' ? {stage_id: Number(selectorValue)} : null;
+        case 'position':
+            return selectorValue !== '' ? {position: Number(selectorValue)} : null;
+        case 'state':
+            return selectorValue !== '' ? {state: selectorValue} : null;
+        default:
+            return null;
+        }
+    }
+
+    buildPayload() {
+        const metadata = metadataPayloadFromFields(this.state, false);
+        const selector = this.selectorPayload();
+        if (!selector || !metadataPayloadHasFields(metadata)) {
+            return null;
+        }
+        return Object.assign({}, selector, metadata);
+    }
+
+    submit(event) {
+        event.preventDefault();
+        const payload = this.buildPayload();
+        if (!payload || this.props.disabled || this.state.saving) {
+            return;
+        }
+        this.setState({saving: true});
+        bulkUpdateMatchMetadata(
+            this.props.tournament.id,
+            payload,
+            this.onSuccess,
+            this.onError
+        );
+    }
+
+    onSuccess() {
+        notify.show('Match-Infos wurden gespeichert.', 'success', 2500);
+        this.setState({
+            saving: false,
+            location: '',
+            startTime: '',
+            notes: ''
+        });
+        this.props.onTournamentChange();
+    }
+
+    onError(errorBody, status) {
+        const fallback = status === 423 ?
+            'Follower-Modus aktiv. Match-Infos sind gesperrt.' :
+            'Match-Infos konnten nicht gespeichert werden.';
+        notify.show(errorMessage(errorBody, fallback), 'error', 3000);
+        this.setState({saving: false});
+    }
+
+    renderMatchIdSelector() {
+        if (this.state.selectorType !== 'match_ids') {
+            return null;
+        }
+        const rows = this.props.visibleRows;
+        const selectedCount = Object.keys(this.state.selectedMatchIds)
+            .filter(matchId => this.state.selectedMatchIds[matchId]).length;
+
+        return (
+            <div className='mission-metadata-match-picker' data-testid='mission-metadata-match-picker'>
+                <div className='text-muted small mb-2'>
+                    {selectedCount} Matches ausgewählt. Suche filtert diese Liste.
+                </div>
+                {rows.length === 0 &&
+                    <div className='text-muted'>Keine sichtbaren Matches für Auswahl.</div>}
+                {rows.map(row => (
+                    <FormGroup check key={row.match.id} className='mission-metadata-match-option'>
+                        <Input
+                            id={'missionMetadataBulkMatch' + row.match.id}
+                            type='checkbox'
+                            checked={this.state.selectedMatchIds[row.match.id] === true}
+                            disabled={this.props.disabled || this.state.saving}
+                            data-testid='mission-metadata-bulk-match'
+                            onChange={event => this.toggleMatchId(row.match.id, event)}
+                        />
+                        <Label check for={'missionMetadataBulkMatch' + row.match.id}>
+                            {metadataMatchLabel(row)} · {row.match.team1.name} vs. {row.match.team2.name}
+                        </Label>
+                    </FormGroup>
+                ))}
+            </div>
+        );
+    }
+
+    render() {
+        const selectorOptions = metadataSelectorValueOptions(
+            this.state.selectorType,
+            this.props.tournament,
+            this.props.rows
+        );
+        const selectorValue = this.currentSelectorValue(selectorOptions);
+        const requiresSelectorValue = selectorOptions.length > 0;
+        const canSubmit = this.buildPayload() !== null && !this.props.disabled && !this.state.saving;
+
+        return (
+            <form className='mission-control-panel mission-metadata-bulk mb-3'
+                data-testid='mission-metadata-bulk-form'
+                onSubmit={this.submit}>
+                <h3 className='h5 mission-pane-heading'>Bulk Match-Infos</h3>
+                <p>Setzt Ort, Startzeit oder Notizen für mehrere Matches.</p>
+                <Row className='g-3'>
+                    <Col md='4'>
+                        <Label for='missionMetadataBulkSelectorType'>Ziel</Label>
+                        <Input id='missionMetadataBulkSelectorType'
+                            type='select'
+                            value={this.state.selectorType}
+                            disabled={this.props.disabled || this.state.saving}
+                            data-testid='mission-metadata-bulk-selector-type'
+                            onChange={this.setSelectorType}>
+                            {MATCH_METADATA_SELECTOR_TYPES.map(option => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </Input>
+                    </Col>
+                    {requiresSelectorValue &&
+                        <Col md='4'>
+                            <Label for='missionMetadataBulkSelectorValue'>Auswahl</Label>
+                            <Input id='missionMetadataBulkSelectorValue'
+                                type='select'
+                                value={selectorValue}
+                                disabled={this.props.disabled || this.state.saving || selectorOptions.length === 0}
+                                data-testid='mission-metadata-bulk-selector-value'
+                                onChange={this.setSelectorValue}>
+                                {selectorOptions.map(option => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </Input>
+                        </Col>}
+                    <Col md='4'>
+                        <Label for='missionMetadataBulkLocation'>Ort</Label>
+                        <Input id='missionMetadataBulkLocation'
+                            value={this.state.location}
+                            disabled={this.props.disabled || this.state.saving}
+                            data-testid='mission-metadata-bulk-location'
+                            onChange={event => this.setField('location', event)}
+                        />
+                    </Col>
+                    <Col md='4'>
+                        <Label for='missionMetadataBulkStartTime'>Startzeit</Label>
+                        <Input id='missionMetadataBulkStartTime'
+                            value={this.state.startTime}
+                            disabled={this.props.disabled || this.state.saving}
+                            data-testid='mission-metadata-bulk-start-time'
+                            onChange={event => this.setField('startTime', event)}
+                        />
+                    </Col>
+                    <Col md='8'>
+                        <Label for='missionMetadataBulkNotes'>Notizen</Label>
+                        <Input id='missionMetadataBulkNotes'
+                            type='textarea'
+                            rows='2'
+                            value={this.state.notes}
+                            disabled={this.props.disabled || this.state.saving}
+                            data-testid='mission-metadata-bulk-notes'
+                            onChange={event => this.setField('notes', event)}
+                        />
+                    </Col>
+                </Row>
+                {this.renderMatchIdSelector()}
+                <Button color='primary' className='mt-3'
+                    type='submit'
+                    disabled={!canSubmit}
+                    data-testid='mission-metadata-bulk-save'>
+                    {this.state.saving ? 'Speichert...' : 'Bulk speichern'}
+                </Button>
+            </form>
+        );
+    }
+}
+
+class MissionMatchMetadataCard extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = this.stateFromMatch(props.row.match);
+        this.setField = this.setField.bind(this);
+        this.submit = this.submit.bind(this);
+        this.onSuccess = this.onSuccess.bind(this);
+        this.onError = this.onError.bind(this);
+    }
+
+    stateFromMatch(match) {
+        return {
+            location: metadataTextValue(match.location),
+            startTime: metadataTextValue(match.startTime),
+            notes: metadataTextValue(match.notes),
+            saving: false
+        };
+    }
+
+    componentDidUpdate(prevProps) {
+        const prevMatch = prevProps.row.match;
+        const match = this.props.row.match;
+        if (prevMatch.id !== match.id ||
+            prevMatch.location !== match.location ||
+            prevMatch.startTime !== match.startTime ||
+            prevMatch.notes !== match.notes) {
+            this.setState(this.stateFromMatch(match));
+        }
+    }
+
+    setField(field, event) {
+        this.setState({[field]: event.target.value});
+    }
+
+    submit(event) {
+        event.preventDefault();
+        if (this.props.disabled || this.state.saving) {
+            return;
+        }
+        this.setState({saving: true});
+        updateMatchMetadata(
+            this.props.row.match.id,
+            metadataPayloadFromFields(this.state, true),
+            this.onSuccess,
+            this.onError
+        );
+    }
+
+    onSuccess() {
+        notify.show('Match-Info wurde gespeichert.', 'success', 2000);
+        this.setState({saving: false});
+        this.props.onTournamentChange();
+    }
+
+    onError(errorBody, status) {
+        const fallback = status === 423 ?
+            'Follower-Modus aktiv. Match-Infos sind gesperrt.' :
+            'Match-Info konnte nicht gespeichert werden.';
+        notify.show(errorMessage(errorBody, fallback), 'error', 3000);
+        this.setState({saving: false});
+    }
+
+    render() {
+        const row = this.props.row;
+        const match = row.match;
+        const disabled = this.props.disabled || this.state.saving;
+
+        return (
+            <form className='mission-control-panel mission-metadata-card'
+                data-testid='mission-metadata-card'
+                data-match-id={match.id}
+                onSubmit={this.submit}>
+                <div className='mission-metadata-card-header'>
+                    <div>
+                        <h4>{metadataMatchLabel(row)}</h4>
+                        <div className='text-muted small'>
+                            <TeamName name={match.team1.name} inline/> vs. <TeamName name={match.team2.name} inline/>
+                        </div>
+                    </div>
+                    <Badge color='light' className='mission-stage-badge'>{matchStateLabel(match.state)}</Badge>
+                </div>
+                <FormGroup>
+                    <Label for={'missionMetadataLocation' + match.id}>Ort</Label>
+                    <Input id={'missionMetadataLocation' + match.id}
+                        value={this.state.location}
+                        disabled={disabled}
+                        data-testid='mission-metadata-location'
+                        onChange={event => this.setField('location', event)}
+                    />
+                </FormGroup>
+                <FormGroup>
+                    <Label for={'missionMetadataStartTime' + match.id}>Startzeit</Label>
+                    <Input id={'missionMetadataStartTime' + match.id}
+                        value={this.state.startTime}
+                        disabled={disabled}
+                        data-testid='mission-metadata-start-time'
+                        onChange={event => this.setField('startTime', event)}
+                    />
+                </FormGroup>
+                <FormGroup>
+                    <Label for={'missionMetadataNotes' + match.id}>Notizen</Label>
+                    <Input id={'missionMetadataNotes' + match.id}
+                        type='textarea'
+                        rows='3'
+                        value={this.state.notes}
+                        disabled={disabled}
+                        data-testid='mission-metadata-notes'
+                        onChange={event => this.setField('notes', event)}
+                    />
+                </FormGroup>
+                <Button color='primary' type='submit'
+                    disabled={disabled}
+                    data-testid='mission-metadata-save'>
+                    {this.state.saving ? 'Speichert...' : 'Speichern'}
+                </Button>
+            </form>
+        );
+    }
 }
 
 function MissionMatches(props) {
