@@ -466,7 +466,6 @@ export class MissionControl extends React.Component {
         this.setState({actionRunning: 'playoff-start'});
         return new Promise((resolve, reject) => {
             finishGroupStage(groupStage.id, () => {
-                this.setState({actionRunning: 'playoff-start-result'});
                 resolve({messages: ['Playoffs wurden generiert.']});
             }, errorBody => {
                 this.setState({actionRunning: null});
@@ -484,7 +483,6 @@ export class MissionControl extends React.Component {
         this.setState({actionRunning: 'playoff-delete'});
         return new Promise((resolve, reject) => {
             deletePlayoffs(this.props.tournament.id, () => {
-                this.setState({actionRunning: 'playoff-delete-result'});
                 resolve({messages: ['Playoffs wurden gelöscht.']});
             }, errorBody => {
                 this.setState({actionRunning: null});
@@ -2100,9 +2098,9 @@ class MissionTimer extends React.Component {
 
 function MissionNextMatches(props) {
     const groupStage = props.tournament.groupStage;
-    const hasPlayoffDeleteResult = props.actionRunning === 'playoff-delete-result';
+    const hasPlayoffDeleteResult = props.actionRunning === 'playoff-delete';
     const hasPlayoffStages = props.tournament.playoffStages.length > 0 || hasPlayoffDeleteResult;
-    const hasPlayoffStartResult = props.actionRunning === 'playoff-start-result';
+    const hasPlayoffStartResult = props.actionRunning === 'playoff-start';
     const canStartPlayoffs = (groupStage && groupStage.state !== 'finished') || hasPlayoffStartResult;
     const stagesWithReadyMatches = props.tournament.playoffStages
         .map(stage => ({
@@ -2126,8 +2124,7 @@ function MissionNextMatches(props) {
                         <MissionStartConfirmButton
                             testId='mission-playoff-start'
                             color='warning'
-                            disabled={props.disabled || props.actionRunning === 'playoff-start' ||
-                                hasPlayoffStartResult}
+                            disabled={props.disabled || props.actionRunning === 'playoff-start'}
                             onConfirm={props.onStartPlayoffs}
                             onResultClose={props.onPlayoffActionResultClose}
                             title='Playoffs starten'
@@ -2147,8 +2144,7 @@ function MissionNextMatches(props) {
                         <MissionStartConfirmButton
                             testId='mission-playoff-delete'
                             color='danger'
-                            disabled={props.disabled || props.actionRunning === 'playoff-delete' ||
-                                hasPlayoffDeleteResult}
+                            disabled={props.disabled || props.actionRunning === 'playoff-delete'}
                             onConfirm={props.onDeletePlayoffs}
                             onResultClose={props.onPlayoffActionResultClose}
                             title='Playoffs löschen'
