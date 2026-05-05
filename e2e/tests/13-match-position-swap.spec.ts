@@ -110,7 +110,8 @@ test('Non-owner cannot open swap UI in match modal', async ({ context, page }, t
 
   await page.locator('[data-match-id]').first().click();
   await expect(page.getByTestId('swap-match-position-controls')).toHaveCount(0);
-  await expect(page.locator('.match-modal-content')).toHaveCount(0);
+  await expect(page.locator('.match-modal-content')).toBeVisible();
+  await expect(page.getByTestId('match-metadata-details')).toBeVisible();
   await keyframe(page, testInfo, 'swap_non_owner_no_controls');
 });
 
@@ -127,7 +128,8 @@ test('Read-only owner cannot open swap UI in match modal', async ({ context, pag
 
   await page.locator('[data-match-id]').first().click();
   await expect(page.getByTestId('swap-match-position-controls')).toHaveCount(0);
-  await expect(page.locator('.match-modal-content')).toHaveCount(0);
+  await expect(page.locator('.match-modal-content')).toBeVisible();
+  await expect(page.getByTestId('match-metadata-details')).toBeVisible();
   await keyframe(page, testInfo, 'swap_read_only_no_controls');
 });
 

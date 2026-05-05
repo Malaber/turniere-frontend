@@ -687,6 +687,50 @@
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
 }
 
+.mission-metadata-grid {
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+}
+
+.mission-metadata-bulk {
+    height: auto;
+}
+
+.mission-metadata-match-picker {
+    border-top: 1px solid #dde3ea;
+    margin-top: 1rem;
+    max-height: 18rem;
+    overflow: auto;
+    padding-top: 1rem;
+}
+
+.mission-metadata-match-option {
+    margin-bottom: 0.45rem;
+}
+
+.mission-metadata-card {
+    height: auto;
+}
+
+.mission-metadata-card-header {
+    align-items: flex-start;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.match-metadata-details {
+    background: #f8fafc;
+    border: 1px solid #dde3ea;
+    border-radius: 0.45rem;
+    padding: 0.85rem 1rem;
+}
+
+.match-metadata-details dt,
+.match-metadata-details dd {
+    margin-bottom: 0.35rem;
+}
+
 .mission-pane-scores .mission-control-group-table {
     max-width: 100%;
 }

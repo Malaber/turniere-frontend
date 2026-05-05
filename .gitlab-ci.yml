@@ -92,9 +92,14 @@ frontend e2e:
     - npm ci
   script:
     - npx playwright test
+  after_script:
+    - mkdir -p screenshots test-results
+    - if [ -d e2e/screenshots ]; then cp -a e2e/screenshots/. screenshots/; fi
+    - if [ -d e2e/test-results ]; then cp -a e2e/test-results/. test-results/; fi
   artifacts:
+    expose_as: 'E2E screenshots'
     when: always
     paths:
-      - e2e/screenshots/
-      - e2e/test-results/
+      - screenshots/
+      - test-results/
     expire_in: 30 days
