@@ -784,6 +784,7 @@ function LocalSaveErrorLogEntry(props) {
         null;
     const entryClassName = 'mission-local-save-error-entry' +
         (entry.lastRetryResult === 'success' ? ' has-success-response' : '');
+    const statusColor = entry.status ? 'danger' : 'secondary';
     const retryResponseAvailable = entry.lastRetryResponse !== undefined && entry.lastRetryResponse !== null;
 
     return (
@@ -796,7 +797,7 @@ function LocalSaveErrorLogEntry(props) {
                     <span className='mission-transaction-log-detail'>
                         <FaClock aria-hidden='true' /> {formatTransactionLogTime(entry.createdAt)}
                     </span>
-                    <Badge color='light' className='mission-transaction-log-action'>{status}</Badge>
+                    <Badge color={statusColor} className='mission-local-save-error-status'>{status}</Badge>
                     {entry.lastRetryResult === 'success' &&
                         <Badge color='warning' className='mission-transaction-log-action'>
                             Retry OK

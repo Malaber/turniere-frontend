@@ -478,6 +478,15 @@
     overflow-wrap: anywhere;
 }
 
+.mission-local-save-error-status {
+    font-weight: 700;
+    line-height: 1.2;
+    max-width: 12rem;
+    overflow-wrap: anywhere;
+    text-align: left;
+    white-space: normal;
+}
+
 .mission-local-save-error-body {
     border-top: 1px solid #f0c2c2;
     padding: 1rem;
