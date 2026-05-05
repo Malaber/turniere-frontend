@@ -54,7 +54,8 @@ export function markLocalSaveErrorRetrySuccess(entryId, response) {
         retryCount: Number(entry.retryCount || 0) + 1,
         lastRetryAt: new Date().toISOString(),
         lastRetryStatus: response && response.status ? response.status : null,
-        lastRetryResult: 'success'
+        lastRetryResult: 'success',
+        lastRetryResponse: response ? sanitizeValue(response.data) : null
     }));
 }
 

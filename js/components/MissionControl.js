@@ -776,9 +776,12 @@ function LocalSaveErrorLogEntry(props) {
     const lastRetry = entry.lastRetryAt ?
         retryResultLabel(entry.lastRetryResult, entry.lastRetryStatus, entry.lastRetryAt) :
         null;
+    const entryClassName = 'mission-local-save-error-entry' +
+        (entry.lastRetryResult === 'success' ? ' has-success-response' : '');
+    const retryResponseAvailable = entry.lastRetryResponse !== undefined && entry.lastRetryResponse !== null;
 
     return (
-        <li className='mission-local-save-error-entry' data-testid='mission-local-save-error-entry'>
+        <li className={entryClassName} data-testid='mission-local-save-error-entry'>
             <details>
                 <summary className='mission-local-save-error-summary'
                     data-testid='mission-local-save-error-summary'>
@@ -788,6 +791,10 @@ function LocalSaveErrorLogEntry(props) {
                         <FaClock aria-hidden='true' /> {formatTransactionLogTime(entry.createdAt)}
                     </span>
                     <Badge color='light' className='mission-transaction-log-action'>{status}</Badge>
+                    {entry.lastRetryResult === 'success' &&
+                        <Badge color='warning' className='mission-transaction-log-action'>
+                            Retry OK
+                        </Badge>}
                 </summary>
 
                 <div className='mission-local-save-error-body'>
@@ -832,6 +839,13 @@ function LocalSaveErrorLogEntry(props) {
                             <h4>Fehlerantwort</h4>
                             <pre data-testid='mission-local-save-error-response'>{formatJson(entry.response)}</pre>
                         </div>
+                        {retryResponseAvailable &&
+                            <div>
+                                <h4>Letzte Retry-Antwort</h4>
+                                <pre data-testid='mission-local-save-error-retry-response'>{
+                                    formatJson(entry.lastRetryResponse)
+                                }</pre>
+                            </div>}
                     </div>
                 </div>
             </details>

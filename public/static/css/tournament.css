@@ -452,6 +452,12 @@
     border-radius: 8px;
 }
 
+.mission-local-save-error-entry.has-success-response {
+    background: #fffaf0;
+    border-color: #ffe08a;
+    border-left-color: #ffc107;
+}
+
 .mission-local-save-error-summary {
     align-items: center;
     cursor: pointer;

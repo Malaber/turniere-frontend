@@ -338,7 +338,11 @@ test('Mission Control stores failed saves locally and retries them from Verlauf'
       });
       return;
     }
-    await route.continue();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ timer_mode: 'countdown', timestamp_seconds: 20 }),
+    });
   });
 
   await page.goto(`/t/${tournament.id}/mission-control`);
@@ -375,6 +379,9 @@ test('Mission Control stores failed saves locally and retries them from Verlauf'
   await entry.getByTestId('mission-local-save-error-retry').click();
   await expect.poll(async () => timerPatchRequests, { timeout: 20_000 }).toBe(2);
   await expect(entry.getByTestId('mission-local-save-error-retry-status')).toContainText('erfolgreich');
+  await expect(entry).toHaveClass(/has-success-response/);
+  await expect(entry.getByTestId('mission-local-save-error-retry-response')).toContainText('"timer_mode"');
+  await expect(entry.getByText('Retry OK')).toBeVisible();
 
   const retryState = await page.evaluate(() => {
     const entries = JSON.parse(localStorage.getItem('turniere.localSaveErrorLog.v1') || '[]');
