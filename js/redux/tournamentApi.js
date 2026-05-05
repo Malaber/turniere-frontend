@@ -249,7 +249,10 @@ function convertMatch(apiMatch, allowUndecided) {
         winnerTeamId: apiMatch.winner ? apiMatch.winner.id : null,
         backendPosition: apiMatch.position,
         position: apiMatch.position + 1,
-        group: apiMatch.group ? {id: apiMatch.group.id, number: apiMatch.group.number} : null
+        group: apiMatch.group ? {id: apiMatch.group.id, number: apiMatch.group.number} : null,
+        location: apiMatch.location || '',
+        startTime: apiMatch.start_time || '',
+        notes: apiMatch.notes || ''
     };
 
     if (apiMatch.match_scores.length === 2) {

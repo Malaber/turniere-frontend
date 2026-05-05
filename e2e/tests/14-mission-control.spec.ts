@@ -329,6 +329,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
 
   await expect(page.getByRole('link', { name: 'Timer', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Match-Infos' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Checklisten' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Verlauf' })).toBeVisible();
@@ -531,6 +532,88 @@ test('Mission Control stops and restarts a running match', async ({ context, pag
   }, { timeout: 20_000 }).toBe('in_progress');
   await expect(card.getByTestId('mission-match-stop')).toBeVisible({ timeout: 20_000 });
   await expect(card.getByTestId('mission-match-save')).toBeEnabled();
+});
+
+test('Mission Control edits match metadata one-by-one and in bulk', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = await loggedInClient();
+  const groupStage = tournament.stages.find((stage) => stage.level === -1);
+  const firstMatch = groupStage!.groups[0].matches[0];
+  const secondMatch = groupStage!.groups[0].matches[1];
+  const firstTeamNames = firstMatch.match_scores.map((score) => score.team!.name);
+  const secondTeamNames = secondMatch.match_scores.map((score) => score.team!.name);
+
+  await page.goto(`/t/${tournament.id}/mission-control#metadata`);
+  await expect(page.getByTestId('mission-metadata-control')).toBeVisible({ timeout: 20_000 });
+  const metadataPane = page.locator('.tab-pane.active');
+  await expect(metadataPane.getByTestId('mission-control-search')).toBeVisible();
+  await metadataPane.getByTestId('mission-control-search').fill(firstTeamNames[0]);
+  const firstCard = metadataPane
+    .getByTestId('mission-metadata-card')
+    .filter({ hasText: firstTeamNames[0] })
+    .filter({ hasText: firstTeamNames[1] });
+  await expect(firstCard).toHaveCount(1);
+
+  await firstCard.getByTestId('mission-metadata-location').fill('Main Hall');
+  await firstCard.getByTestId('mission-metadata-start-time').fill('17:00');
+  await firstCard.getByTestId('mission-metadata-notes').fill('Opening match. Stream setup needed.');
+  await firstCard.getByTestId('mission-metadata-save').click();
+
+  await expect.poll(async () => {
+    const match = await client.get<{ location: string; start_time: string; notes: string }>(
+      `/matches/${firstMatch.id}`,
+    );
+    expectStatus(match, 200, 'fetch match metadata after single save');
+    return {
+      location: match.json.location,
+      startTime: match.json.start_time,
+      notes: match.json.notes,
+    };
+  }, { timeout: 20_000 }).toEqual({
+    location: 'Main Hall',
+    startTime: '17:00',
+    notes: 'Opening match. Stream setup needed.',
+  });
+
+  await metadataPane.getByTestId('mission-control-search').fill('');
+  const bulkForm = metadataPane.getByTestId('mission-metadata-bulk-form');
+  await bulkForm.getByTestId('mission-metadata-bulk-selector-type').selectOption('match_ids');
+  await bulkForm
+    .locator('.mission-metadata-match-option')
+    .filter({ hasText: firstTeamNames[0] })
+    .filter({ hasText: firstTeamNames[1] })
+    .getByTestId('mission-metadata-bulk-match')
+    .check();
+  await bulkForm
+    .locator('.mission-metadata-match-option')
+    .filter({ hasText: secondTeamNames[0] })
+    .filter({ hasText: secondTeamNames[1] })
+    .getByTestId('mission-metadata-bulk-match')
+    .check();
+  await bulkForm.getByTestId('mission-metadata-bulk-location').fill('Court 2');
+  await bulkForm.getByTestId('mission-metadata-bulk-start-time').fill('18:30');
+  await bulkForm.getByTestId('mission-metadata-bulk-notes').fill('Second wave.');
+  await bulkForm.getByTestId('mission-metadata-bulk-save').click();
+
+  await expect.poll(async () => {
+    const first = await client.get<{ location: string; start_time: string; notes: string }>(
+      `/matches/${firstMatch.id}`,
+    );
+    const second = await client.get<{ location: string; start_time: string; notes: string }>(
+      `/matches/${secondMatch.id}`,
+    );
+    expectStatus(first, 200, 'fetch first match metadata after bulk save');
+    expectStatus(second, 200, 'fetch second match metadata after bulk save');
+    return [first.json, second.json].map((match) => ({
+      location: match.location,
+      startTime: match.start_time,
+      notes: match.notes,
+    }));
+  }, { timeout: 20_000 }).toEqual([
+    { location: 'Court 2', startTime: '18:30', notes: 'Second wave.' },
+    { location: 'Court 2', startTime: '18:30', notes: 'Second wave.' },
+  ]);
 });
 
 test('Mission Control keeps Ergebnisse search pinned while scrolling scores', async ({

@@ -754,6 +754,36 @@ export function swapMatchPositions(matchId, otherMatchId, successCallback, error
     });
 }
 
+export function updateMatchMetadata(matchId, payload, successCallback, errorCallback) {
+    const currentState = getState();
+    patchRequest(currentState, '/matches/' + matchId, payload).then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
+}
+
+export function bulkUpdateMatchMetadata(tournamentId, payload, successCallback, errorCallback) {
+    const currentState = getState();
+    patchRequest(currentState, '/tournaments/' + tournamentId + '/matches/metadata', payload).then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
+}
+
 export function submitMatchScores(scoreTeam1, scoreIdTeam1, scoreTeam2, scoreIdTeam2, successCallback, errorCallback) {
     __store.dispatch({
         type: actionTypesTournamentinfo.SUBMIT_MATCH_SCORES,

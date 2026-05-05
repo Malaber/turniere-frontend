@@ -262,6 +262,7 @@ export class Group extends Component {
                                         isSignedIn={this.props.isSignedIn}
                                         isOwner={this.props.isOwner}
                                         readOnlyMode={this.props.readOnlyMode}
+                                        allowReadOnlyModal
                                         onChange={this.reload}
                                         onFinish={this.reload}
                                         key={match.id}

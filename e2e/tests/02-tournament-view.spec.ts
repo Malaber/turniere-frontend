@@ -204,6 +204,36 @@ test('Tournament view renders public metadata', async ({ page }) => {
   );
 });
 
+test('Anonymous tournament viewer opens match metadata from match card', async ({ page }) => {
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+  const groupStage = tournament.stages.find((stage) => stage.level === -1);
+  const match = groupStage!.groups[0].matches[0];
+
+  const metadata = await client.patch(`/matches/${match.id}`, {
+    location: 'Main Hall',
+    start_time: '17:00',
+    notes: 'Opening match. Stream setup needed.',
+  });
+  expectStatus(metadata, 200, 'set match metadata for public modal');
+
+  await page.goto(`/t/${tournament.id}`);
+  await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
+  await showAllTournamentMatches(page);
+
+  await page.locator(`[data-match-id="${match.id}"]`).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Match-Details' })).toBeVisible();
+  await expect(dialog.getByTestId('match-metadata-location')).toHaveText('Main Hall');
+  await expect(dialog.getByTestId('match-metadata-start-time')).toHaveText('17:00');
+  await expect(dialog.getByTestId('match-metadata-notes')).toHaveText('Opening match. Stream setup needed.');
+  await expect(dialog.getByRole('button', { name: 'Spiel starten' })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Schließen' }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
 test('Public tournament view renders group-stage and playoff data', async ({ page }, testInfo) => {
   // --- Seed: create group-stage tournament (4 groups × 4 teams, 8 playoff spots) ---
   const { tournament } = await seedGroupStageTournament(4, 4, 8);
