@@ -52,7 +52,8 @@ test('Owner can open Mission Control settings and save normal properties', async
   await page.fill('#edittournament-textfield-location', 'Berlin Arena');
   await page.fill('#edittournament-textfield-startsAt', startsAt);
   await page.fill('#edittournament-textfield-endsAt', endsAt);
-  await page.locator('#edittournament-button-resetDates').click();
+  await page.locator('#edittournament-button-resetStartsAt').click();
+  await page.locator('#edittournament-button-resetEndsAt').click();
   await expect(page.locator('#edittournament-textfield-startsAt')).toHaveValue('');
   await expect(page.locator('#edittournament-textfield-endsAt')).toHaveValue('');
   await page.fill('#edittournament-textfield-startsAt', startsAt);

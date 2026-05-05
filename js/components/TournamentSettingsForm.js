@@ -43,7 +43,6 @@ export class TournamentSettingsForm extends React.Component {
         } = this.state;
         const currentlyReadOnly = this.props.tournament.readOnlyMode === true;
         const syncTestConfigured = !readOnlyMode && syncTargetUrl.trim().length > 0 && syncAuthToken.trim().length > 0;
-        const dateFieldsSet = startsAt.length > 0 || endsAt.length > 0;
 
         return (<div>
             {readOnlyMode &&
@@ -74,24 +73,30 @@ export class TournamentSettingsForm extends React.Component {
             <div className="row">
                 <div className="form-group mb-3 col-md-6">
                     <Label htmlFor="edittournament-textfield-startsAt">Start</Label>
-                    <Input type="datetime-local" id="edittournament-textfield-startsAt"
-                        disabled={currentlyReadOnly || this.props.disabled}
-                        value={startsAt} onChange={this.handleStartsAtInput.bind(this)}/>
+                    <div className="input-group">
+                        <Input type="datetime-local" id="edittournament-textfield-startsAt"
+                            disabled={currentlyReadOnly || this.props.disabled}
+                            value={startsAt} onChange={this.handleStartsAtInput.bind(this)}/>
+                        <Button color="secondary" outline type="button" id="edittournament-button-resetStartsAt"
+                            disabled={currentlyReadOnly || this.props.disabled || startsAt.length === 0}
+                            onClick={this.handleResetStartsAtClick.bind(this)}>
+                            Löschen
+                        </Button>
+                    </div>
                 </div>
                 <div className="form-group mb-3 col-md-6">
                     <Label htmlFor="edittournament-textfield-endsAt">Ende</Label>
-                    <Input type="datetime-local" id="edittournament-textfield-endsAt"
-                        disabled={currentlyReadOnly || this.props.disabled}
-                        value={endsAt} onChange={this.handleEndsAtInput.bind(this)}/>
+                    <div className="input-group">
+                        <Input type="datetime-local" id="edittournament-textfield-endsAt"
+                            disabled={currentlyReadOnly || this.props.disabled}
+                            value={endsAt} onChange={this.handleEndsAtInput.bind(this)}/>
+                        <Button color="secondary" outline type="button" id="edittournament-button-resetEndsAt"
+                            disabled={currentlyReadOnly || this.props.disabled || endsAt.length === 0}
+                            onClick={this.handleResetEndsAtClick.bind(this)}>
+                            Löschen
+                        </Button>
+                    </div>
                 </div>
-            </div>
-            <div className="form-group mb-3">
-                <Button color="secondary" outline size="sm" type="button" id="edittournament-button-resetDates"
-                    data-testid="tournament-dates-reset-button"
-                    disabled={currentlyReadOnly || this.props.disabled || !dateFieldsSet}
-                    onClick={this.handleResetDatesClick.bind(this)}>
-                    Start und Ende zurücksetzen
-                </Button>
             </div>
             <div className="form-group mb-3">
                 <Label htmlFor="edittournament-textfield-websiteUrl">Website</Label>
@@ -261,8 +266,12 @@ export class TournamentSettingsForm extends React.Component {
         this.setState({endsAt: input.target.value});
     }
 
-    handleResetDatesClick() {
-        this.setState({startsAt: '', endsAt: ''});
+    handleResetStartsAtClick() {
+        this.setState({startsAt: ''});
+    }
+
+    handleResetEndsAtClick() {
+        this.setState({endsAt: ''});
     }
 
     handleWebsiteUrlInput(input) {
