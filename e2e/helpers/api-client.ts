@@ -56,6 +56,10 @@ export class ApiClient {
     return this.request<T>('PATCH', path, body);
   }
 
+  async delete<T = unknown>(path: string): Promise<ApiResponse<T>> {
+    return this.request<T>('DELETE', path);
+  }
+
   private async request<T = unknown>(
     method: string,
     path: string,

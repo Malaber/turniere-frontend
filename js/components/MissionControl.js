@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader,
-    Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
+    Nav, NavItem, NavLink, Row, Spinner, Table, TabContent, TabPane
 } from 'reactstrap';
 import {
     FaChevronRight, FaClock, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaSyncAlt,
@@ -11,7 +11,9 @@ import {notify} from './Notifications';
 import {
     createBeamer,
     deleteBeamer,
+    deletePlayoffs,
     endMatch,
+    finishGroupStage,
     getBeamers,
     getTournamentTransactionLog,
     setTournamentTimer,
@@ -68,6 +70,49 @@ function errorMessage(errorBody, fallback) {
         return errorBody.error;
     }
     return fallback;
+}
+
+function errorMessages(errorBody, fallback) {
+    if (!errorBody) {
+        return [fallback];
+    }
+    if (typeof errorBody.error === 'string') {
+        return [errorBody.error];
+    }
+    if (Array.isArray(errorBody.errors)) {
+        return errorBody.errors.map(error => String(error));
+    }
+    if (errorBody.errors && Array.isArray(errorBody.errors.full_messages)) {
+        return errorBody.errors.full_messages.map(error => String(error));
+    }
+    if (Array.isArray(errorBody.full_messages)) {
+        return errorBody.full_messages.map(error => String(error));
+    }
+    if (typeof errorBody === 'string') {
+        return [errorBody];
+    }
+    return [fallback];
+}
+
+function playoffStartMessages(errorBody, fallback) {
+    const blockingTies = errorBody && Array.isArray(errorBody.blocking_ties) ? errorBody.blocking_ties : [];
+    if (blockingTies.length === 0) {
+        return errorMessages(errorBody, fallback);
+    }
+
+    return [
+        'Playoffs können noch nicht gestartet werden.',
+        ...blockingTies.map(tie => {
+            const teamNames = Array.isArray(tie.team_names) ? tie.team_names.join(' vs. ') : 'Teams';
+            return 'Gruppe ' + tie.group_number + ': ' + teamNames + ' brauchen ein Entscheidungsmatch.';
+        })
+    ];
+}
+
+function modalActionError(messages) {
+    const error = new Error(messages[0] || 'Aktion fehlgeschlagen.');
+    error.messages = messages;
+    return error;
 }
 
 const DISPLAY_STATES = [
@@ -277,6 +322,8 @@ export class MissionControl extends React.Component {
         this.updateStickyOffset = this.updateStickyOffset.bind(this);
         this.startGroupMatches = this.startGroupMatches.bind(this);
         this.startStageMatches = this.startStageMatches.bind(this);
+        this.startPlayoffs = this.startPlayoffs.bind(this);
+        this.deletePlayoffs = this.deletePlayoffs.bind(this);
         this.onActionSuccess = this.onActionSuccess.bind(this);
         this.onActionError = this.onActionError.bind(this);
         this.handleTournamentChange = this.handleTournamentChange.bind(this);
@@ -401,6 +448,44 @@ export class MissionControl extends React.Component {
     startStageMatches(stage) {
         this.setState({actionRunning: 'stage-' + stage.id});
         startNextStageMatches(stage, this.onActionSuccess, this.onActionError);
+    }
+
+    startPlayoffs() {
+        const groupStage = this.props.tournament.groupStage;
+        if (!groupStage) {
+            return Promise.reject(modalActionError(['Keine Gruppenphase gefunden.']));
+        }
+
+        this.setState({actionRunning: 'playoff-start'});
+        return new Promise((resolve, reject) => {
+            finishGroupStage(groupStage.id, () => {
+                this.setState({actionRunning: null});
+                this.handleTournamentChange();
+                resolve({messages: ['Playoffs wurden generiert.']});
+            }, errorBody => {
+                this.setState({actionRunning: null});
+                reject(modalActionError(
+                    playoffStartMessages(
+                        errorBody,
+                        'Playoffs konnten nicht gestartet werden.'
+                    )
+                ));
+            });
+        });
+    }
+
+    deletePlayoffs() {
+        this.setState({actionRunning: 'playoff-delete'});
+        return new Promise((resolve, reject) => {
+            deletePlayoffs(this.props.tournament.id, () => {
+                this.setState({actionRunning: null});
+                this.handleTournamentChange();
+                resolve({messages: ['Playoffs wurden gelöscht.']});
+            }, errorBody => {
+                this.setState({actionRunning: null});
+                reject(modalActionError(errorMessages(errorBody, 'Playoffs konnten nicht gelöscht werden.')));
+            });
+        });
     }
 
     onActionSuccess(matches) {
@@ -593,6 +678,8 @@ export class MissionControl extends React.Component {
                                     actionRunning={this.state.actionRunning}
                                     onStartGroupMatches={this.startGroupMatches}
                                     onStartStageMatches={this.startStageMatches}
+                                    onStartPlayoffs={this.startPlayoffs}
+                                    onDeletePlayoffs={this.deletePlayoffs}
                                 />
                             </TabPane>
 
@@ -2003,6 +2090,8 @@ class MissionTimer extends React.Component {
 
 function MissionNextMatches(props) {
     const groupStage = props.tournament.groupStage;
+    const hasPlayoffStages = props.tournament.playoffStages.length > 0;
+    const canStartPlayoffs = groupStage && groupStage.state !== 'finished';
     const stagesWithReadyMatches = props.tournament.playoffStages
         .map(stage => ({
             stage: stage,
@@ -2018,6 +2107,42 @@ function MissionNextMatches(props) {
                 Ergebnisse-Tab.
             </p>
             <div className='mission-bulk-start-grid'>
+                {canStartPlayoffs &&
+                    <div className='mission-control-panel'>
+                        <h4>Playoff-Start</h4>
+                        <p>Generiert Playoff-Matches aus der abgeschlossenen Gruppenphase.</p>
+                        <MissionStartConfirmButton
+                            testId='mission-playoff-start'
+                            color='warning'
+                            disabled={props.disabled || props.actionRunning === 'playoff-start'}
+                            onConfirm={props.onStartPlayoffs}
+                            title='Playoffs starten'
+                            message='Playoffs werden nach OK aus der Gruppenphase generiert.'
+                            loadingMessage='Playoffs werden generiert...'
+                            resultInModal>
+                            Playoffs starten
+                        </MissionStartConfirmButton>
+                    </div>}
+                {hasPlayoffStages &&
+                    <div className='mission-control-panel'>
+                        <h4>Playoff-Löschung</h4>
+                        <p>
+                            Löscht alle Playoff-Matches. Das klappt nur, solange dort keine Spiele laufen oder
+                            Scores stehen.
+                        </p>
+                        <MissionStartConfirmButton
+                            testId='mission-playoff-delete'
+                            color='danger'
+                            disabled={props.disabled || props.actionRunning === 'playoff-delete'}
+                            onConfirm={props.onDeletePlayoffs}
+                            title='Playoffs löschen'
+                            message={'Alle Playoff-Matches werden nach OK gelöscht, wenn noch keine ' +
+                                'Playoff-Ergebnisse existieren.'}
+                            loadingMessage='Playoffs werden gelöscht...'
+                            resultInModal>
+                            Playoffs löschen
+                        </MissionStartConfirmButton>
+                    </div>}
                 {groupStage && groupStage.state !== 'finished' ?
                     <div className='mission-control-panel'>
                         <h4>Gruppenphase</h4>
@@ -2069,7 +2194,10 @@ class MissionStartConfirmButton extends React.Component {
         this.state = {
             holding: false,
             holdProgress: 0,
-            confirmOpen: false
+            confirmOpen: false,
+            modalRunning: false,
+            resultColor: null,
+            resultMessages: []
         };
         this.startHold = this.startHold.bind(this);
         this.cancelHold = this.cancelHold.bind(this);
@@ -2079,6 +2207,16 @@ class MissionStartConfirmButton extends React.Component {
         this.confirm = this.confirm.bind(this);
         this.onKeyDown = this.onKeyDown.bind(this);
         this.onKeyUp = this.onKeyUp.bind(this);
+    }
+
+    resultMessagesFromOutcome(outcome, fallback) {
+        if (outcome && Array.isArray(outcome.messages)) {
+            return outcome.messages;
+        }
+        if (outcome && typeof outcome.message === 'string') {
+            return [outcome.message];
+        }
+        return [fallback];
     }
 
     componentDidUpdate(prevProps) {
@@ -2139,19 +2277,59 @@ class MissionStartConfirmButton extends React.Component {
             this.holdFrame = null;
         }
         this.holdStartedAt = null;
-        this.setState({holding: false, holdProgress: 0, confirmOpen: true});
+        this.setState({
+            holding: false,
+            holdProgress: 0,
+            confirmOpen: true,
+            modalRunning: false,
+            resultColor: null,
+            resultMessages: []
+        });
     }
 
     closeConfirm() {
-        this.setState({confirmOpen: false});
+        if (this.state.modalRunning) {
+            return;
+        }
+        this.setState({confirmOpen: false, resultColor: null, resultMessages: []});
     }
 
     confirm() {
-        if (this.props.disabled) {
+        if (this.props.disabled || this.state.modalRunning) {
             return;
         }
-        this.closeConfirm();
-        this.props.onConfirm();
+        if (!this.props.resultInModal) {
+            this.closeConfirm();
+            this.props.onConfirm();
+            return;
+        }
+
+        this.setState({modalRunning: true, resultColor: null, resultMessages: []});
+        let action;
+        try {
+            action = this.props.onConfirm();
+        } catch (error) {
+            this.setState({
+                modalRunning: false,
+                resultColor: 'danger',
+                resultMessages: this.resultMessagesFromOutcome(error, 'Aktion fehlgeschlagen.')
+            });
+            return;
+        }
+
+        Promise.resolve(action).then(result => {
+            this.setState({
+                modalRunning: false,
+                resultColor: 'success',
+                resultMessages: this.resultMessagesFromOutcome(result, 'Aktion abgeschlossen.')
+            });
+        }).catch(error => {
+            this.setState({
+                modalRunning: false,
+                resultColor: 'danger',
+                resultMessages: this.resultMessagesFromOutcome(error, 'Aktion fehlgeschlagen.')
+            });
+        });
     }
 
     onKeyDown(event) {
@@ -2176,6 +2354,7 @@ class MissionStartConfirmButton extends React.Component {
     render() {
         const holdProgress = Math.round(this.state.holdProgress * 100);
         const className = 'mission-hold-start-button' + (this.state.holding ? ' is-holding' : '');
+        const hasResult = this.state.resultMessages.length > 0;
 
         return (
             <>
@@ -2207,14 +2386,43 @@ class MissionStartConfirmButton extends React.Component {
                     fade={false} data-testid='mission-start-confirm-modal'>
                     <ModalHeader toggle={this.closeConfirm}>{this.props.title}</ModalHeader>
                     <ModalBody>
-                        <p className='mb-0'>{this.props.message}</p>
+                        <p className={this.props.resultInModal ? 'mb-3' : 'mb-0'}>{this.props.message}</p>
+                        {this.state.modalRunning &&
+                            <Alert color='info' data-testid='mission-start-confirm-loading' className='mb-0'>
+                                <Spinner size='sm' className='me-2' />
+                                {this.props.loadingMessage || 'Aktion läuft...'}
+                            </Alert>}
+                        {hasResult &&
+                            <Alert color={this.state.resultColor || 'secondary'}
+                                data-testid='mission-start-confirm-result' className='mb-0'>
+                                {this.state.resultMessages.length === 1 ?
+                                    this.state.resultMessages[0] :
+                                    <ul className='mb-0 ps-3'>
+                                        {this.state.resultMessages.map((message, index) => (
+                                            <li key={index}>{message}</li>
+                                        ))}
+                                    </ul>}
+                            </Alert>}
                     </ModalBody>
                     <ModalFooter>
-                        <Button color='success' onClick={this.confirm} disabled={this.props.disabled}
-                            data-testid='mission-start-confirm-ok'>
-                            OK
-                        </Button>
-                        <Button color='secondary' onClick={this.closeConfirm}>Abbrechen</Button>
+                        {hasResult ?
+                            <Button color='primary' onClick={this.closeConfirm}
+                                data-testid='mission-start-result-ok'>
+                                OK
+                            </Button> :
+                            <>
+                                <Button color='success' onClick={this.confirm}
+                                    disabled={this.props.disabled || this.state.modalRunning}
+                                    data-testid='mission-start-confirm-ok'>
+                                    {this.state.modalRunning &&
+                                        <Spinner size='sm' className='me-2' />}
+                                    OK
+                                </Button>
+                                <Button color='secondary' onClick={this.closeConfirm}
+                                    disabled={this.state.modalRunning}>
+                                    Abbrechen
+                                </Button>
+                            </>}
                     </ModalFooter>
                 </Modal>
             </>

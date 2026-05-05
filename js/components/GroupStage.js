@@ -1,5 +1,5 @@
 import {
-    Alert, Button, Card, CardBody, Col, Collapse, Modal, ModalBody, ModalFooter, ModalHeader, Row, Table
+    Button, Card, CardBody, Col, Collapse, Modal, ModalBody, ModalFooter, ModalHeader, Row, Table
 } from 'reactstrap';
 import {Match} from './Match';
 import React, {Component} from 'react';
@@ -9,7 +9,7 @@ import {sortMatchesByPositionAscending} from '../utils/sorting';
 import {
     FaChevronDown, FaCircleExclamation, FaCircleInfo
 } from 'react-icons/fa6';
-import {createDeciderMatch, finishGroupStage, swapMatchPositions as apiSwapMatchPositions} from '../api';
+import {createDeciderMatch, swapMatchPositions as apiSwapMatchPositions} from '../api';
 import {TeamName} from './TeamName';
 
 export default class GroupStage extends Component {
@@ -19,72 +19,14 @@ export default class GroupStage extends Component {
             acc[group.id] = React.createRef();
             return acc;
         }, {});
-        this.state = {
-            blockingTies: [],
-            finishingStage: false
-        };
-        this.finishStage = this.finishStage.bind(this);
-        this.onFinishStageSuccess = this.onFinishStageSuccess.bind(this);
-        this.onFinishStageError = this.onFinishStageError.bind(this);
-        this.clearBlockingTies = this.clearBlockingTies.bind(this);
-    }
-
-    finishStage() {
-        this.setState({finishingStage: true});
-        finishGroupStage(this.props.stageId, this.onFinishStageSuccess, this.onFinishStageError);
-    }
-
-    onFinishStageSuccess() {
-        this.setState({blockingTies: [], finishingStage: false});
-        notify.show('Playoffs wurden generiert.', 'success', 2500);
-        this.props.onTournamentChange !== undefined && this.props.onTournamentChange();
-    }
-
-    onFinishStageError(errorBody) {
-        const blockingTies = errorBody && Array.isArray(errorBody.blocking_ties) ? errorBody.blocking_ties : [];
-        this.setState({blockingTies: blockingTies, finishingStage: false});
-        if (blockingTies.length > 0) {
-            notify.show('Ein Entscheidungsmatch ist noch nötig, bevor die Playoffs starten können.', 'warning', 4000);
-        } else {
-            notify.show('Die Gruppenphase konnte nicht beendet werden.', 'error', 3000);
-        }
-    }
-
-    clearBlockingTies() {
-        if (this.state.blockingTies.length > 0) {
-            this.setState({blockingTies: []});
-        }
     }
 
     render() {
-        const canEdit = this.props.isSignedIn && this.props.isOwner && !this.props.readOnlyMode;
         return (
             <div className='py-2 px-1'>
                 <h1 className='custom-font'>
                     <span className='px-2'>Gruppenphase</span>
                 </h1>
-                {canEdit && this.props.stageState !== 'finished' &&
-                    <div className='px-2 mt-3'>
-                        <Button color='success' onClick={this.finishStage} disabled={this.state.finishingStage}
-                            data-testid='finish-group-stage'>
-                            {this.state.finishingStage ? 'Playoffs werden generiert...' : 'Playoffs starten'}
-                        </Button>
-                    </div>}
-                {this.state.blockingTies.length > 0 &&
-                    <Alert color='warning' className='mx-2 mt-3' data-testid='blocking-ties-alert'>
-                        <div><strong>Playoffs können noch nicht gestartet werden.</strong></div>
-                        {this.state.blockingTies.map((tie, index) => (
-                            <div key={index}>
-                                Gruppe {tie.group_number}: {tie.team_names.map((teamName, teamIndex) => (
-                                    <React.Fragment key={teamName}>
-                                        {teamIndex > 0 && ' vs. '}
-                                        <TeamName name={teamName} inline/>
-                                    </React.Fragment>
-                                ))}
-                                {' '}brauchen ein Entscheidungsmatch.
-                            </div>
-                        ))}
-                    </Alert>}
                 <Row className='mt-3 gx-0'>
                     {this.props.groups.map(group => (
                         <Group
@@ -95,8 +37,6 @@ export default class GroupStage extends Component {
                             readOnlyMode={this.props.readOnlyMode}
                             groupRef={this.groupRefs[group.id]}
                             teams={this.props.teams}
-                            blockingTies={this.state.blockingTies}
-                            onGroupReload={this.clearBlockingTies}
                         />
                     ))}
                 </Row>

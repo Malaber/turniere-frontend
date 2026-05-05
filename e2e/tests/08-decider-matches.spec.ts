@@ -49,6 +49,21 @@ async function waitForNoModal(page: Page, timeout = 15000) {
   await expect(page.getByRole('dialog')).toHaveCount(0, { timeout });
 }
 
+async function expectStartHoldProgressStarted(button: Locator) {
+  const progress = button.getByTestId('mission-start-hold-progress');
+  await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow')), {
+    timeout: 500,
+  }).toBeGreaterThan(0);
+}
+
+async function holdStartUntilConfirmOpen(page: Page, button: Locator) {
+  await button.hover();
+  await page.mouse.down();
+  await expectStartHoldProgressStarted(button);
+  await expect(page.getByTestId('mission-start-confirm-modal')).toBeVisible({ timeout: 3_000 });
+  await page.mouse.up();
+}
+
 async function expectDeciderCardState(card: Locator, state: string, timeout = 15000) {
   await expect(card).toHaveAttribute('data-match-state', state, { timeout });
 }
@@ -137,15 +152,27 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   let modal = page.getByRole('dialog');
 
   await gotoTournament(page, tournament.id);
+  await expect(page.getByTestId('finish-group-stage')).toHaveCount(0);
 
   await expect(decisionIcons).toHaveCount(2, { timeout: 15000 });
   await keyframe(page, testInfo, 'decider_required');
 
-  await page.getByTestId('finish-group-stage').click();
-  await expect(page.getByTestId('blocking-ties-alert')).toBeVisible({ timeout: 15000 });
-  await expect(page.getByTestId('blocking-ties-alert')).toContainText(relevantTeamNames[0]);
-  await expect(page.getByTestId('blocking-ties-alert')).toContainText(relevantTeamNames[1]);
+  await page.goto(`/t/${tournament.id}/mission-control#starts`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  const blockedPlayoffStart = page.getByTestId('mission-playoff-start');
+  await expect(blockedPlayoffStart).toBeVisible();
+  await holdStartUntilConfirmOpen(page, blockedPlayoffStart);
+  modal = page.getByTestId('mission-start-confirm-modal');
+  await modal.getByTestId('mission-start-confirm-ok').click();
+  await expect(modal.getByTestId('mission-start-confirm-result')).toContainText(
+    'Playoffs können noch nicht gestartet werden.',
+    { timeout: 20_000 },
+  );
+  await expect(modal.getByTestId('mission-start-confirm-result')).toContainText(relevantTeamNames[0]);
+  await expect(modal.getByTestId('mission-start-confirm-result')).toContainText(relevantTeamNames[1]);
   await keyframe(page, testInfo, 'decider_blocking_alert');
+  await modal.getByTestId('mission-start-result-ok').click();
+  await gotoTournament(page, tournament.id);
 
   await deciderOwnerTrigger.click();
   modal = page.getByRole('dialog');
@@ -200,13 +227,22 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await keyframe(page, testInfo, 'decider_resolved');
 
+  await page.goto(`/t/${tournament.id}/mission-control#starts`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  const playoffStart = page.getByTestId('mission-playoff-start');
+  await holdStartUntilConfirmOpen(page, playoffStart);
+  modal = page.getByTestId('mission-start-confirm-modal');
   const finishResponse = page.waitForResponse(response =>
     response.request().method() === 'PATCH' && /\/stages\/\d+$/.test(response.url())
   );
-  await page.getByTestId('finish-group-stage').click();
+  await modal.getByTestId('mission-start-confirm-ok').click();
   expect((await finishResponse).ok()).toBe(true);
+  await expect(modal.getByTestId('mission-start-confirm-result')).toContainText('Playoffs wurden generiert.', {
+    timeout: 20_000,
+  });
+  await modal.getByTestId('mission-start-result-ok').click();
   await expect.poll(async () => {
-    await page.reload();
+    await page.goto(`/t/${tournament.id}`);
     await waitForTournamentDetails(page);
     return page.locator('.stages').textContent();
   }, {
