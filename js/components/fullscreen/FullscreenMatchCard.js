@@ -34,6 +34,7 @@ export function FullscreenMatchCard({
     match,
     index,
     showScores = false,
+    hero = false,
     fillHeight = false,
     animateEntry = true,
     isActive = true,
@@ -53,6 +54,7 @@ export function FullscreenMatchCard({
             className={joinClasses(
                 styles.matchCard,
                 animateEntry ? styles.matchCardEnter : '',
+                hero ? styles.matchCardHero : '',
                 fillHeight ? styles.matchCardFill : styles.matchCardAspect,
                 stateClass(match.state)
             )}
