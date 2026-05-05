@@ -43,6 +43,7 @@ export class TournamentSettingsForm extends React.Component {
         } = this.state;
         const currentlyReadOnly = this.props.tournament.readOnlyMode === true;
         const syncTestConfigured = !readOnlyMode && syncTargetUrl.trim().length > 0 && syncAuthToken.trim().length > 0;
+        const dateFieldsSet = startsAt.length > 0 || endsAt.length > 0;
 
         return (<div>
             {readOnlyMode &&
@@ -83,6 +84,14 @@ export class TournamentSettingsForm extends React.Component {
                         disabled={currentlyReadOnly || this.props.disabled}
                         value={endsAt} onChange={this.handleEndsAtInput.bind(this)}/>
                 </div>
+            </div>
+            <div className="form-group mb-3">
+                <Button color="secondary" outline size="sm" type="button" id="edittournament-button-resetDates"
+                    data-testid="tournament-dates-reset-button"
+                    disabled={currentlyReadOnly || this.props.disabled || !dateFieldsSet}
+                    onClick={this.handleResetDatesClick.bind(this)}>
+                    Start und Ende zurücksetzen
+                </Button>
             </div>
             <div className="form-group mb-3">
                 <Label htmlFor="edittournament-textfield-websiteUrl">Website</Label>
@@ -250,6 +259,10 @@ export class TournamentSettingsForm extends React.Component {
 
     handleEndsAtInput(input) {
         this.setState({endsAt: input.target.value});
+    }
+
+    handleResetDatesClick() {
+        this.setState({startsAt: '', endsAt: ''});
     }
 
     handleWebsiteUrlInput(input) {
