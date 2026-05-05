@@ -16,6 +16,7 @@ export function Stage(props) {
                             isSignedIn={isSignedIn}
                             isOwner={isOwner}
                             readOnlyMode={readOnlyMode}
+                            allowReadOnlyModal
                             onFinish={updateNextStage}
                             stageLevel={stageLevel}
                         />

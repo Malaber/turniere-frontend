@@ -6,6 +6,44 @@ import {TeamName} from './TeamName';
 import {submitDeciderMatchScores, submitMatchScores} from '../api';
 import {notify} from './Notifications';
 
+function hasMatchMetadata(match) {
+    return Boolean(
+        (match.location || '').trim() ||
+        (match.startTime || '').trim() ||
+        (match.notes || '').trim()
+    );
+}
+
+function MatchMetadataDetails(props) {
+    const {match} = props;
+    const hasMetadata = hasMatchMetadata(match);
+
+    return (
+        <div className='match-metadata-details mb-3' data-testid='match-metadata-details'>
+            <h5 className='h6 mb-2'>Match-Infos</h5>
+            {hasMetadata ?
+                <dl className='row mb-0'>
+                    {match.location &&
+                        <>
+                            <dt className='col-sm-4'>Ort</dt>
+                            <dd className='col-sm-8' data-testid='match-metadata-location'>{match.location}</dd>
+                        </>}
+                    {match.startTime &&
+                        <>
+                            <dt className='col-sm-4'>Startzeit</dt>
+                            <dd className='col-sm-8' data-testid='match-metadata-start-time'>{match.startTime}</dd>
+                        </>}
+                    {match.notes &&
+                        <>
+                            <dt className='col-sm-4'>Notizen</dt>
+                            <dd className='col-sm-8' data-testid='match-metadata-notes'>{match.notes}</dd>
+                        </>}
+                </dl> :
+                <div className='text-muted' data-testid='match-metadata-empty'>Keine Match-Infos hinterlegt.</div>}
+        </div>
+    );
+}
+
 export class MatchModal extends Component {
     constructor(props) {
         super(props);
@@ -113,6 +151,7 @@ export class MatchModal extends Component {
         let submitScoresButton = '';
         let matchTable = <MatchTable match={this.props.match} matchStatus={this.props.match.state}/>;
         let scoreHint = null;
+        const canControl = this.props.canControl === true;
         const canSwapMatchPosition = this.props.canSwapMatchPosition &&
             Array.isArray(this.props.swapTargets) && this.props.swapTargets.length > 0;
         const selectedSwapTarget = canSwapMatchPosition ?
@@ -123,13 +162,15 @@ export class MatchModal extends Component {
         switch (this.props.match.state) {
         case 'in_progress':
             title = this.props.match.decider ? 'Entscheidungsmatch läuft' : 'Spiel läuft';
-            submitScoresButton = <Button color='primary' onClick={this.submitScores}>
-                {this.props.match.decider ? 'Tie-Breaker Punkte ändern' : 'Spielstand ändern'}
-            </Button>;
-            if (!this.props.match.allowUndecided && this.state.scoreTeam1 === this.state.scoreTeam2) {
-                actionButton = <Button color='primary' disabled>Spiel beenden</Button>;
-            } else {
-                actionButton = <Button color='primary' onClick={this.props.endMatch}>Spiel beenden</Button>;
+            if (canControl) {
+                submitScoresButton = <Button color='primary' onClick={this.submitScores}>
+                    {this.props.match.decider ? 'Tie-Breaker Punkte ändern' : 'Spielstand ändern'}
+                </Button>;
+                if (!this.props.match.allowUndecided && this.state.scoreTeam1 === this.state.scoreTeam2) {
+                    actionButton = <Button color='primary' disabled>Spiel beenden</Button>;
+                } else {
+                    actionButton = <Button color='primary' onClick={this.props.endMatch}>Spiel beenden</Button>;
+                }
             }
             if (this.props.match.decider) {
                 scoreHint = (
@@ -138,8 +179,10 @@ export class MatchModal extends Component {
                     </small>
                 );
             }
-            matchTable = <EditableMatchTable match={this.props.match} updateScoreTeam1={this.updateScoreTeam1}
-                updateScoreTeam2={this.updateScoreTeam2}/>;
+            if (canControl) {
+                matchTable = <EditableMatchTable match={this.props.match} updateScoreTeam1={this.updateScoreTeam1}
+                    updateScoreTeam2={this.updateScoreTeam2}/>;
+            }
             break;
         case 'finished':
             title = this.props.match.decider ? 'Entscheidungsmatch beendet' : 'Spiel beendet';
@@ -156,8 +199,13 @@ export class MatchModal extends Component {
             title = this.props.match.decider ?
                 'Entscheidungsmatch kann gestartet werden' :
                 'Spiel kann gestartet werden';
-            actionButton = <Button color='primary' onClick={this.props.startMatch}>Spiel starten</Button>;
+            if (canControl) {
+                actionButton = <Button color='primary' onClick={this.props.startMatch}>Spiel starten</Button>;
+            }
             break;
+        }
+        if (!canControl) {
+            title = 'Match-Details';
         }
         if (canSwapMatchPosition) {
             swapControls = (
@@ -200,6 +248,7 @@ export class MatchModal extends Component {
             fade={false} contentClassName='match-modal-content'>
             <ModalHeader toggle={this.props.toggle}>{title}</ModalHeader>
             <ModalBody>
+                <MatchMetadataDetails match={this.props.match}/>
                 {matchTable}
                 {scoreHint}
             </ModalBody>
@@ -207,7 +256,7 @@ export class MatchModal extends Component {
                 {swapControls}
                 {submitScoresButton}
                 {actionButton}
-                <Button color='secondary' onClick={this.props.toggle}>Abbrechen</Button>
+                <Button color='secondary' onClick={this.props.toggle}>{canControl ? 'Abbrechen' : 'Schließen'}</Button>
             </ModalFooter>
         </Modal>);
     }
