@@ -24,11 +24,10 @@ Dockerfile
 docker-compose*.yml
 .dockerignore
 
-e2e/**
-screenshots/**
-test-results/**
+e2e
+e2e/screenshots
+e2e/test-results
 .idea
-README.md
 .hound.yml
 .gitignore
 .gitlab-ci.yml

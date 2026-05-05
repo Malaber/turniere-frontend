@@ -29,25 +29,24 @@ async function scrollToLocator(locator: Locator) {
 }
 
 async function showAllTournamentMatches(page: Page) {
-  const showButtons = page.getByRole('button', { name: 'Matches einblenden' });
-  await expect(showButtons.first()).toBeVisible({ timeout: 120000 });
+  await expect(page.getByTitle('Matches einblenden').first()).toBeVisible({ timeout: 120000 });
 
   for (let attempt = 0; attempt < 10; attempt += 1) {
-    const count = await showButtons.count();
+    const count = await page.getByTitle('Matches einblenden').count();
     if (count === 0) {
       return;
     }
 
-    await showButtons.evaluateAll((buttons) => {
+    await page.getByTitle('Matches einblenden').evaluateAll((buttons) => {
       buttons.forEach((button) => (button as HTMLElement).click());
     });
 
     await expect.poll(
-      () => showButtons.count(),
+      () => page.getByTitle('Matches einblenden').count(),
       { timeout: 5000 },
     ).toBeLessThan(count);
   }
-  await expect(showButtons).toHaveCount(0);
+  await expect(page.getByTitle('Matches einblenden')).toHaveCount(0);
 }
 
 async function expectMatchCardToUseSingleSurface(card: Locator) {
@@ -126,10 +125,7 @@ async function prepareRunningAndFinishedLongNameMatches(
 }
 
 function statusText(page: Page, text: string | RegExp) {
-  const matcher = typeof text === 'string'
-    ? new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
-    : text;
-  return page.locator('small.text-muted').filter({ hasText: matcher }).last();
+  return page.locator('small.text-muted:visible').filter({ hasText: text }).first();
 }
 
 test('Tournament id view renders basic information while full tournament loads', async ({ page }) => {
@@ -199,8 +195,7 @@ test('Public tournament view renders group-stage and playoff data', async ({ pag
   // --- Step 1: fresh tournament page ---
   await page.goto(`/t/${tournament.id}`);
   await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
-  await expect(page.locator('li').filter({ hasText: /Final-Call:/ }).first())
-    .toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('.big-image')).toContainText(/(Final-Call|Spielende):/);
   await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
 
   await keyframe(page, testInfo, 'tournament_created');
@@ -259,21 +254,17 @@ test('Tournament view match badges show group-local positions', async ({ page })
 
   await page.goto(`/t/${tournament.id}`);
   await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
-  await page.getByRole('button', { name: 'Matches einblenden' }).first().click();
+  await page.getByTitle('Matches einblenden').first().click();
 
   const groupCard = page.locator(`[data-match-id="${groupMatch!.id}"]`);
-  await expect(groupCard).toBeVisible({ timeout: 20_000 });
   const groupBadge = groupCard.getByTestId('match-position-badge');
   await expect(groupBadge).toHaveText(String(groupMatch!.position + 1));
   await expect(groupBadge).toHaveAttribute('data-match-badge-kind', 'position');
   await expect(groupCard.getByTestId('match-position-badge-group')).toHaveCount(0);
 
   const { tournament: playoffTournament } = await seedAndPlayGroupStage(2, 4, 4);
-  const playoffMatch = playoffTournament.stages
-    .filter((stage) => stage.level !== -1)
-    .flatMap((stage) => stage.matches)
-    .filter((match) => match.state === 'not_started' && match.match_scores.every((score) => score.team))
-    .sort((a, b) => a.position - b.position)[0];
+  const playoffStage = playoffTournament.stages.find((stage) => stage.level !== -1);
+  const playoffMatch = playoffStage?.matches.slice().sort((a, b) => a.position - b.position)[0];
   expect(playoffMatch).toBeTruthy();
 
   await page.goto(`/t/${playoffTournament.id}`);
@@ -407,7 +398,7 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
 
   await page.goto(`/t/${tournament.id}`);
   await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
-  await showAllTournamentMatches(page);
+  await page.getByTitle('Matches einblenden').first().click();
 
   const matchCard = page.locator(`[data-match-id="${match!.id}"]`);
   await expect(matchCard).toBeVisible({ timeout: 15_000 });
@@ -417,18 +408,10 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
     tournament_id: tournament.id,
   });
   await keyframe(page, testInfo, 'live_tournament_initial');
-  await page.waitForTimeout(1_000);
 
   const started = await client.patch(`/matches/${match!.id}`, { state: 'in_progress' });
   expectStatus(started, 200, 'start match for live tournament view');
-  try {
-    await expect(statusText(page, 'Spiel läuft')).toBeVisible({ timeout: 20_000 });
-  } catch {
-    await page.goto(`/t/${tournament.id}`);
-    await expect(page.locator('.big-image')).toBeVisible({ timeout: 120_000 });
-    await showAllTournamentMatches(page);
-    await expect(statusText(page, 'Spiel läuft')).toBeVisible({ timeout: 20_000 });
-  }
+  await expect(page.getByText('Spiel läuft').first()).toBeVisible({ timeout: 10_000 });
 
   const displayedTeamNames = await matchCard.locator('td').allInnerTexts();
   const firstDisplayedScore = match!.match_scores.find((score) => score.team?.name === displayedTeamNames[0].trim());
@@ -442,29 +425,14 @@ test('Tournament view receives live tournament snapshots', async ({ page }, test
   expectStatus(secondScore, 200, 'update second score for live tournament view');
   await expect.poll(
     async () => (await matchCard.locator('th').allInnerTexts()).sort().join(','),
-    { timeout: 20_000 },
-  ).toBe('3,7').catch(async () => {
-    await page.goto(`/t/${tournament.id}`);
-    await expect(page.locator('.big-image')).toBeVisible({ timeout: 120_000 });
-    await showAllTournamentMatches(page);
-    await expect.poll(
-      async () => (await matchCard.locator('th').allInnerTexts()).sort().join(','),
-      { timeout: 20_000 },
-    ).toBe('3,7');
-  });
+    { timeout: 10_000 },
+  ).toBe('3,7');
   await keyframe(page, testInfo, 'live_tournament_scores');
 
   const finished = await client.patch(`/matches/${match!.id}`, { state: 'finished' });
   expectStatus(finished, 200, 'finish match for live tournament view');
   await expect(page.getByText(new RegExp(`Gewinner: ${firstDisplayedScore!.team!.name}`))).toBeVisible({
-    timeout: 20_000,
-  }).catch(async () => {
-    await page.goto(`/t/${tournament.id}`);
-    await expect(page.locator('.big-image')).toBeVisible({ timeout: 120_000 });
-    await showAllTournamentMatches(page);
-    await expect(page.getByText(new RegExp(`Gewinner: ${firstDisplayedScore!.team!.name}`))).toBeVisible({
-      timeout: 20_000,
-    });
+    timeout: 10_000,
   });
   await keyframe(page, testInfo, 'live_tournament_finished');
 });

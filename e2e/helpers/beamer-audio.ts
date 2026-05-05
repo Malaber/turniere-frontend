@@ -92,7 +92,7 @@ export async function waitForBeamerEffect(
   type: string,
   cue?: string,
   minimum = 1,
-  timeout = 30_000,
+  timeout = 8_000,
 ) {
   await page.waitForFunction(
     ({ expectedType, expectedCue, expectedMinimum }) => {

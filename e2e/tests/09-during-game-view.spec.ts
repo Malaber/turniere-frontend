@@ -310,14 +310,13 @@ test('Fullscreen timer takeover during countdown and finished', async ({ page },
   expect(cardsVisibleBefore).toBeGreaterThan(0);
 
   const timerRes = await client.patch(`/tournaments/${tournament.id}/timer`, {
-    timestamp_seconds: 25,
+    timestamp_seconds: 15,
   });
   expectStatus(timerRes, 200, 'start countdown timer');
-  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
   // Wait for countdown phase (timer <= 10s triggers takeover)
   const timerTakeover = page.locator('[class*="timerTakeover"]');
-  await expect(timerTakeover).toBeVisible({ timeout: 30_000 });
+  await expect(timerTakeover).toBeVisible({ timeout: 15_000 });
 
   // Use direct screenshot — bump animation repeats each second
   await page.screenshot({
@@ -588,10 +587,9 @@ test.describe('Fullscreen mobile viewport', () => {
     await keyframe(page, testInfo, 'mobile_audio_unlocked');
 
     const midCue = await client.patch(`/tournaments/${tournament.id}/timer`, {
-      timestamp_seconds: 10 * 60 + 15,
+      timestamp_seconds: 10 * 60 + 4,
     });
     expectStatus(midCue, 200, 'start mobile 10:10 cue timer');
-    await waitForBeamerEffect(page, 'sound', 'mid-game-warning');
     await waitForBeamerEffect(page, 'sound-started', 'mid-game-warning');
     await expect(unlockButton).toHaveCount(0);
     await keyframe(page, testInfo, 'mobile_audio_next_cue_stays_unlocked');

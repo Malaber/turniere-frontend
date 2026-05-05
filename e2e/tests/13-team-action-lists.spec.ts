@@ -294,10 +294,7 @@ test('Owner can create a new team action list and other viewer receives it live'
   }, {
     timeout: 20_000,
     message: 'wait for created list on second viewer via websocket'
-  }).toBe(true).catch(async () => {
-    await viewerPage.reload();
-    await expect(viewerPage.getByText(listName)).toBeVisible({ timeout: 20_000 });
-  });
+  }).toBe(true);
 
   await keyframe(page, testInfo, 'team_action_list_created_owner');
   await keyframe(viewerPage, testInfo, 'team_action_list_created_viewer');
@@ -410,10 +407,6 @@ test('Websocket snapshot propagates owner update to another viewer', async ({ co
 
   await expect(ownerCheckbox).toBeVisible();
   await expect(viewerCheckbox).toBeVisible();
-  await waitForActionCableSubscription(viewerPage, {
-    channel: 'TournamentTeamActionListsChannel',
-    tournament_id: tournament.id,
-  });
 
   await ownerCheckbox.check();
   await expect(ownerCheckbox).toBeChecked();
@@ -421,10 +414,7 @@ test('Websocket snapshot propagates owner update to another viewer', async ({ co
   await expect.poll(async () => await viewerCheckbox.isChecked(), {
     timeout: 20_000,
     message: 'wait for websocket update to viewer page'
-  }).toBe(true).catch(async () => {
-    await viewerPage.reload();
-    await expect(checkboxByItem(viewerPage, item)).toBeChecked({ timeout: 20_000 });
-  });
+  }).toBe(true);
 
   await keyframe(ownerPage, testInfo, 'team_action_owner_after_update');
   await keyframe(viewerPage, testInfo, 'team_action_viewer_live_update');

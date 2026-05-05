@@ -78,26 +78,6 @@ async function expectStartHoldProgressStarted(button: Locator) {
   }).toBeGreaterThan(0);
 }
 
-async function clickSoundEffectAndWait(
-  button: Locator,
-  beamerPage: Page,
-  cue: string,
-  minimum: number,
-) {
-  let lastError: unknown = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await button.click();
-    try {
-      await waitForBeamerEffect(beamerPage, 'sound-effect', cue, minimum, 10_000);
-      return;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError ?? new Error(`No ${cue} sound effect event received`);
-}
-
 async function expectBeamerCardOrder(page: Page, expectedNames: string[]) {
   await expect.poll(async () => page.locator('.mission-beamer-name').evaluateAll((elements) => (
     elements.map((element) => element.textContent?.trim() ?? '')
@@ -768,7 +748,8 @@ test('Mission Control soundboard controls beamer audio with timer priority', asy
   const startCount = await countBeamerEffects(beamerPage, 'sound-effect', 'start-countdown');
   const startButton = card.getByTestId(`mission-sound-play-${beamer.json.id}-start-countdown`);
   await expect(startButton).toBeEnabled();
-  await clickSoundEffectAndWait(startButton, beamerPage, 'start-countdown', startCount + 1);
+  await startButton.click();
+  await waitForBeamerEffect(beamerPage, 'sound-effect', 'start-countdown', startCount + 1);
   await waitForBeamerEffect(beamerPage, 'sound-started', 'start-countdown');
 
   const warningCount = await countBeamerEffects(beamerPage, 'sound-effect', 'mid-game-warning');
@@ -805,7 +786,7 @@ test('Mission Control soundboard controls beamer audio with timer priority', asy
     tournament_id: tournament.id,
   });
   const timerRes = await client.patch(`/tournaments/${tournament.id}/timer`, {
-    timestamp_seconds: 20,
+    timestamp_seconds: 12,
   });
   expectStatus(timerRes, 200, 'start timer cue');
   await waitForBeamerEffect(beamerPage, 'sound', 'end-countdown', timerCount + 1);

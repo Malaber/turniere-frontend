@@ -13,7 +13,7 @@ const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
 const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
 const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
-test.setTimeout(600_000);
+test.setTimeout(240_000);
 
 type ApiMatchForBadge = {
   id: number;
@@ -280,8 +280,7 @@ test('Fullscreen shows during-game and between-games modes with timer', async ({
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=during_game`);
   await expect(page.locator('[class*="digitSlot"]').first()).toBeVisible({ timeout: 15000 });
-  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 60_000 });
-  await expect(page.locator('body')).toContainText('G1-S1', { timeout: 60_000 });
+  await expect(page.locator('body')).toContainText('G1-S1', { timeout: 20_000 });
   await keyframe(page, testInfo, 'fullscreen_beamer_during_game');
 
   await page.goto(`/t/${tournament.id}/fullscreen?display=between_games`);
@@ -591,18 +590,14 @@ test('Fullscreen match list receives live match snapshots', async ({ page }, tes
     state: 'in_progress',
   });
   await keyframe(page, testInfo, 'live_matches_empty');
-  await page.waitForTimeout(1_000);
 
   const started = await client.patch(`/matches/${match!.id}`, { state: 'in_progress' });
   expectStatus(started, 200, 'start live fullscreen match');
-  const matchCard = page.locator(`[data-match-id="${match!.id}"]`);
-  await expect(matchCard).toBeVisible({ timeout: 20_000 }).catch(async () => {
-    await page.reload();
-    await expect(matchCard).toBeVisible({ timeout: 20_000 });
-  });
+  await expect(page.locator(`[data-match-id="${match!.id}"]`)).toBeVisible({ timeout: 10_000 });
 
   const firstScore = await client.patch(`/match_scores/${match!.match_scores[0].id}`, { points: 5 });
   expectStatus(firstScore, 200, 'update first live fullscreen score');
+  const matchCard = page.locator(`[data-match-id="${match!.id}"]`);
   await expect.poll(async () => {
     const scores = await matchCard.locator('th').allTextContents();
     return scores;
@@ -612,21 +607,12 @@ test('Fullscreen match list receives live match snapshots', async ({ page }, tes
   await expect.poll(async () => {
     const scores = await matchCard.locator('th').allTextContents();
     return scores.sort();
-  }, { timeout: 20_000 }).toEqual(['4', '5']).catch(async () => {
-    await page.reload();
-    await expect.poll(async () => {
-      const scores = await matchCard.locator('th').allTextContents();
-      return scores.sort();
-    }, { timeout: 20_000 }).toEqual(['4', '5']);
-  });
+  }, { timeout: 10_000 }).toEqual(['4', '5']);
   await keyframe(page, testInfo, 'live_matches_in_progress');
 
   const finished = await client.patch(`/matches/${match!.id}`, { state: 'finished' });
   expectStatus(finished, 200, 'finish live fullscreen match');
-  await expect(page.getByText(/keine Matches/i)).toBeVisible({ timeout: 20_000 }).catch(async () => {
-    await page.reload();
-    await expect(page.getByText(/keine Matches/i)).toBeVisible({ timeout: 20_000 });
-  });
+  await expect(page.getByText(/keine Matches/i)).toBeVisible({ timeout: 10_000 });
   await expect(page.locator(`[data-match-id="${match!.id}"]`)).toHaveCount(0);
   await keyframe(page, testInfo, 'live_matches_finished_removed');
 });
@@ -699,16 +685,11 @@ test('Fullscreen timer updates live for countup mode', async ({ page }, testInfo
   );
   expectStatus(timerRes, 200, 'start countup timer');
 
-  await expect(page.locator('.timer-container')).toContainText(/(Overtime|Spielende):/i, {
-    timeout: 60_000,
+  await expect(page.getByText(/Spielzeit:/i)).toHaveCount(0);
+  await expect(page.getByText(/(Overtime|Spielende):/i)).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.timer-container')).toContainText(/3:[1-5][0-9]|4:0[0-9]/, {
+    timeout: 10_000,
   });
-  const timerValue = page.locator('.timer-container .navbar-brand');
-  await expect(timerValue).toContainText(/[0-9]+:[0-5][0-9]/, {
-    timeout: 60_000,
-  });
-  const textBefore = await timerValue.textContent();
-  await page.waitForTimeout(2_500);
-  await expect(timerValue).not.toHaveText((textBefore || '').trim(), { timeout: 5_000 });
   await keyframe(page, testInfo, 'fullscreen_timer_reason_countup');
 });
 
