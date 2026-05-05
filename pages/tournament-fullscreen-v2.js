@@ -18,6 +18,7 @@ import {BeamerTimerEffects} from '../js/components/fullscreen/BeamerTimerEffects
 import {TimerOnlyView} from '../js/components/fullscreen/TimerOnlyView';
 import {WerbungView} from '../js/components/fullscreen/WerbungView';
 import {NextMatchesView} from '../js/components/fullscreen/NextMatchesView';
+import {FinalView} from '../js/components/fullscreen/FinalView';
 import {
     beamerMediaImageForKey,
     selectedWerbungImages,
@@ -28,6 +29,7 @@ import {
 
 
 const NEXT_MATCHES_DISPLAY_MODE = 'next_matches';
+const FINAL_DISPLAY_MODE = 'final';
 
 const DISPLAY_STATE_LABELS = {
     'matches_all': 'alle',
@@ -40,6 +42,7 @@ const DISPLAY_STATE_LABELS = {
     'between_games': 'Zwischen den Spielen',
     'during_game': 'Während dem Spiel',
     'next_matches': 'Nächste Spiele',
+    'final': 'Finale',
     'timer_only': 'Nur Timer',
     'static_image': 'Statisches Bild',
     'werbung': 'Werbung'
@@ -54,6 +57,7 @@ const DEFAULT_DISPLAY_STATE_FILTERS = {
     'during_game': {state: 'in_progress'},
     'between_games': {},
     'next_matches': {},
+    'final': {stage_level: 0},
     'timer_only': {},
     'groups': {},
     'group_tables': {},
@@ -97,7 +101,8 @@ function displayStateUsesMatches(displayState) {
         'matches_finished',
         'during_game',
         'between_games',
-        'next_matches'
+        'next_matches',
+        'final'
     ].indexOf(displayState) !== -1;
 }
 
@@ -110,6 +115,9 @@ function displayStateForBeamer(beamer) {
     }
     if (beamer && beamer.config && beamer.config.display_mode === NEXT_MATCHES_DISPLAY_MODE) {
         return 'next_matches';
+    }
+    if (beamer && beamer.config && beamer.config.display_mode === FINAL_DISPLAY_MODE) {
+        return 'final';
     }
     if (beamer && beamer.config && beamer.config.display_mode === WERBUNG_DISPLAY_MODE) {
         return 'werbung';
@@ -575,6 +583,12 @@ class Main extends React.Component {
             return <NextMatchesView
                 matches={this.state.loadedMatches ? matches : null}
                 timerState={timerState}/>;
+        case 'final':
+            return <FinalView
+                tournamentMeta={tournamentMeta}
+                matches={this.state.loadedMatches ? matches : null}
+                timerState={timerState}
+                showThirdPlace={(this.state.beamerConfig || {}).show_third_place !== false}/>;
         case 'static_image':
             return <div className="fullscreen-static-image">
                 <img
