@@ -1,4 +1,5 @@
 import {getApiUrl} from '../runtimeConfig';
+import {recordLocalSaveError, shouldRecordLocalSaveError} from '../utils/localSaveErrorLog';
 
 const axios = require('axios');
 
@@ -31,7 +32,21 @@ export function putRequest(state, url, data) {
     return request(state, 'put', url, data);
 }
 
-function request(state, method, url, data) {
+export function retryStoredRequest(state, entry) {
+    if (!entry || !entry.method || !entry.url) {
+        return Promise.reject(new Error('Invalid retry entry.'));
+    }
+    const method = String(entry.method).toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].indexOf(method) === -1) {
+        return Promise.reject(new Error('Unsupported retry method.'));
+    }
+    const data = Object.prototype.hasOwnProperty.call(entry, 'retryPayload') ?
+        entry.retryPayload :
+        entry.payload;
+    return request(state, method, entry.url, data, {skipLocalSaveErrorLog: true});
+}
+
+function request(state, method, url, data, options = {}) {
     const config = {
         headers: generateHeaders(state)
     };
@@ -46,6 +61,9 @@ function request(state, method, url, data) {
     }).catch(error => {
         if (error.response) {
             storeAuthHeaders(error.response);
+        }
+        if (!options.skipLocalSaveErrorLog && shouldRecordLocalSaveError(method, url)) {
+            recordLocalSaveError({method, url, payload: data, error});
         }
         throw error;
     });
