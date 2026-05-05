@@ -1755,6 +1755,7 @@ class MissionTimer extends React.Component {
         this.setCountdownTimestamp = this.setCountdownTimestamp.bind(this);
         this.startCountup = this.startCountup.bind(this);
         this.changeTimerReason = this.changeTimerReason.bind(this);
+        this.removeTimerReason = this.removeTimerReason.bind(this);
         this.clearTimer = this.clearTimer.bind(this);
         this.onSuccess = this.onSuccess.bind(this);
         this.onError = this.onError.bind(this);
@@ -1903,6 +1904,13 @@ class MissionTimer extends React.Component {
         this.patchTimer(this.timerReasonPayload(), {reasonOnly: true});
     }
 
+    removeTimerReason() {
+        if (!this.canChangeTimerReason()) {
+            return;
+        }
+        this.patchTimer({timer_reason: null}, {reasonOnly: true});
+    }
+
     clearTimer() {
         if (this.props.disabled || this.state.running) {
             return;
@@ -1940,6 +1948,7 @@ class MissionTimer extends React.Component {
         const reasonTextMissing = this.reasonTextMissing();
         const canStart = this.canStartTimer();
         const canChangeReason = this.canChangeTimerReason();
+        const canRemoveReason = canChangeReason && Boolean(this.state.timerReason);
         return (
             <section className='mission-control-section mission-pane-timer' data-testid='mission-timer-control'>
                 <div className='mission-current-timer mb-3'>
@@ -1966,7 +1975,7 @@ class MissionTimer extends React.Component {
                                 data-testid='mission-timer-reason-select'
                                 disabled={this.props.disabled || this.state.running}
                                 onChange={this.setTimerReason}>
-                                <option value=''>Standard</option>
+                                <option value=''>Kein Grund</option>
                                 {TIMER_REASON_OPTIONS.map(option => (
                                     <option key={option.value} value={option.value}>{option.label}</option>
                                 ))}
@@ -1984,12 +1993,20 @@ class MissionTimer extends React.Component {
                             </Col>}
                     </Row>
                     {hasActiveTimer &&
-                        <Button outline color='secondary' className='mt-3'
-                            data-testid='mission-timer-reason-save'
-                            disabled={!canChangeReason}
-                            onClick={this.changeTimerReason}>
-                            Aktiven Grund speichern
-                        </Button>}
+                        <div className='d-flex flex-wrap gap-2 mt-3'>
+                            <Button outline color='secondary'
+                                data-testid='mission-timer-reason-save'
+                                disabled={!canChangeReason}
+                                onClick={this.changeTimerReason}>
+                                Aktiven Grund speichern
+                            </Button>
+                            <Button outline color='danger'
+                                data-testid='mission-timer-reason-remove'
+                                disabled={!canRemoveReason}
+                                onClick={this.removeTimerReason}>
+                                Grund entfernen
+                            </Button>
+                        </div>}
                 </div>
                 <Row className='g-3'>
                     <Col lg='4'>

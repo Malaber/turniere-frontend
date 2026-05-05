@@ -354,9 +354,11 @@ test('Mission Control changes active timer reason without restarting timer', asy
 
   await page.goto(`/t/${tournament.id}/mission-control`);
   await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('mission-timer-reason-select')).toContainText('Kein Grund');
 
   await page.getByTestId('mission-timer-quick-2015').click();
   await expect(page.getByTestId('mission-timer-reason-save')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('mission-timer-reason-remove')).toBeDisabled();
   await expect(page.getByTestId('mission-current-timer-display')).toContainText(/\d{1,2}:[0-5][0-9]/);
 
   const started = await timerState(client, tournament.id);
@@ -400,8 +402,7 @@ test('Mission Control changes active timer reason without restarting timer', asy
     timeout: 20_000,
   });
 
-  await page.getByTestId('mission-timer-reason-select').selectOption('');
-  await page.getByTestId('mission-timer-reason-save').click();
+  await page.getByTestId('mission-timer-reason-remove').click();
   await expect.poll(async () => timerState(client, tournament.id), { timeout: 20_000 }).toEqual({
     timestamp: started.timestamp,
     mode: 'countdown',
@@ -412,6 +413,7 @@ test('Mission Control changes active timer reason without restarting timer', asy
   await expect(page.getByTestId('mission-current-timer-reason')).toContainText('Timer', {
     timeout: 20_000,
   });
+  await expect(page.getByTestId('mission-timer-reason-select')).toHaveValue('');
 });
 
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
