@@ -5,3 +5,5 @@
 check-syntax.sh
 .DS_Store
 __pycache__
+/screenshots/
+/test-results/

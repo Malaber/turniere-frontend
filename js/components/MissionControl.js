@@ -4,8 +4,8 @@ import {
     Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
 } from 'reactstrap';
 import {
-    FaChevronRight, FaClock, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaSyncAlt,
-    FaTrash, FaUser, FaUsers
+    FaChevronRight, FaClock, FaExclamationTriangle, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay,
+    FaSearch, FaStop, FaSyncAlt, FaTrash, FaUser, FaUsers
 } from 'react-icons/fa';
 import {notify} from './Notifications';
 import {
@@ -15,6 +15,7 @@ import {
     endMatch,
     getBeamers,
     getTournamentTransactionLog,
+    retryLocalSaveError,
     setTournamentTimer,
     startMatch,
     startNextGroupMatches,
@@ -49,6 +50,12 @@ import {
     WERBUNG_DISPLAY_MODE,
     WERBUNG_IMAGE_KEYS_CONFIG_KEY
 } from '../utils/beamerMedia';
+import {
+    clearLocalSaveErrorLog,
+    LOCAL_SAVE_ERROR_LOG_CHANGED_EVENT,
+    readLocalSaveErrorLog,
+    removeLocalSaveErrorLogEntry
+} from '../utils/localSaveErrorLog';
 
 const NEXT_MATCHES_DISPLAY_MODE = 'next_matches';
 const FINAL_DISPLAY_MODE = 'final';
@@ -274,7 +281,9 @@ export class MissionControl extends React.Component {
             transactionLogLoaded: false,
             transactionLogLoading: false,
             transactionLogErrorStatus: null,
-            transactionLogErrorMessage: ''
+            transactionLogErrorMessage: '',
+            localSaveErrorEntries: [],
+            localSaveErrorRetryingId: null
         };
         this.searchInput = React.createRef();
         this.setActiveTab = this.setActiveTab.bind(this);
@@ -292,6 +301,10 @@ export class MissionControl extends React.Component {
         this.reloadTransactionLog = this.reloadTransactionLog.bind(this);
         this.onTransactionLogSuccess = this.onTransactionLogSuccess.bind(this);
         this.onTransactionLogError = this.onTransactionLogError.bind(this);
+        this.reloadLocalSaveErrorLog = this.reloadLocalSaveErrorLog.bind(this);
+        this.retryLocalSaveErrorEntry = this.retryLocalSaveErrorEntry.bind(this);
+        this.removeLocalSaveErrorEntry = this.removeLocalSaveErrorEntry.bind(this);
+        this.clearLocalSaveErrorEntries = this.clearLocalSaveErrorEntries.bind(this);
     }
 
     componentDidMount() {
@@ -299,10 +312,12 @@ export class MissionControl extends React.Component {
         if (initialTab) {
             this.setActiveTab(initialTab, false);
         }
+        this.reloadLocalSaveErrorLog();
         window.addEventListener('popstate', this.handleLocationChange);
         window.addEventListener('hashchange', this.handleLocationChange);
         window.addEventListener('keydown', this.handleGlobalKeyDown);
         window.addEventListener('resize', this.updateStickyOffset);
+        window.addEventListener(LOCAL_SAVE_ERROR_LOG_CHANGED_EVENT, this.reloadLocalSaveErrorLog);
         this.updateStickyOffset();
         const navbar = document.querySelector('.navbar.sticky-top');
         if (navbar && typeof window.ResizeObserver === 'function') {
@@ -334,6 +349,7 @@ export class MissionControl extends React.Component {
         window.removeEventListener('hashchange', this.handleLocationChange);
         window.removeEventListener('keydown', this.handleGlobalKeyDown);
         window.removeEventListener('resize', this.updateStickyOffset);
+        window.removeEventListener(LOCAL_SAVE_ERROR_LOG_CHANGED_EVENT, this.reloadLocalSaveErrorLog);
         if (this.navbarResizeObserver) {
             this.navbarResizeObserver.disconnect();
             this.navbarResizeObserver = null;
@@ -473,6 +489,34 @@ export class MissionControl extends React.Component {
             transactionLogErrorStatus: status,
             transactionLogErrorMessage: errorMessage(errorBody, 'Verlauf konnte nicht geladen werden.')
         });
+    }
+
+    reloadLocalSaveErrorLog() {
+        this.setState({localSaveErrorEntries: readLocalSaveErrorLog()});
+    }
+
+    retryLocalSaveErrorEntry(entry) {
+        this.setState({localSaveErrorRetryingId: entry.id});
+        retryLocalSaveError(entry, () => {
+            notify.show('Fehlgeschlagener Speicherversuch wurde erneut gesendet.', 'success', 3000);
+            this.setState({localSaveErrorRetryingId: null});
+            this.reloadLocalSaveErrorLog();
+            this.handleTournamentChange();
+        }, errorBody => {
+            notify.show(errorMessage(errorBody, 'Wiederholung ist fehlgeschlagen.'), 'error', 3000);
+            this.setState({localSaveErrorRetryingId: null});
+            this.reloadLocalSaveErrorLog();
+        });
+    }
+
+    removeLocalSaveErrorEntry(entryId) {
+        removeLocalSaveErrorLogEntry(entryId);
+        this.reloadLocalSaveErrorLog();
+    }
+
+    clearLocalSaveErrorEntries() {
+        clearLocalSaveErrorLog();
+        this.reloadLocalSaveErrorLog();
     }
 
     render() {
@@ -673,6 +717,13 @@ export class MissionControl extends React.Component {
                             </TabPane>
 
                             <TabPane tabId='history'>
+                                <LocalSaveErrorLog
+                                    entries={this.state.localSaveErrorEntries}
+                                    retryingId={this.state.localSaveErrorRetryingId}
+                                    onRetry={this.retryLocalSaveErrorEntry}
+                                    onRemove={this.removeLocalSaveErrorEntry}
+                                    onClear={this.clearLocalSaveErrorEntries}
+                                />
                                 <MissionTransactionLog
                                     entries={this.state.transactionLogEntries}
                                     loaded={this.state.transactionLogLoaded}
@@ -695,6 +746,156 @@ export class MissionControl extends React.Component {
                 </Card>
             </div>
         );
+    }
+}
+
+function LocalSaveErrorLog(props) {
+    const entries = Array.isArray(props.entries) ? props.entries : [];
+
+    return (
+        <section className='mission-control-section mission-local-save-error-log'
+            data-testid='mission-local-save-error-log'>
+            <div className='mission-transaction-log-header'>
+                <div>
+                    <h3 className='h5 mission-pane-heading mb-1'>
+                        <FaExclamationTriangle aria-hidden='true' /> Lokales Fehlerlog
+                    </h3>
+                    <div className='text-muted'>
+                        Fehlgeschlagene Speicherversuche aus diesem Browser.
+                    </div>
+                </div>
+                <Button outline color='secondary'
+                    disabled={entries.length === 0}
+                    data-testid='mission-local-save-error-clear'
+                    onClick={props.onClear}>
+                    <FaTrash aria-hidden='true' /> Leeren
+                </Button>
+            </div>
+
+            <Alert color='warning' className='mb-3' data-testid='mission-local-save-error-storage-warning'>
+                Dieses Log liegt nur im localStorage dieses Browsers und wird nicht zwischen Geräten synchronisiert.
+                Wiederholen kann gefährlich sein, weil Turnierdaten inzwischen veraltet sein können.
+            </Alert>
+
+            {entries.length === 0 &&
+                <Alert color='light' className='mb-0' data-testid='mission-local-save-error-empty'>
+                    Keine lokalen Speicherfehler vorhanden.
+                </Alert>}
+
+            {entries.length > 0 &&
+                <ol className='mission-local-save-error-list'>
+                    {entries.map(entry => (
+                        <LocalSaveErrorLogEntry
+                            entry={entry}
+                            key={entry.id}
+                            retrying={props.retryingId === entry.id}
+                            onRetry={props.onRetry}
+                            onRemove={props.onRemove}
+                        />
+                    ))}
+                </ol>}
+        </section>
+    );
+}
+
+function LocalSaveErrorLogEntry(props) {
+    const entry = props.entry || {};
+    const status = entry.status ? 'HTTP ' + entry.status : 'Netzwerkfehler';
+    const lastRetry = entry.lastRetryAt ?
+        retryResultLabel(entry.lastRetryResult, entry.lastRetryStatus, entry.lastRetryAt) :
+        null;
+    const entryClassName = 'mission-local-save-error-entry' +
+        (entry.lastRetryResult === 'success' ? ' has-success-response' : '');
+    const statusColor = entry.status ? 'danger' : 'secondary';
+    const retryResponseAvailable = entry.lastRetryResponse !== undefined && entry.lastRetryResponse !== null;
+
+    return (
+        <li className={entryClassName} data-testid='mission-local-save-error-entry'>
+            <details>
+                <summary className='mission-local-save-error-summary'
+                    data-testid='mission-local-save-error-summary'>
+                    <Badge color='danger' pill>{entry.method || 'SAVE'}</Badge>
+                    <span className='mission-local-save-error-url'>{entry.url || 'unbekannter Endpunkt'}</span>
+                    <span className='mission-transaction-log-detail'>
+                        <FaClock aria-hidden='true' /> {formatTransactionLogTime(entry.createdAt)}
+                    </span>
+                    <Badge color={statusColor} className='mission-local-save-error-status'>{status}</Badge>
+                    {entry.lastRetryResult === 'success' &&
+                        <Badge color='warning' className='mission-transaction-log-action'>
+                            Retry OK
+                        </Badge>}
+                </summary>
+
+                <div className='mission-local-save-error-body'>
+                    <Alert color='danger' className='mb-3'>
+                        Nur wiederholen, wenn klar ist, dass Aktion noch stimmt. Serverdaten können inzwischen anders
+                        sein; erneutes Senden kann aktuelle Ergebnisse überschreiben.
+                    </Alert>
+
+                    {entry.message &&
+                        <div className='mission-local-save-error-message'
+                            data-testid='mission-local-save-error-message'>
+                            {entry.message}
+                        </div>}
+
+                    {lastRetry &&
+                        <div className='text-muted small mb-3' data-testid='mission-local-save-error-retry-status'>
+                            {lastRetry}
+                        </div>}
+
+                    <div className='mission-local-save-error-actions'>
+                        <Button color='danger'
+                            disabled={props.retrying}
+                            data-testid='mission-local-save-error-retry'
+                            onClick={() => props.onRetry(entry)}>
+                            <FaSyncAlt aria-hidden='true' /> {
+                                props.retrying ? 'Sendet...' : 'Gefährlich erneut senden'
+                            }
+                        </Button>
+                        <Button outline color='secondary'
+                            data-testid='mission-local-save-error-remove'
+                            onClick={() => props.onRemove(entry.id)}>
+                            <FaTrash aria-hidden='true' /> Entfernen
+                        </Button>
+                    </div>
+
+                    <div className='mission-local-save-error-details'>
+                        <div>
+                            <h4>Gesendete Daten</h4>
+                            <pre data-testid='mission-local-save-error-payload'>{formatJson(entry.payload)}</pre>
+                        </div>
+                        <div>
+                            <h4>Fehlerantwort</h4>
+                            <pre data-testid='mission-local-save-error-response'>{formatJson(entry.response)}</pre>
+                        </div>
+                        {retryResponseAvailable &&
+                            <div>
+                                <h4>Letzte Retry-Antwort</h4>
+                                <pre data-testid='mission-local-save-error-retry-response'>{
+                                    formatJson(entry.lastRetryResponse)
+                                }</pre>
+                            </div>}
+                    </div>
+                </div>
+            </details>
+        </li>
+    );
+}
+
+function retryResultLabel(result, status, value) {
+    const prefix = result === 'success' ? 'Letzter Retry erfolgreich' : 'Letzter Retry fehlgeschlagen';
+    const statusLabel = status ? ' (HTTP ' + status + ')' : '';
+    return prefix + statusLabel + ': ' + formatTransactionLogTime(value);
+}
+
+function formatJson(value) {
+    if (value === undefined || value === null) {
+        return 'Keine Daten gespeichert.';
+    }
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch (error) {
+        return String(value);
     }
 }
 

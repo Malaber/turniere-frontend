@@ -416,6 +416,80 @@ test('Mission Control changes active timer reason without restarting timer', asy
   await expect(page.getByTestId('mission-timer-reason-select')).toHaveValue('');
 });
 
+test('Mission Control stores failed saves locally and retries them from Verlauf', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  let timerPatchRequests = 0;
+
+  await page.route(`**/api/tournaments/${tournament.id}/timer`, async (route) => {
+    if (route.request().method() !== 'PATCH') {
+      await route.continue();
+      return;
+    }
+    timerPatchRequests += 1;
+    if (timerPatchRequests === 1) {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Timer state is stale' }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ timer_mode: 'countdown', timestamp_seconds: 20 }),
+    });
+  });
+
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+
+  await page.getByTestId('mission-timer-quick-20s').click();
+  await expect.poll(async () => timerPatchRequests, { timeout: 20_000 }).toBe(1);
+
+  await expect.poll(async () => page.evaluate(() => {
+    const entries = JSON.parse(localStorage.getItem('turniere.localSaveErrorLog.v1') || '[]');
+    return entries.length;
+  }), { timeout: 20_000 }).toBe(1);
+
+  await page.getByRole('link', { name: 'Verlauf' }).click();
+  const localLog = page.getByTestId('mission-local-save-error-log');
+  await expect(localLog.getByTestId('mission-local-save-error-storage-warning')).toContainText('localStorage');
+  await expect(localLog.getByTestId('mission-local-save-error-storage-warning')).toContainText(
+    'nicht zwischen Geräten synchronisiert',
+  );
+  await expect(localLog.getByTestId('mission-local-save-error-storage-warning')).toContainText('gefährlich');
+
+  const entry = localLog.getByTestId('mission-local-save-error-entry').first();
+  await expect(entry).toBeVisible();
+  await expect(entry.getByTestId('mission-local-save-error-summary')).toContainText(
+    `/tournaments/${tournament.id}/timer`,
+  );
+  await expect(entry.getByTestId('mission-local-save-error-summary')).toContainText('HTTP 409');
+
+  await entry.getByTestId('mission-local-save-error-summary').click();
+  await expect(entry.getByTestId('mission-local-save-error-message')).toContainText('Timer state is stale');
+  await expect(entry.getByTestId('mission-local-save-error-payload')).toContainText('"timestamp_seconds": 20');
+  await expect(entry.getByTestId('mission-local-save-error-payload')).toContainText('"timer_mode": "countdown"');
+
+  await entry.getByTestId('mission-local-save-error-retry').click();
+  await expect.poll(async () => timerPatchRequests, { timeout: 20_000 }).toBe(2);
+  await expect(entry.getByTestId('mission-local-save-error-retry-status')).toContainText('erfolgreich');
+  await expect(entry).toHaveClass(/has-success-response/);
+  await expect(entry.getByTestId('mission-local-save-error-retry-response')).toContainText('"timer_mode"');
+  await expect(entry.getByText('Retry OK')).toBeVisible();
+
+  const retryState = await page.evaluate(() => {
+    const entries = JSON.parse(localStorage.getItem('turniere.localSaveErrorLog.v1') || '[]');
+    return entries[0];
+  });
+  expect(retryState.lastRetryResult).toBe('success');
+
+  await entry.getByTestId('mission-local-save-error-remove').click();
+  await expect(localLog.getByTestId('mission-local-save-error-empty')).toBeVisible();
+});
+
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(4, 4, 8);

@@ -2,11 +2,14 @@ import { Locator, Page, TestInfo } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
-function screenshotPath(testInfo: TestInfo, name: string): string {
-  const sanitize = (s: string) => s.replace(/[^a-z0-9-]/gi, '_').replace(/_+/g, '_').toLowerCase();
-  const dir = path.join('screenshots', sanitize(testInfo.title));
+function sanitizePathPart(s: string): string {
+  return s.replace(/[^a-z0-9-]/gi, '_').replace(/_+/g, '_').toLowerCase();
+}
+
+export function screenshotFilePath(testInfo: TestInfo, name: string): string {
+  const dir = 'screenshots';
   fs.mkdirSync(dir, { recursive: true });
-  return path.join(dir, `${name}.png`);
+  return path.join(dir, `${sanitizePathPart(testInfo.title)}__${sanitizePathPart(name)}.png`);
 }
 
 async function waitForSettledLayout(page: Page): Promise<void> {
@@ -35,10 +38,10 @@ async function waitForSettledLayout(page: Page): Promise<void> {
 
 /**
  * Capture a viewport screenshot at a named visual keyframe.
- * Saved to screenshots/{test-title}/{name}.png — used for manual review and regression spotting.
+ * Saved to screenshots/{test-title}__{name}.png for flat artifact browsing.
  */
 export async function keyframe(page: Page, testInfo: TestInfo, name: string): Promise<void> {
-  const file = screenshotPath(testInfo, name);
+  const file = screenshotFilePath(testInfo, name);
   await waitForSettledLayout(page);
   await page.screenshot({ path: file, fullPage: false });
 }
@@ -47,7 +50,7 @@ export async function keyframe(page: Page, testInfo: TestInfo, name: string): Pr
  * Capture a focused screenshot of one visible UI element such as a modal.
  */
 export async function locatorKeyframe(locator: Locator, testInfo: TestInfo, name: string): Promise<void> {
-  const file = screenshotPath(testInfo, name);
+  const file = screenshotFilePath(testInfo, name);
   await locator.page().waitForTimeout(250);
   await locator.screenshot({ path: file });
 }
@@ -56,7 +59,7 @@ export async function locatorKeyframe(locator: Locator, testInfo: TestInfo, name
  * Capture the visible bootstrap modal content box itself.
  */
 export async function modalKeyframe(page: Page, testInfo: TestInfo, name: string): Promise<void> {
-  const file = screenshotPath(testInfo, name);
+  const file = screenshotFilePath(testInfo, name);
   await waitForSettledLayout(page);
   const contentLocator = page.locator(
     '.ranking-decision-modal-content, .match-modal-content, .modal-dialog'
