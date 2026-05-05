@@ -362,6 +362,13 @@ test('Mission Control changes active timer reason without restarting timer', asy
   const started = await timerState(client, tournament.id);
   expect(started.mode).toBe('countdown');
   expect(started.timestamp).toBeTruthy();
+  expect(started.reason).toBeNull();
+  expect(started.reasonText).toBeNull();
+  expect(timerPatchBodies[timerPatchBodies.length - 1]).toEqual({
+    timestamp_seconds: (20 * 60) + 15,
+    timer_mode: 'countdown',
+    timer_reason: null,
+  });
 
   await page.getByTestId('mission-timer-reason-select').selectOption('playoff_start');
   await page.getByTestId('mission-timer-reason-save').click();
@@ -402,7 +409,7 @@ test('Mission Control changes active timer reason without restarting timer', asy
     reasonText: null,
   });
   expect(timerPatchBodies[timerPatchBodies.length - 1]).toEqual({ timer_reason: null });
-  await expect(page.getByTestId('mission-current-timer-reason')).toContainText('Spielende', {
+  await expect(page.getByTestId('mission-current-timer-reason')).toContainText('Timer', {
     timeout: 20_000,
   });
 });

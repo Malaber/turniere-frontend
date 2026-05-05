@@ -67,7 +67,7 @@ export function getTimerReasonLabel(timerState) {
         return TIMER_REASON_LABELS[timerState.reason];
     }
 
-    return TIMER_REASON_LABELS[TIMER_REASON_MATCH_END];
+    return 'Timer';
 }
 
 export function getTimerDisplay(timerState, nowMs) {

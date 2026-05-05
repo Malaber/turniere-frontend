@@ -1844,9 +1844,9 @@ class MissionTimer extends React.Component {
             !this.reasonTextMissing();
     }
 
-    timerReasonPayload(includeEmptyReason = false) {
+    timerReasonPayload() {
         if (!this.state.timerReason) {
-            return includeEmptyReason ? {timer_reason: null} : {};
+            return {timer_reason: null};
         }
 
         if (this.state.timerReason === TIMER_REASON_CUSTOM) {
@@ -1894,7 +1894,7 @@ class MissionTimer extends React.Component {
         if (!this.canChangeTimerReason()) {
             return;
         }
-        this.patchTimer(this.timerReasonPayload(true), {reasonOnly: true});
+        this.patchTimer(this.timerReasonPayload(), {reasonOnly: true});
     }
 
     clearTimer() {
@@ -1908,7 +1908,7 @@ class MissionTimer extends React.Component {
         this.setState({running: true});
         const requestPayload = payload.clear_timer || options.reasonOnly ?
             payload :
-            Object.assign({}, payload, this.timerReasonPayload(false));
+            Object.assign({}, payload, this.timerReasonPayload());
         setTournamentTimer(this.props.tournamentId, requestPayload, this.onSuccess, this.onError);
     }
 
@@ -1951,7 +1951,7 @@ class MissionTimer extends React.Component {
                 </div>
                 <div className='mission-control-panel mb-3' data-testid='mission-timer-reason-control'>
                     <h4>Timer-Grund</h4>
-                    <p>Optional. Ohne Auswahl bleibt der Standard Spielende.</p>
+                    <p>Optional. Ohne Auswahl wird kein Grund gesetzt.</p>
                     <Row className='g-2'>
                         <Col md='4'>
                             <Label for='missionTimerReason'>Grund</Label>
