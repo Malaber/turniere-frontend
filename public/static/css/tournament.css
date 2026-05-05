@@ -235,6 +235,65 @@
     margin-bottom: 1rem;
 }
 
+.mission-checklist-list-controls {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    height: auto;
+    max-width: none;
+    padding: 0.85rem 1rem;
+}
+
+.mission-checklist-list-controls select {
+    max-width: 16rem;
+}
+
+.mission-checklist-list-controls + .mission-checklist-details {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.mission-checklist-details {
+    height: auto;
+}
+
+.mission-collapsible-summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+}
+
+.mission-collapsible-summary::-webkit-details-marker {
+    display: none;
+}
+
+.mission-collapsible-summary h4 {
+    display: inline-flex;
+    margin-bottom: 0;
+}
+
+.mission-collapsible-chevron {
+    color: #607080;
+    flex: 0 0 auto;
+    transition: transform 0.15s ease;
+}
+
+.mission-collapsible-details[open] > .mission-collapsible-summary .mission-collapsible-chevron {
+    transform: rotate(90deg);
+}
+
+.mission-checklist-count {
+    color: #607080;
+    font-size: 0.85rem;
+    margin-left: auto;
+}
+
+.mission-checklist-body {
+    padding-top: 0.85rem;
+}
+
 .mission-bulk-start-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
@@ -298,6 +357,84 @@
 .mission-countup-button {
     min-width: 18rem;
     color: #07121f;
+}
+
+.mission-transaction-log-header {
+    align-items: flex-start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.mission-transaction-log-header h3 {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.45rem;
+}
+
+.mission-transaction-log-list {
+    display: grid;
+    gap: 0.75rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.mission-transaction-log-entry {
+    background: #fff;
+    border: 1px solid #d9e1ea;
+    border-left: 4px solid #0d6efd;
+    border-radius: 8px;
+    padding: 0.9rem 1rem;
+}
+
+.mission-transaction-log-entry-meta,
+.mission-transaction-log-chips {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.mission-transaction-log-action {
+    color: #25313f;
+}
+
+.mission-transaction-log-detail {
+    align-items: center;
+    color: #607080;
+    display: inline-flex;
+    gap: 0.3rem;
+    font-size: 0.9rem;
+}
+
+.mission-transaction-log-message {
+    color: #25313f;
+    margin-top: 0.55rem;
+    overflow-wrap: anywhere;
+}
+
+.mission-transaction-log-chips {
+    margin-top: 0.65rem;
+}
+
+.mission-transaction-log-chip {
+    background: #f4f7fa;
+    border: 1px solid #d9e1ea;
+    border-radius: 999px;
+    color: #25313f;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    padding: 0.25rem 0.55rem;
+    text-decoration: none;
+}
+
+.mission-transaction-log-chip:hover {
+    background: #eef7ff;
+    border-color: #9ec5fe;
+    color: #0a58ca;
+    text-decoration: none;
 }
 
 .mission-beamer-list {
@@ -438,6 +575,13 @@
     grid-template-columns: minmax(16rem, 32rem) 1fr auto;
     gap: 0.75rem;
     align-items: center;
+    position: sticky;
+    top: calc(var(--mission-control-navbar-offset, 4rem) + 0.5rem);
+    z-index: 20;
+    background: #fff;
+    border: 1px solid #d9e1ea;
+    border-radius: 0.45rem;
+    box-shadow: 0 0.35rem 1rem rgba(37, 49, 63, 0.12);
     padding: 0.65rem;
     margin-bottom: 1.25rem;
 }
@@ -472,8 +616,64 @@
     margin-bottom: 1.25rem;
 }
 
-.mission-stage-badge {
+.mission-finished-stage-details {
+    border: 1px solid #dde3ea;
+    border-radius: 0.45rem;
+    background: #fff;
+    margin-bottom: 1rem;
+}
+
+.mission-finished-stage-summary {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    list-style: none;
+    padding: 1rem;
+    font-weight: 600;
+}
+
+.mission-finished-stage-summary::-webkit-details-marker {
+    display: none;
+}
+
+.mission-finished-stage-chevron {
+    color: #607080;
+    flex: 0 0 auto;
+    transition: transform 0.15s ease;
+}
+
+.mission-finished-stage-details[open] .mission-finished-stage-chevron {
+    transform: rotate(90deg);
+}
+
+.mission-finished-stage-title {
     color: #25313f;
+}
+
+.mission-finished-stage-state {
+    color: #607080;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+.mission-finished-stage-body {
+    padding: 0 1rem 1rem;
+}
+
+.mission-match-stage-nested {
+    background: #f8fafc;
+    margin-bottom: 0.75rem;
+}
+
+.mission-match-stage-nested:last-child {
+    margin-bottom: 0;
+}
+
+.mission-stage-badge {
+    background-color: #eef2f6 !important;
+    color: #25313f !important;
     margin-left: 0.65rem;
 }
 
@@ -718,6 +918,10 @@ i.is-finished {
 
     .mission-filter-reset {
         justify-self: start;
+    }
+
+    .mission-transaction-log-header {
+        flex-direction: column;
     }
 
     .mission-countup-button {

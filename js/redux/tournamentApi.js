@@ -182,6 +182,7 @@ function convertTeamActionList(apiList) {
         name: apiList.name,
         key: apiList.key,
         actionName: apiList.action_name,
+        createdAt: apiList.created_at ? new Date(apiList.created_at) : null,
         source: apiList.source,
         teamActionItems: teamActionItems
     };
@@ -203,6 +204,7 @@ function convertPlayoffStage(apiStage) {
     return {
         id: apiStage.id,
         level: apiStage.level,
+        state: apiStage.state,
         matches: apiStage.matches.sort(
             sortMatchesByPositionAscending()
         ).map(

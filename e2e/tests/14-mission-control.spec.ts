@@ -7,6 +7,7 @@ import {
   LONG_TEAM_NAME_SINGLE_WORD,
   longGroupStageTeamName,
   seedAndPlayGroupStage,
+  seedGroupStageAndRunToBeforeFinal,
   seedGroupStageTournament,
 } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
@@ -180,34 +181,162 @@ test('Mission Control configures Werbung image checklist', async ({ context, pag
   await expect(card).toBeVisible({ timeout: 20_000 });
 
   await card.getByTestId(`mission-beamer-mode-${beamer.json.id}`).selectOption('werbung');
+
   const checklist = card.getByTestId(`mission-beamer-werbung-checklist-${beamer.json.id}`);
   await expect(checklist).toBeVisible();
-  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_banner`)).toBeChecked();
-  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-bpwstr_qr_code`)).toBeChecked();
 
-  const tennis = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis_blurred`);
-  await tennis.click();
+  const defaultImageKeys = [
+    'bpwstr_banner',
+    'bpwstr_logo',
+    'bpwstr_qr_code',
+    'Merch_Werbebanner',
+    'Schorlepongturnier_Werbebanner',
+  ];
 
-  await expect.poll(async () => {
-    const beamers = await client.get<Array<{ id: number; config: Record<string, unknown> }>>(
-      `/tournaments/${tournament.id}/beamers`,
-    );
-    expectStatus(beamers, 200, 'fetch beamers after werbung config');
-    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
-    return updated?.config;
-  }, { timeout: 20_000 }).toMatchObject({
-    display_mode: 'werbung',
-    werbung_image_keys: expect.arrayContaining(['bpwstr_banner', 'bpwstr_logo', 'bpwstr_qr_code']),
-  });
+  for (const imageKey of defaultImageKeys) {
+    await expect(
+      card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-${imageKey}`),
+    ).toBeChecked();
+  }
+
+  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis_blurred`)).toHaveCount(0);
+  await expect(card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-tennis-blurred`)).toHaveCount(0);
+
+  const merch = card.getByTestId(`mission-beamer-werbung-image-${beamer.json.id}-Merch_Werbebanner`);
+  await merch.uncheck();
 
   await expect.poll(async () => {
     const beamers = await client.get<Array<{ id: number; config: { werbung_image_keys?: string[] } }>>(
       `/tournaments/${tournament.id}/beamers`,
     );
-    expectStatus(beamers, 200, 'fetch beamers after werbung uncheck');
+    expectStatus(beamers, 200, 'fetch beamers after werbung merch uncheck');
     const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
     return updated?.config.werbung_image_keys || [];
-  }, { timeout: 20_000 }).not.toContain('tennis_blurred');
+  }, { timeout: 20_000 }).not.toContain('Merch_Werbebanner');
+
+  await merch.check();
+
+  await expect.poll(async () => {
+    const beamers = await client.get<Array<{ id: number; config: { werbung_image_keys?: string[] } }>>(
+      `/tournaments/${tournament.id}/beamers`,
+    );
+    expectStatus(beamers, 200, 'fetch beamers after werbung merch re-check');
+    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
+    return updated?.config.werbung_image_keys || [];
+  }, { timeout: 20_000 }).toEqual(expect.arrayContaining(defaultImageKeys));
+});
+
+test('Mission Control configures Next Matches beamer mode', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = await loggedInClient();
+
+  const beamer = await client.post<{ id: number }>(`/tournaments/${tournament.id}/beamers`, {
+    name: 'next-control',
+    display_state: 'during_game',
+    config: { match_filter: 'state:finished' },
+  });
+  expectStatus(beamer, 201, 'create next-control beamer');
+
+  await page.goto(`/t/${tournament.id}/mission-control#beamer`);
+  const card = page.getByTestId(`mission-beamer-card-${beamer.json.id}`);
+  await expect(card).toBeVisible({ timeout: 20_000 });
+
+  await card.getByTestId(`mission-beamer-mode-${beamer.json.id}`).selectOption('next_matches');
+
+  await expect.poll(async () => {
+    const beamers = await client.get<Array<{
+      id: number;
+      display_state: string;
+      config: { display_mode?: string; match_filter?: string };
+    }>>(`/tournaments/${tournament.id}/beamers`);
+    expectStatus(beamers, 200, 'fetch beamers after next matches mode change');
+    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
+    return {
+      displayState: updated?.display_state,
+      displayMode: updated?.config.display_mode,
+      matchFilter: updated?.config.match_filter ?? null,
+    };
+  }, { timeout: 20_000 }).toEqual({
+    displayState: 'between_games',
+    displayMode: 'next_matches',
+    matchFilter: 'state:finished',
+  });
+
+  const matchSelect = card.getByTestId(`mission-beamer-match-${beamer.json.id}`);
+  await expect(matchSelect).toBeVisible({ timeout: 20_000 });
+  await expect(matchSelect).toHaveValue('state:finished');
+  await matchSelect.selectOption('state:in_progress');
+
+  await expect.poll(async () => {
+    const beamers = await client.get<Array<{
+      id: number;
+      display_state: string;
+      config: { display_mode?: string; match_filter?: string };
+    }>>(`/tournaments/${tournament.id}/beamers`);
+    expectStatus(beamers, 200, 'fetch beamers after next matches filter change');
+    const updated = beamers.json.find((candidate) => candidate.id === beamer.json.id);
+    return {
+      displayState: updated?.display_state,
+      displayMode: updated?.config.display_mode,
+      matchFilter: updated?.config.match_filter ?? null,
+    };
+  }, { timeout: 20_000 }).toEqual({
+    displayState: 'between_games',
+    displayMode: 'next_matches',
+    matchFilter: 'state:in_progress',
+  });
+});
+
+test('Mission Control loads transaction log lazily in Verlauf tab', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  let logRequests = 0;
+
+  await page.route('**/api/tournaments/*/transaction_log', async (route) => {
+    logRequests += 1;
+    await route.continue();
+  });
+
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('link', { name: 'Verlauf' })).toBeVisible();
+  await page.waitForTimeout(500);
+  expect(logRequests).toBe(0);
+
+  await page.getByRole('link', { name: 'Verlauf' }).click();
+  await expect(page).toHaveURL(/#history$/);
+  await expect(page.getByTestId('mission-transaction-log')).toBeVisible();
+  await expect.poll(async () => logRequests, { timeout: 20_000 }).toBe(1);
+
+  const entries = page.getByTestId('mission-transaction-log-entry');
+  await expect(entries.first()).toBeVisible({ timeout: 20_000 });
+  await expect(entries.first()).toContainText('tournament.created');
+  await expect(page.getByTestId('mission-transaction-log-sequence').first()).toHaveText('#1');
+
+  const sequences = await page.getByTestId('mission-transaction-log-sequence').evaluateAll((elements) => (
+    elements.map((element) => Number((element.textContent ?? '').replace('#', '')))
+  ));
+  const sortedSequences = [...sequences].sort((left, right) => left - right);
+  expect(sequences).toEqual(sortedSequences);
+
+  await page.getByRole('link', { name: 'Timer', exact: true }).click();
+  await page.getByTestId('mission-timer-quick-20s').click();
+  await expect.poll(async () => logRequests, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
+
+  await page.getByRole('link', { name: 'Verlauf' }).click();
+  await expect(entries.filter({ hasText: 'tournament.timer_changed' }).first()).toBeVisible({ timeout: 20_000 });
+
+  const requestsAfterMutationRefresh = logRequests;
+  await page.getByRole('link', { name: 'Teams' }).click();
+  await page.getByRole('link', { name: 'Verlauf' }).click();
+  await page.waitForTimeout(500);
+  expect(logRequests).toBe(requestsAfterMutationRefresh);
+
+  await page.getByTestId('mission-transaction-log-refresh').click();
+  await expect.poll(async () => logRequests, { timeout: 20_000 }).toBeGreaterThanOrEqual(
+    requestsAfterMutationRefresh + 1,
+  );
 });
 
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {
@@ -222,6 +351,7 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page.getByRole('link', { name: 'Ergebnisse' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Teams' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Checklisten' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Verlauf' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Turnier-Einstellungen' })).toBeVisible();
   await expect(page.getByTestId('mission-tournament-link')).toHaveAttribute('href', `/t/${tournament.id}`);
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
@@ -421,6 +551,71 @@ test('Mission Control stops and restarts a running match', async ({ context, pag
   }, { timeout: 20_000 }).toBe('in_progress');
   await expect(card.getByTestId('mission-match-stop')).toBeVisible({ timeout: 20_000 });
   await expect(card.getByTestId('mission-match-save')).toBeEnabled();
+});
+
+test('Mission Control keeps Ergebnisse search pinned while scrolling scores', async ({
+  context,
+  page,
+}, testInfo) => {
+  await injectAuth(context);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const { tournament } = await seedGroupStageTournament(8, 4, 8);
+
+  await page.goto(`/t/${tournament.id}/mission-control#scores`);
+  await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  const scoresPane = page.locator('.tab-pane.active');
+  const toolbar = scoresPane.locator('.mission-match-toolbar');
+  const search = scoresPane.getByTestId('mission-control-search');
+  await expect(search).toBeVisible();
+  await expect(toolbar).toHaveCSS('position', 'sticky');
+  await expect.poll(async () => page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight), {
+    timeout: 5_000,
+  }).toBeGreaterThan(400);
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(async () => page.evaluate(() => {
+    window.scrollBy(0, Math.max(200, Math.round(window.innerHeight / 2)));
+    const toolbarElement = document.querySelector('.tab-pane.active .mission-match-toolbar');
+    if (!toolbarElement) {
+      return Number.POSITIVE_INFINITY;
+    }
+    const toolbarTop = toolbarElement.getBoundingClientRect().top;
+    const stickyTop = Number.parseFloat(window.getComputedStyle(toolbarElement).top);
+    return Math.abs(Math.round(toolbarTop - stickyTop));
+  }), {
+    timeout: 5_000,
+  }).toBeLessThanOrEqual(2);
+  const pinnedGeometry = await toolbar.evaluate((el) => {
+    const navbar = document.querySelector('.navbar.sticky-top');
+    const navbarBottom = navbar?.getBoundingClientRect().bottom ?? 0;
+    const rect = el.getBoundingClientRect();
+    const stickyTop = Number.parseFloat(window.getComputedStyle(el).top);
+    const inputRect = el.querySelector('[data-testid="mission-control-search"]')?.getBoundingClientRect();
+    return {
+      top: Math.round(rect.top),
+      bottom: Math.round(rect.bottom),
+      navbarBottom: Math.round(navbarBottom),
+      stickyTop: Math.round(stickyTop),
+      inputTop: Math.round(inputRect?.top ?? -1),
+      inputBottom: Math.round(inputRect?.bottom ?? -1),
+      inputWidth: Math.round(inputRect?.width ?? 0),
+      viewportHeight: window.innerHeight,
+    };
+  });
+
+  expect(pinnedGeometry.top).toBeGreaterThanOrEqual(pinnedGeometry.stickyTop - 2);
+  expect(pinnedGeometry.top).toBeLessThanOrEqual(pinnedGeometry.stickyTop + 2);
+  expect(pinnedGeometry.stickyTop).toBeGreaterThanOrEqual(pinnedGeometry.navbarBottom + 4);
+  expect(pinnedGeometry.stickyTop).toBeLessThanOrEqual(pinnedGeometry.navbarBottom + 24);
+  expect(pinnedGeometry.bottom).toBeLessThan(pinnedGeometry.viewportHeight);
+  expect(pinnedGeometry.inputTop).toBeGreaterThanOrEqual(pinnedGeometry.top);
+  expect(pinnedGeometry.inputBottom).toBeLessThanOrEqual(pinnedGeometry.bottom);
+  expect(pinnedGeometry.inputWidth).toBeGreaterThan(220);
+
+  await search.fill('gruppe 8');
+  await expect(scoresPane.getByRole('heading', { name: 'Gruppe 8 6 Matches' })).toBeVisible();
+  await expect(scoresPane.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).toHaveCount(0);
+  await keyframe(page, testInfo, 'mission_control_scores_search_pinned');
 });
 
 test('Mission Control saves independent beamer display controls instantly', async ({ context, page }, testInfo) => {
@@ -631,6 +826,42 @@ test('Mission Control soundboard controls beamer audio with timer priority', asy
   await keyframe(page, testInfo, 'beamer_soundboard');
 });
 
+test('Mission Control collapses finished score stages below active stages', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageAndRunToBeforeFinal(2, 4, 4);
+  const semifinal = tournament.stages.find((stage) => stage.level === 1);
+  expect(semifinal).toBeTruthy();
+
+  await page.goto(`/t/${tournament.id}/mission-control#scores`);
+  await expect(page.getByTestId('mission-score-control')).toBeVisible({ timeout: 20_000 });
+  const scoresPane = page.locator('.tab-pane.active');
+  const finalHeading = scoresPane.getByRole('heading', { name: /Finale \d+ Matches/ });
+  await expect(finalHeading).toBeVisible();
+
+  const groupDetails = scoresPane.getByTestId('mission-finished-stage-group-stage');
+  const semifinalDetails = scoresPane.getByTestId(`mission-finished-stage-stage-${semifinal!.id}`);
+  await expect(groupDetails).toBeVisible();
+  await expect(semifinalDetails).toBeVisible();
+  await expect(groupDetails.getByTestId('mission-finished-stage-chevron')).toBeVisible();
+  await expect(groupDetails).not.toHaveAttribute('open', '');
+  await expect(semifinalDetails).not.toHaveAttribute('open', '');
+  await expect(groupDetails.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).not.toBeVisible();
+  await expect(semifinalDetails.getByRole('heading', { name: 'Halbfinale 2 Matches' })).not.toBeVisible();
+
+  const finalTop = await finalHeading.evaluate((element) => element.getBoundingClientRect().top);
+  const groupDetailsTop = await groupDetails.evaluate((element) => element.getBoundingClientRect().top);
+  expect(finalTop).toBeLessThan(groupDetailsTop);
+
+  await groupDetails.getByTestId('mission-finished-stage-summary').click();
+  await expect(groupDetails).toHaveAttribute('open', '');
+  await expect(groupDetails.getByRole('heading', { name: 'Gruppe 1 6 Matches' })).toBeVisible();
+  await expect(groupDetails.getByTestId('mission-match-card').filter({ hasText: 'G1-S1' }).first()).toBeVisible();
+
+  await semifinalDetails.getByTestId('mission-finished-stage-summary').click();
+  await expect(semifinalDetails).toHaveAttribute('open', '');
+  await expect(semifinalDetails.getByRole('heading', { name: 'Halbfinale 2 Matches' })).toBeVisible();
+});
+
 test('Mission Control mockup panes cover timer, beamer, and playoff match routing', async ({
   context,
   page,
@@ -744,6 +975,11 @@ test('Mission Control mockup panes cover timer, beamer, and playoff match routin
   await expect(scoresPane.getByText('Tisch 1 -> Tisch 1').first()).toBeVisible();
   await keyframe(page, testInfo, 'scores_wide_match_control');
 
+  await scoresPane.getByTestId('mission-control-search').fill('');
+  const finishedGroupStage = scoresPane.getByTestId('mission-finished-stage-group-stage');
+  await expect(finishedGroupStage).toBeVisible();
+  await finishedGroupStage.getByTestId('mission-finished-stage-summary').click();
+  await expect(finishedGroupStage).toHaveAttribute('open', '');
   await scoresPane.getByTestId('mission-control-search').fill('G2-S1');
   await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G2-S1' }).first()).toBeVisible();
   await expect(scoresPane.getByTestId('mission-match-card').filter({ hasText: 'G1-S4' })).toHaveCount(0);

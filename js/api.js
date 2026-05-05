@@ -875,6 +875,21 @@ export function deleteBeamer(tournamentId, beamerId, successCallback, errorCallb
     });
 }
 
+export function getTournamentTransactionLog(tournamentId, successCallback, errorCallback) {
+    const currentState = getState();
+    getRequest(currentState, '/tournaments/' + tournamentId + '/transaction_log').then(resp => {
+        storeOptionalToken(resp);
+        successCallback(Array.isArray(resp.data) ? resp.data : []);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
+}
+
 export function startNextGroupMatches(groups, successCallback, errorCallback) {
     const matches = groups.map(group => group.matches
         .filter(match => match.state === 'not_started')

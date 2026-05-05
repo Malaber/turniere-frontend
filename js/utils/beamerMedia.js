@@ -3,6 +3,8 @@ export const STATIC_IMAGE_KEY_CONFIG_KEY = 'image_key';
 export const WERBUNG_IMAGE_KEYS_CONFIG_KEY = 'werbung_image_keys';
 export const WERBUNG_ROTATION_SECONDS_CONFIG_KEY = 'werbung_rotation_seconds';
 export const DEFAULT_WERBUNG_ROTATION_SECONDS = 10;
+export const BPWSTR_LOGO_IMAGE_KEY = 'bpwstr_logo';
+export const BPWSTR_QR_CODE_IMAGE_KEY = 'bpwstr_qr_code';
 
 export const BEAMER_MEDIA_IMAGES = [
     {
@@ -11,29 +13,24 @@ export const BEAMER_MEDIA_IMAGES = [
         src: '/static/images/bpwstr_banner.jpg'
     },
     {
-        key: 'bpwstr_logo',
+        key: BPWSTR_LOGO_IMAGE_KEY,
         label: 'BPWSTR Logo',
         src: '/static/images/bpwstr_logo.png'
     },
     {
-        key: 'bpwstr_qr_code',
+        key: BPWSTR_QR_CODE_IMAGE_KEY,
         label: 'BPWSTR QR-Code',
         src: '/static/images/bpwstr_qr_code.png'
     },
     {
-        key: 'turniere_logo',
-        label: 'Turnie Logo',
-        src: '/static/images/logo-questionmark.png'
+        key: 'Merch_Werbebanner',
+        label: 'Merch_Werbebanner',
+        src: '/static/images/Merch_Werbebanner.png'
     },
     {
-        key: 'landingpage_background',
-        label: 'Landingpage Hintergrund',
-        src: '/static/images/landingpage-background.jpg'
-    },
-    {
-        key: 'tennis_blurred',
-        label: 'Tennis Hintergrund',
-        src: '/static/images/tennis-blurred.jpg'
+        key: 'Schorlepongturnier_Werbebanner',
+        label: 'Schorlepongturnier_Werbebanner',
+        src: '/static/images/Schorlepongturnier_Werbebanner.png'
     }
 ];
 

@@ -21,6 +21,9 @@ const TIMER_EFFECT_CUES = [
 
 const TICK_MS = 250;
 const AUDIO_PERMISSION_PROBE_SRC = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=';
+const CONFETTI_FINISH_DELAY_MS = 1000;
+const CONFETTI_FIREWORK_BURSTS = 14;
+const CONFETTI_FIREWORK_INTERVAL_MS = 180;
 
 
 function emitDebugEvent(type, payload) {
@@ -40,18 +43,30 @@ function soundEffectCommandId(command) {
 }
 
 
-function triggerConfetti() {
-    emitDebugEvent('confetti');
+function randomFireworkOrigin() {
+    return {
+        x: 0.12 + (Math.random() * 0.76),
+        y: 0.12 + (Math.random() * 0.58)
+    };
+}
 
-    confetti({
-        particleCount: 180,
-        spread: 90,
-        startVelocity: 45,
+function triggerConfettiBurst(origin, burstIndex) {
+    emitDebugEvent('confetti', {
+        burstIndex,
+        style: 'firework',
+        origin
+    });
+
+    Promise.resolve(confetti({
+        particleCount: 70 + Math.floor(Math.random() * 45),
+        spread: 360,
+        startVelocity: 28 + (Math.random() * 22),
         decay: 0.92,
-        gravity: 0.9,
-        origin: {x: 0.5, y: 0.5},
+        gravity: 0.85,
+        scalar: 0.9 + (Math.random() * 0.4),
+        origin,
         zIndex: 2147483647
-    })
+    }))
         .catch(error => {
             emitDebugEvent('confetti-error', {message: error.message});
         });
@@ -74,9 +89,11 @@ export class BeamerTimerEffects extends React.Component {
         this.playbackAttemptId = 0;
         this.audioPermissionStatus = 'unknown';
         this.lastSoundEffectCommandId = null;
-        this.previousSecondsRemaining = null;
+        this.previousMsRemaining = null;
         this.timerSessionKey = null;
         this.finishedTriggered = false;
+        this.finishConfettiTimeoutId = null;
+        this.confettiTimeouts = [];
         this.unlockInProgress = false;
 
         this.checkAudioPermission = this.checkAudioPermission.bind(this);
@@ -106,7 +123,46 @@ export class BeamerTimerEffects extends React.Component {
 
     componentWillUnmount() {
         clearInterval(this.intervalId);
+        this.clearConfettiTimeouts();
         this.stopActiveSounds('unmount');
+    }
+
+    clearConfettiTimeouts() {
+        if (this.finishConfettiTimeoutId) {
+            clearTimeout(this.finishConfettiTimeoutId);
+            this.finishConfettiTimeoutId = null;
+        }
+        this.confettiTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+        this.confettiTimeouts = [];
+    }
+
+    scheduleConfettiFireworks() {
+        this.clearConfettiTimeouts();
+        emitDebugEvent('confetti-scheduled', {
+            delayMs: CONFETTI_FINISH_DELAY_MS
+        });
+        this.finishConfettiTimeoutId = setTimeout(() => {
+            this.finishConfettiTimeoutId = null;
+            this.startConfettiFireworks();
+        }, CONFETTI_FINISH_DELAY_MS);
+    }
+
+    startConfettiFireworks() {
+        this.clearConfettiTimeouts();
+
+        for (let burstIndex = 0; burstIndex < CONFETTI_FIREWORK_BURSTS; burstIndex++) {
+            const fire = () => {
+                triggerConfettiBurst(randomFireworkOrigin(), burstIndex);
+            };
+
+            if (burstIndex === 0) {
+                fire();
+                continue;
+            }
+
+            const timeoutId = setTimeout(fire, burstIndex * CONFETTI_FIREWORK_INTERVAL_MS);
+            this.confettiTimeouts.push(timeoutId);
+        }
     }
 
     resetSessionIfNeeded(timerState) {
@@ -121,8 +177,9 @@ export class BeamerTimerEffects extends React.Component {
         this.pendingCue = null;
         this.pendingElapsedSeconds = null;
         this.pendingPriority = null;
-        this.previousSecondsRemaining = null;
+        this.previousMsRemaining = null;
         this.finishedTriggered = false;
+        this.clearConfettiTimeouts();
         this.stopTimerSounds('timer-changed');
     }
 
@@ -132,36 +189,37 @@ export class BeamerTimerEffects extends React.Component {
 
         const display = getTimerDisplay(timerState, Date.now());
         if (!display.active || display.mode !== TIMER_MODE_COUNTDOWN) {
-            this.previousSecondsRemaining = null;
+            this.previousMsRemaining = null;
             this.finishedTriggered = false;
             this.stopTimerSounds('timer-inactive');
             return;
         }
 
-        const secondsRemaining = Math.floor(display.ms / 1000);
-        if (secondsRemaining <= 0) {
-            if (!this.finishedTriggered) {
+        if (display.ms === 0) {
+            const crossedFinish = this.previousMsRemaining !== null &&
+                this.previousMsRemaining > 0;
+            if (crossedFinish && !this.finishedTriggered) {
                 this.finishedTriggered = true;
-                triggerConfetti();
+                this.scheduleConfettiFireworks();
             }
-            this.previousSecondsRemaining = secondsRemaining;
+            this.previousMsRemaining = display.ms;
             return;
         }
 
         TIMER_EFFECT_CUES.forEach(cue => {
             if (this.firedCueKeys[cue.key]) return;
 
-            const cueStartSeconds = this.getCueStartSeconds(cue);
-            const elapsedSeconds = Math.max(0, cueStartSeconds - secondsRemaining);
+            const cueStartMs = this.getCueStartMs(cue);
+            const elapsedSeconds = Math.max(0, (cueStartMs - display.ms) / 1000);
             const canSyncFromElapsed = elapsedSeconds < cue.durationSeconds;
-            const crossedCue = this.previousSecondsRemaining !== null &&
-                this.previousSecondsRemaining > cueStartSeconds &&
-                secondsRemaining <= cueStartSeconds;
-            const loadedDuringCue = this.previousSecondsRemaining === null &&
-                secondsRemaining <= cueStartSeconds &&
+            const crossedCue = this.previousMsRemaining !== null &&
+                this.previousMsRemaining > cueStartMs &&
+                display.ms <= cueStartMs;
+            const loadedDuringCue = this.previousMsRemaining === null &&
+                display.ms <= cueStartMs &&
                 canSyncFromElapsed;
 
-            if (crossedCue || loadedDuringCue || secondsRemaining === cueStartSeconds) {
+            if (crossedCue || loadedDuringCue || display.ms === cueStartMs) {
                 this.firedCueKeys[cue.key] = true;
                 if (canSyncFromElapsed) {
                     this.playCue(cue, elapsedSeconds);
@@ -175,20 +233,23 @@ export class BeamerTimerEffects extends React.Component {
             }
         });
 
-        this.previousSecondsRemaining = secondsRemaining;
+        this.previousMsRemaining = display.ms;
     }
 
     getCueStartSeconds(cue) {
         return cue.secondsRemaining + cue.startOffsetSeconds;
     }
 
+    getCueStartMs(cue) {
+        return this.getCueStartSeconds(cue) * 1000;
+    }
+
     getElapsedSeconds(cue) {
         const display = getTimerDisplay(this.props.timerState, Date.now());
         if (!display.active || display.mode !== TIMER_MODE_COUNTDOWN) return null;
 
-        const secondsRemaining = Math.floor(display.ms / 1000);
-        const cueStartSeconds = this.getCueStartSeconds(cue);
-        const elapsedSeconds = Math.max(0, cueStartSeconds - secondsRemaining);
+        const cueStartMs = this.getCueStartMs(cue);
+        const elapsedSeconds = Math.max(0, (cueStartMs - display.ms) / 1000);
         if (elapsedSeconds >= cue.durationSeconds) return null;
 
         return elapsedSeconds;

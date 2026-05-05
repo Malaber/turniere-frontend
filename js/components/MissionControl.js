@@ -3,13 +3,17 @@ import {
     Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader,
     Nav, NavItem, NavLink, Row, Table, TabContent, TabPane
 } from 'reactstrap';
-import {FaExternalLinkAlt, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaTrash, FaUsers} from 'react-icons/fa';
+import {
+    FaChevronRight, FaClock, FaExternalLinkAlt, FaHistory, FaKeyboard, FaLock, FaPlay, FaSearch, FaStop, FaSyncAlt,
+    FaTrash, FaUser, FaUsers
+} from 'react-icons/fa';
 import {notify} from './Notifications';
 import {
     createBeamer,
     deleteBeamer,
     endMatch,
     getBeamers,
+    getTournamentTransactionLog,
     setTournamentTimer,
     startMatch,
     startNextGroupMatches,
@@ -44,6 +48,8 @@ import {
     WERBUNG_IMAGE_KEYS_CONFIG_KEY
 } from '../utils/beamerMedia';
 
+const NEXT_MATCHES_DISPLAY_MODE = 'next_matches';
+
 function stageName(level) {
     const names = ['Finale', 'Halbfinale', 'Viertelfinale', 'Achtelfinale'];
     if (level < names.length) {
@@ -67,6 +73,7 @@ function errorMessage(errorBody, fallback) {
 const DISPLAY_STATES = [
     {value: 'between_games', label: 'Zwischen den Spielen'},
     {value: 'during_game', label: 'Während dem Spiel'},
+    {value: 'next_matches', label: 'Nächste Spiele'},
     {value: 'timer_only', label: 'Nur Timer'},
     {value: 'group_tables', label: 'Gruppenstand'},
     {value: 'static_image', label: 'Statisches Bild'},
@@ -76,6 +83,8 @@ const DISPLAY_STATES = [
 const BEAMER_MODES = [
     {value: 'group_tables', label: 'Group Tables', displayState: 'group_tables'},
     {value: 'during_game', label: 'Matches with Timer', displayState: 'during_game'},
+    {value: 'next_matches', label: 'Next Matches', displayState: 'between_games',
+        configDisplayMode: NEXT_MATCHES_DISPLAY_MODE},
     {value: 'timer_only', label: 'Timer Only', displayState: 'during_game', configDisplayMode: 'timer_only'},
     {value: 'between_games', label: 'Matches Only', displayState: 'between_games'},
     {value: 'static_image', label: 'Static Image', displayState: 'static_image'},
@@ -89,8 +98,14 @@ const BEAMER_MATCH_STATES = [
     {value: 'finished', label: 'Beendet'}
 ];
 
-const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'checklists', 'teams', 'settings'];
-const SEARCH_TAB_IDS = ['scores', 'teams'];
+const TAB_IDS = ['timer', 'beamer', 'starts', 'scores', 'checklists', 'teams', 'history', 'settings'];
+const SEARCH_TAB_IDS = ['scores', 'teams', 'checklists'];
+const TEAM_ACTION_LIST_SORT_OPTIONS = [
+    {value: 'name', label: 'Name'},
+    {value: 'date', label: 'Datum'},
+    {value: 'unchecked', label: 'Offen zuerst'},
+    {value: 'checked', label: 'Erledigt zuerst'}
+];
 
 function tabFromLocation() {
     if (typeof window === 'undefined') {
@@ -109,11 +124,12 @@ function displayStateLabel(value) {
 }
 
 function beamerModeFor(beamer) {
-    if (beamer.config && beamer.config.display_mode === 'timer_only') {
-        return 'timer_only';
-    }
-    if (beamer.config && beamer.config.display_mode === WERBUNG_DISPLAY_MODE) {
-        return 'werbung';
+    const configDisplayMode = beamer.config && beamer.config.display_mode;
+    if (configDisplayMode) {
+        const configMode = BEAMER_MODES.find(item => item.configDisplayMode === configDisplayMode);
+        if (configMode) {
+            return configMode.value;
+        }
     }
 
     const mode = BEAMER_MODES.find(item => item.displayState === beamer.display_state && !item.configDisplayMode);
@@ -128,6 +144,9 @@ function beamerModeLabel(value) {
 function beamerDisplayStateFor(beamer) {
     if (beamer.config && beamer.config.display_mode === 'timer_only') {
         return 'timer_only';
+    }
+    if (beamer.config && beamer.config.display_mode === NEXT_MATCHES_DISPLAY_MODE) {
+        return 'next_matches';
     }
     if (beamer.config && beamer.config.display_mode === WERBUNG_DISPLAY_MODE) {
         return 'werbung';
@@ -242,7 +261,12 @@ export class MissionControl extends React.Component {
         this.state = {
             activeTab: 'timer',
             search: '',
-            actionRunning: null
+            actionRunning: null,
+            transactionLogEntries: [],
+            transactionLogLoaded: false,
+            transactionLogLoading: false,
+            transactionLogErrorStatus: null,
+            transactionLogErrorMessage: ''
         };
         this.searchInput = React.createRef();
         this.setActiveTab = this.setActiveTab.bind(this);
@@ -250,23 +274,50 @@ export class MissionControl extends React.Component {
         this.handleLocationChange = this.handleLocationChange.bind(this);
         this.handleGlobalKeyDown = this.handleGlobalKeyDown.bind(this);
         this.focusSearch = this.focusSearch.bind(this);
+        this.updateStickyOffset = this.updateStickyOffset.bind(this);
         this.startGroupMatches = this.startGroupMatches.bind(this);
         this.startStageMatches = this.startStageMatches.bind(this);
         this.onActionSuccess = this.onActionSuccess.bind(this);
         this.onActionError = this.onActionError.bind(this);
+        this.handleTournamentChange = this.handleTournamentChange.bind(this);
+        this.loadTransactionLogIfNeeded = this.loadTransactionLogIfNeeded.bind(this);
+        this.reloadTransactionLog = this.reloadTransactionLog.bind(this);
+        this.onTransactionLogSuccess = this.onTransactionLogSuccess.bind(this);
+        this.onTransactionLogError = this.onTransactionLogError.bind(this);
     }
 
     componentDidMount() {
         const initialTab = tabFromLocation();
         if (initialTab) {
-            this.setState({activeTab: initialTab});
+            this.setActiveTab(initialTab, false);
         }
         window.addEventListener('popstate', this.handleLocationChange);
         window.addEventListener('hashchange', this.handleLocationChange);
         window.addEventListener('keydown', this.handleGlobalKeyDown);
+        window.addEventListener('resize', this.updateStickyOffset);
+        this.updateStickyOffset();
+        const navbar = document.querySelector('.navbar.sticky-top');
+        if (navbar && typeof window.ResizeObserver === 'function') {
+            this.navbarResizeObserver = new window.ResizeObserver(this.updateStickyOffset);
+            this.navbarResizeObserver.observe(navbar);
+        }
     }
 
-    componentDidUpdate() {
+    componentDidUpdate(prevProps) {
+        this.updateStickyOffset();
+        if (prevProps.tournament.id !== this.props.tournament.id) {
+            this.setState({
+                transactionLogEntries: [],
+                transactionLogLoaded: false,
+                transactionLogLoading: false,
+                transactionLogErrorStatus: null,
+                transactionLogErrorMessage: ''
+            }, () => {
+                if (this.state.activeTab === 'history') {
+                    this.loadTransactionLogIfNeeded();
+                }
+            });
+        }
         this.handleLocationChange();
     }
 
@@ -274,6 +325,12 @@ export class MissionControl extends React.Component {
         window.removeEventListener('popstate', this.handleLocationChange);
         window.removeEventListener('hashchange', this.handleLocationChange);
         window.removeEventListener('keydown', this.handleGlobalKeyDown);
+        window.removeEventListener('resize', this.updateStickyOffset);
+        if (this.navbarResizeObserver) {
+            this.navbarResizeObserver.disconnect();
+            this.navbarResizeObserver = null;
+        }
+        document.documentElement.style.removeProperty('--mission-control-navbar-offset');
     }
 
     setActiveTab(tab, updateUrl = true, callback = null) {
@@ -281,7 +338,14 @@ export class MissionControl extends React.Component {
             return;
         }
 
-        this.setState({activeTab: tab}, callback);
+        this.setState({activeTab: tab}, () => {
+            if (callback) {
+                callback();
+            }
+            if (tab === 'history') {
+                this.loadTransactionLogIfNeeded();
+            }
+        });
         if (updateUrl && typeof window !== 'undefined') {
             window.history.pushState(null, '', '#' + tab);
         }
@@ -323,6 +387,12 @@ export class MissionControl extends React.Component {
         focus();
     }
 
+    updateStickyOffset() {
+        const navbar = document.querySelector('.navbar.sticky-top');
+        const height = navbar ? Math.ceil(navbar.getBoundingClientRect().height) : 0;
+        document.documentElement.style.setProperty('--mission-control-navbar-offset', height + 'px');
+    }
+
     startGroupMatches() {
         this.setState({actionRunning: 'group'});
         startNextGroupMatches(this.props.tournament.groupStage.groups, this.onActionSuccess, this.onActionError);
@@ -340,13 +410,61 @@ export class MissionControl extends React.Component {
             notify.show('Matches wurden gestartet.', 'success', 2500);
         }
         this.setState({actionRunning: null});
-        this.props.onTournamentChange();
+        this.handleTournamentChange();
     }
 
     onActionError(errorBody) {
         notify.show(errorMessage(errorBody, 'Die Matches konnten nicht gestartet werden.'), 'error', 3000);
         this.setState({actionRunning: null});
+        this.handleTournamentChange();
+    }
+
+    handleTournamentChange() {
         this.props.onTournamentChange();
+        if (this.state.transactionLogLoaded && !this.state.transactionLogLoading) {
+            this.reloadTransactionLog();
+        }
+    }
+
+    loadTransactionLogIfNeeded() {
+        if (this.state.transactionLogLoaded || this.state.transactionLogLoading) {
+            return;
+        }
+        this.reloadTransactionLog();
+    }
+
+    reloadTransactionLog() {
+        if (!this.props.tournament || !this.props.tournament.id || this.state.transactionLogLoading) {
+            return;
+        }
+        this.setState({
+            transactionLogLoading: true,
+            transactionLogErrorStatus: null,
+            transactionLogErrorMessage: ''
+        });
+        getTournamentTransactionLog(
+            this.props.tournament.id,
+            this.onTransactionLogSuccess,
+            this.onTransactionLogError
+        );
+    }
+
+    onTransactionLogSuccess(entries) {
+        this.setState({
+            transactionLogEntries: entries,
+            transactionLogLoaded: true,
+            transactionLogLoading: false,
+            transactionLogErrorStatus: null,
+            transactionLogErrorMessage: ''
+        });
+    }
+
+    onTransactionLogError(errorBody, status) {
+        this.setState({
+            transactionLogLoading: false,
+            transactionLogErrorStatus: status,
+            transactionLogErrorMessage: errorMessage(errorBody, 'Verlauf konnte nicht geladen werden.')
+        });
     }
 
     render() {
@@ -435,6 +553,15 @@ export class MissionControl extends React.Component {
                                 </NavLink>
                             </NavItem>
                             <NavItem>
+                                <NavLink href='#history' active={this.state.activeTab === 'history'}
+                                    onClick={event => {
+                                        event.preventDefault();
+                                        this.setActiveTab('history');
+                                    }}>
+                                    Verlauf
+                                </NavLink>
+                            </NavItem>
+                            <NavItem>
                                 <NavLink href='#settings' active={this.state.activeTab === 'settings'}
                                     onClick={event => {
                                         event.preventDefault();
@@ -451,7 +578,7 @@ export class MissionControl extends React.Component {
                                     tournamentId={tournament.id}
                                     timerState={tournament.timerState}
                                     disabled={!canControl}
-                                    onTournamentChange={this.props.onTournamentChange}
+                                    onTournamentChange={this.handleTournamentChange}
                                 />
                             </TabPane>
 
@@ -476,7 +603,7 @@ export class MissionControl extends React.Component {
                                     onSearchChange={this.setSearch}
                                     searchInputRef={this.searchInput}
                                     disabled={!canControl}
-                                    onTournamentChange={this.props.onTournamentChange}
+                                    onTournamentChange={this.handleTournamentChange}
                                 />
                             </TabPane>
 
@@ -500,7 +627,7 @@ export class MissionControl extends React.Component {
                                     teams={tournament.teams}
                                     search={this.state.search}
                                     disabled={!canControl}
-                                    onTournamentChange={this.props.onTournamentChange}
+                                    onTournamentChange={this.handleTournamentChange}
                                 />
                             </TabPane>
 
@@ -508,9 +635,23 @@ export class MissionControl extends React.Component {
                                 <MissionChecklists
                                     tournamentId={tournament.id}
                                     teamActionLists={tournament.teamActionLists}
+                                    search={this.state.search}
+                                    onSearchChange={this.setSearch}
+                                    searchInputRef={this.searchInput}
                                     disabled={!canControl}
                                     onSetTeamActionItemState={this.props.onSetTeamActionItemState}
                                     onCreateTeamActionList={this.props.onCreateTeamActionList}
+                                />
+                            </TabPane>
+
+                            <TabPane tabId='history'>
+                                <MissionTransactionLog
+                                    entries={this.state.transactionLogEntries}
+                                    loaded={this.state.transactionLogLoaded}
+                                    loading={this.state.transactionLogLoading}
+                                    errorStatus={this.state.transactionLogErrorStatus}
+                                    errorMessage={this.state.transactionLogErrorMessage}
+                                    onRefresh={this.reloadTransactionLog}
                                 />
                             </TabPane>
 
@@ -518,7 +659,7 @@ export class MissionControl extends React.Component {
                                 <MissionTournamentSettings
                                     tournament={tournament}
                                     disabled={!canEditSettings}
-                                    onTournamentChange={this.props.onTournamentChange}
+                                    onTournamentChange={this.handleTournamentChange}
                                 />
                             </TabPane>
                         </TabContent>
@@ -527,6 +668,185 @@ export class MissionControl extends React.Component {
             </div>
         );
     }
+}
+
+function MissionTransactionLog(props) {
+    const entries = (Array.isArray(props.entries) ? props.entries : []).slice().sort((left, right) => {
+        const leftSequence = Number(left.sequence || 0);
+        const rightSequence = Number(right.sequence || 0);
+        if (leftSequence !== rightSequence) {
+            return leftSequence - rightSequence;
+        }
+        return Number(left.id || 0) - Number(right.id || 0);
+    });
+    const isInitialLoading = props.loading && !props.loaded;
+
+    return (
+        <section className='mission-control-section mission-transaction-log'
+            data-testid='mission-transaction-log'>
+            <div className='mission-transaction-log-header'>
+                <div>
+                    <h3 className='h5 mission-pane-heading mb-1'>
+                        <FaHistory aria-hidden='true' /> Verlauf
+                    </h3>
+                    <div className='text-muted'>
+                        Chronologischer Turnierverlauf für Owner, sortiert nach Sequenz.
+                    </div>
+                </div>
+                <Button outline color='secondary'
+                    disabled={props.loading}
+                    data-testid='mission-transaction-log-refresh'
+                    onClick={props.onRefresh}>
+                    <FaSyncAlt aria-hidden='true' /> {props.loading ? 'Lädt...' : 'Aktualisieren'}
+                </Button>
+            </div>
+
+            {!props.loaded && !props.loading && !props.errorMessage &&
+                <Alert color='light' className='mb-0' data-testid='mission-transaction-log-idle'>
+                    Verlauf wird erst beim Öffnen dieses Tabs geladen.
+                </Alert>}
+
+            {isInitialLoading &&
+                <Alert color='info' className='mb-0' data-testid='mission-transaction-log-loading'>
+                    Verlauf wird geladen...
+                </Alert>}
+
+            {props.errorMessage &&
+                <Alert color='danger' className='mb-3' data-testid='mission-transaction-log-error'>
+                    {transactionLogErrorMessage(props.errorStatus, props.errorMessage)}
+                </Alert>}
+
+            {props.loaded && entries.length === 0 && !props.errorMessage &&
+                <Alert color='light' className='mb-0' data-testid='mission-transaction-log-empty'>
+                    Noch keine Verlaufseinträge vorhanden.
+                </Alert>}
+
+            {entries.length > 0 &&
+                <ol className='mission-transaction-log-list'>
+                    {entries.map(entry => (
+                        <TransactionLogEntry entry={entry} key={entry.id || entry.sequence}/>
+                    ))}
+                </ol>}
+        </section>
+    );
+}
+
+function TransactionLogEntry(props) {
+    const entry = props.entry || {};
+    const userLabel = entry.user && entry.user.username ? entry.user.username : 'System';
+    const metadata = entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {};
+    const chips = transactionMetadataChips(metadata);
+
+    return (
+        <li className='mission-transaction-log-entry' data-testid='mission-transaction-log-entry'>
+            <div className='mission-transaction-log-entry-meta'>
+                <Badge color='primary' pill data-testid='mission-transaction-log-sequence'>
+                    #{entry.sequence}
+                </Badge>
+                <Badge color='light' className='mission-transaction-log-action'>
+                    {entry.action || 'unknown'}
+                </Badge>
+                <span className='mission-transaction-log-detail'>
+                    <FaUser aria-hidden='true' /> {userLabel}
+                </span>
+                <time className='mission-transaction-log-detail' dateTime={entry.created_at || ''}>
+                    <FaClock aria-hidden='true' /> {formatTransactionLogTime(entry.created_at)}
+                </time>
+            </div>
+            <div className='mission-transaction-log-message' data-testid='mission-transaction-log-message'>
+                {entry.message || entry.action || 'Unbekannter Verlaufseintrag'}
+            </div>
+            {chips.length > 0 &&
+                <div className='mission-transaction-log-chips' data-testid='mission-transaction-log-chips'>
+                    {chips.map(chip => chip.href ?
+                        <a href={chip.href} className='mission-transaction-log-chip' key={chip.key}>
+                            {chip.label}
+                        </a> :
+                        <span className='mission-transaction-log-chip' key={chip.key}>
+                            {chip.label}
+                        </span>
+                    )}
+                </div>}
+        </li>
+    );
+}
+
+function transactionLogErrorMessage(status, fallback) {
+    if (status === 401) {
+        return 'Nicht eingeloggt.';
+    }
+    if (status === 403) {
+        return 'Nur Turnier-Owner darf den Verlauf lesen.';
+    }
+    if (status === 404) {
+        return 'Turnier nicht gefunden.';
+    }
+    return fallback;
+}
+
+function formatTransactionLogTime(value) {
+    if (!value) {
+        return 'Zeit unbekannt';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+    return date.toLocaleString('de-DE', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function transactionMetadataChips(metadata) {
+    const chips = [];
+    pushMetadataChip(chips, metadata.match_id, 'Match ', '#scores', 'match');
+    pushMetadataChip(chips, metadata.stage_id, 'Stage ', null, 'stage');
+    pushMetadataChip(chips, metadata.group_id, 'Gruppe ', null, 'group');
+    appendIdListChips(chips, metadata.advanced_match_ids, 'Ziel-Match ', '#scores', 'advanced-match');
+    pushMetadataChip(chips, metadata.team_id, 'Team ', '#teams', 'team-id');
+    pushMetadataChip(chips, metadata.winner_team_id, 'Gewinner-Team ', '#teams', 'winner-team');
+    appendIdListChips(chips, metadata.team_ids, 'Team ', '#teams', 'team-id');
+    appendIdListChips(chips, metadata.advancing_team_ids, 'Team ', '#teams', 'advancing-team');
+    appendTeamChips(chips, metadata.teams || metadata.advancing_teams);
+    return chips;
+}
+
+function pushMetadataChip(chips, value, prefix, href, keyPrefix) {
+    if (value === null || value === undefined || value === '') {
+        return;
+    }
+    chips.push({
+        key: keyPrefix + '-' + value,
+        label: prefix + value,
+        href
+    });
+}
+
+function appendIdListChips(chips, values, prefix, href, keyPrefix) {
+    if (!Array.isArray(values)) {
+        return;
+    }
+    values.forEach(value => pushMetadataChip(chips, value, prefix, href, keyPrefix));
+}
+
+function appendTeamChips(chips, teams) {
+    if (!Array.isArray(teams)) {
+        return;
+    }
+    teams.forEach(team => {
+        if (!team || team.id === null || team.id === undefined) {
+            return;
+        }
+        chips.push({
+            key: 'team-' + team.id,
+            label: (team.name || 'Team') + ' #' + team.id,
+            href: '#teams'
+        });
+    });
 }
 
 class MissionBeamer extends React.Component {
@@ -631,6 +951,9 @@ class MissionBeamer extends React.Component {
                 config[WERBUNG_IMAGE_KEYS_CONFIG_KEY] = allBeamerMediaImageKeys();
             }
             delete config.show_timer_reason;
+        } else if (mode.configDisplayMode) {
+            config.display_mode = mode.configDisplayMode;
+            delete config.show_timer_reason;
         } else {
             delete config.display_mode;
             delete config.show_timer_reason;
@@ -643,7 +966,9 @@ class MissionBeamer extends React.Component {
 
     updateMatchSelection(beamer, value) {
         const config = Object.assign({}, beamer.config || {}, {match_filter: value});
-        delete config.display_mode;
+        if (beamerModeFor(beamer) !== 'next_matches') {
+            delete config.display_mode;
+        }
         delete config.show_timer_reason;
         this.update(beamer, {
             config
@@ -794,7 +1119,8 @@ class MissionBeamer extends React.Component {
                                         </Input>
                                     </FormGroup>
 
-                                    {(mode === 'during_game' || mode === 'between_games') &&
+                                    {(mode === 'during_game' || mode === 'between_games' ||
+                                        mode === 'next_matches') &&
                                         <FormGroup>
                                             <Label for={'missionBeamerMatch' + beamer.id}>Matchauswahl</Label>
                                             <Input
@@ -930,14 +1256,179 @@ function MissionTournamentSettings(props) {
     );
 }
 
+function compareTeamActionListsByName(left, right) {
+    const nameResult = (left.name || '').localeCompare(right.name || '', 'de', {
+        numeric: true,
+        sensitivity: 'base'
+    });
+    if (nameResult !== 0) {
+        return nameResult;
+    }
+    const leftDate = left.createdAt instanceof Date ? left.createdAt.getTime() : 0;
+    const rightDate = right.createdAt instanceof Date ? right.createdAt.getTime() : 0;
+    if (leftDate !== rightDate) {
+        return leftDate - rightDate;
+    }
+    return String(left.id || '').localeCompare(String(right.id || ''), 'de', {numeric: true});
+}
+
+function compareTeamActionItemsByName(left, right) {
+    const leftName = left.team ? left.team.name : 'Unbekanntes Team';
+    const rightName = right.team ? right.team.name : 'Unbekanntes Team';
+    const nameResult = leftName.localeCompare(rightName, 'de', {
+        numeric: true,
+        sensitivity: 'base'
+    });
+    if (nameResult !== 0) {
+        return nameResult;
+    }
+    return String(left.id || '').localeCompare(String(right.id || ''), 'de', {numeric: true});
+}
+
+function teamActionListCompletedCount(list) {
+    const items = Array.isArray(list.teamActionItems) ? list.teamActionItems : [];
+    return items.filter(item => item.completed === true).length;
+}
+
+function teamActionListUncheckedCount(list) {
+    const items = Array.isArray(list.teamActionItems) ? list.teamActionItems : [];
+    return items.filter(item => item.completed !== true).length;
+}
+
+function compareTeamActionLists(left, right, sortMode) {
+    if (sortMode === 'date') {
+        const leftDate = left.createdAt instanceof Date ? left.createdAt.getTime() : 0;
+        const rightDate = right.createdAt instanceof Date ? right.createdAt.getTime() : 0;
+        if (leftDate !== rightDate) {
+            return rightDate - leftDate;
+        }
+    }
+    if (sortMode === 'checked') {
+        const countResult = teamActionListCompletedCount(right) - teamActionListCompletedCount(left);
+        if (countResult !== 0) {
+            return countResult;
+        }
+    }
+    if (sortMode === 'unchecked') {
+        const countResult = teamActionListUncheckedCount(right) - teamActionListUncheckedCount(left);
+        if (countResult !== 0) {
+            return countResult;
+        }
+    }
+    return compareTeamActionListsByName(left, right);
+}
+
+function compareTeamActionItems(left, right, sortMode) {
+    if (sortMode === 'date') {
+        const leftDate = left.completedAt instanceof Date ? left.completedAt.getTime() : 0;
+        const rightDate = right.completedAt instanceof Date ? right.completedAt.getTime() : 0;
+        if (leftDate !== rightDate) {
+            return rightDate - leftDate;
+        }
+    }
+    if (sortMode === 'checked' && left.completed !== right.completed) {
+        return left.completed === true ? -1 : 1;
+    }
+    if (sortMode === 'unchecked' && left.completed !== right.completed) {
+        return left.completed === true ? 1 : -1;
+    }
+    return compareTeamActionItemsByName(left, right);
+}
+
+function teamActionListMatchesSearch(list, search) {
+    if (!search) {
+        return true;
+    }
+    const haystack = [
+        list.name,
+        list.key,
+        list.actionName,
+        list.source
+    ].join(' ').toLowerCase();
+    return haystack.indexOf(search) !== -1;
+}
+
+function teamActionItemMatchesSearch(list, item, search) {
+    if (!search) {
+        return true;
+    }
+    const completedAt = item.completedAt ? formatTeamActionCompletedAt(item.completedAt) : '';
+    const haystack = [
+        list.name,
+        list.key,
+        list.actionName,
+        list.source,
+        item.team ? item.team.name : 'Unbekanntes Team',
+        item.completed === true ? 'erledigt completed' : 'offen open',
+        completedAt
+    ].join(' ').toLowerCase();
+    return haystack.indexOf(search) !== -1;
+}
+
+function searchableTeamActionLists(teamActionLists, search, sortMode) {
+    const normalizedSearch = (search || '').trim().toLowerCase();
+    return teamActionLists
+        .slice()
+        .sort((left, right) => compareTeamActionLists(left, right, sortMode))
+        .map(list => {
+            const teamActionItems = Array.isArray(list.teamActionItems) ? list.teamActionItems : [];
+            const sortedItems = teamActionItems
+                .slice()
+                .sort((left, right) => compareTeamActionItems(left, right, sortMode));
+            const completedCount = sortedItems.filter(item => item.completed === true).length;
+            const items = teamActionListMatchesSearch(list, normalizedSearch) ?
+                sortedItems :
+                sortedItems.filter(item => teamActionItemMatchesSearch(list, item, normalizedSearch));
+            return Object.assign({}, list, {
+                teamActionItems: items,
+                completedCount,
+                totalCount: sortedItems.length,
+                allCompleted: sortedItems.length > 0 && completedCount === sortedItems.length
+            });
+        })
+        .filter(list => !normalizedSearch || teamActionListMatchesSearch(list, normalizedSearch) ||
+            list.teamActionItems.length > 0);
+}
+
+function MissionCollapsibleDetails(props) {
+    const className = ['mission-collapsible-details', props.className].filter(Boolean).join(' ');
+    const summaryClassName = ['mission-collapsible-summary', props.summaryClassName].filter(Boolean).join(' ');
+    const bodyClassName = ['mission-collapsible-body', props.bodyClassName].filter(Boolean).join(' ');
+    const chevronClassName = ['mission-collapsible-chevron', props.chevronClassName].filter(Boolean).join(' ');
+    const detailsProps = {
+        className,
+        'data-testid': props.testId
+    };
+
+    if (props.defaultOpen === true) {
+        detailsProps.open = true;
+    }
+
+    return (
+        <details {...detailsProps}>
+            <summary className={summaryClassName} title={props.title} data-testid={props.summaryTestId}>
+                <FaChevronRight className={chevronClassName}
+                    data-testid={props.chevronTestId}
+                    aria-hidden='true' />
+                {props.summary}
+            </summary>
+            <div className={bodyClassName}>
+                {props.children}
+            </div>
+        </details>
+    );
+}
+
 class MissionChecklists extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
             pendingByItemKey: {},
-            errorMessage: ''
+            errorMessage: '',
+            sortMode: 'name'
         };
         this.onChange = this.onChange.bind(this);
+        this.setSortMode = this.setSortMode.bind(this);
     }
 
     onChange(list, item, event) {
@@ -973,8 +1464,14 @@ class MissionChecklists extends React.Component {
         });
     }
 
+    setSortMode(event) {
+        this.setState({sortMode: event.target.value});
+    }
+
     render() {
-        const teamActionLists = Array.isArray(this.props.teamActionLists) ? this.props.teamActionLists : [];
+        const allTeamActionLists = Array.isArray(this.props.teamActionLists) ? this.props.teamActionLists : [];
+        const teamActionLists = searchableTeamActionLists(allTeamActionLists, this.props.search, this.state.sortMode);
+        const hasSearch = (this.props.search || '').trim().length > 0;
         const canMutate = !this.props.disabled;
 
         return (<section className='mission-control-section' data-testid='mission-checklists-control'>
@@ -982,6 +1479,13 @@ class MissionChecklists extends React.Component {
             <p className='text-muted mb-3'>
                 Team-Checklisten werden live synchronisiert, zum Beispiel für Token, Unterlagen oder Material.
             </p>
+            <MissionSearchToolbar
+                value={this.props.search}
+                onChange={this.props.onSearchChange}
+                inputRef={this.props.searchInputRef}
+                placeholder='Checklisten, Teams, Schlüssel suchen...'
+                ariaLabel='Checklisten suchen'
+            />
             {canMutate &&
                 <CreateTeamActionListForm
                     tournamentId={this.props.tournamentId}
@@ -995,16 +1499,42 @@ class MissionChecklists extends React.Component {
                 <Alert color='danger' className='mb-3'>
                     {this.state.errorMessage}
                 </Alert>}
-            {teamActionLists.length === 0 &&
+            {allTeamActionLists.length === 0 &&
                 <Alert color='light' className='mb-0'>
                     Keine Checklisten verfügbar.
                 </Alert>}
+            {allTeamActionLists.length > 0 && teamActionLists.length === 0 &&
+                <Alert color='light' className='mb-0'>
+                    {hasSearch ? 'Keine Checklisten gefunden.' : 'Keine Checklisten verfügbar.'}
+                </Alert>}
+            {allTeamActionLists.length > 0 &&
+                <div className='mission-control-panel mission-checklist-list-controls mb-0'
+                    data-testid='mission-checklists-list-controls'>
+                    <Label className='mb-1' for='mission-checklists-sort'>Sortierung</Label>
+                    <Input id='mission-checklists-sort'
+                        type='select'
+                        value={this.state.sortMode}
+                        onChange={this.setSortMode}
+                        data-testid='mission-checklists-sort'>
+                        {TEAM_ACTION_LIST_SORT_OPTIONS.map(option => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </Input>
+                </div>}
             {teamActionLists.map(list => (
-                <div key={list.id} className='mission-control-panel mb-3' data-testid='team-action-list-card'>
-                    <div className='d-flex align-items-center gap-2 flex-wrap mb-2'>
+                <MissionCollapsibleDetails key={list.id}
+                    className='mission-control-panel mission-checklist-details mb-3'
+                    bodyClassName='mission-checklist-body'
+                    defaultOpen={!list.allCompleted}
+                    testId='team-action-list-card'
+                    title='Checkliste ein- oder ausklappen'
+                    summary={<>
                         <h4 className='h6 mb-0'>{list.name}</h4>
                         <Badge color='info' pill>{list.key}</Badge>
-                    </div>
+                        <span className='mission-checklist-count'>
+                            {list.completedCount}/{list.totalCount} erledigt
+                        </span>
+                    </>}>
                     <div className='text-muted small mb-2'>{list.actionName}</div>
                     {list.teamActionItems.map(item => {
                         const pendingKey = buildTeamActionItemPendingKey(list.key, item);
@@ -1029,7 +1559,7 @@ class MissionChecklists extends React.Component {
                             </div>
                         );
                     })}
-                </div>
+                </MissionCollapsibleDetails>
             ))}
         </section>);
     }
@@ -1084,52 +1614,61 @@ class CreateTeamActionListForm extends React.Component {
     }
 
     render() {
-        return (<form className='mission-control-panel mb-3' onSubmit={this.onCreate}
-            data-testid='create-team-action-list-form'>
-            <h4 className='h6 mb-3'>Neue Checkliste anlegen</h4>
-            {this.state.errorMessage &&
-                <Alert color='danger' className='mb-3'>
-                    {this.state.errorMessage}
-                </Alert>}
-            <Row className='g-2'>
-                <Col xs='12' md='4'>
-                    <Label className='mb-1' for='team-action-list-name'>Name</Label>
-                    <Input id='team-action-list-name'
-                        value={this.state.name}
-                        onChange={event => this.setState({name: event.target.value})}
-                        placeholder='Playoff-Tokens einsammeln' />
-                </Col>
-                <Col xs='12' md='4'>
-                    <Label className='mb-1' for='team-action-list-key'>Schlüssel</Label>
-                    <Input id='team-action-list-key'
-                        value={this.state.key}
-                        onChange={event => this.setState({key: event.target.value})}
-                        placeholder='playoff_tokens_einsammeln' />
-                </Col>
-                <Col xs='12' md='4'>
-                    <Label className='mb-1' for='team-action-list-action-name'>Aktionsname</Label>
-                    <Input id='team-action-list-action-name'
-                        value={this.state.actionName}
-                        onChange={event => this.setState({actionName: event.target.value})}
-                        placeholder='Token abgegeben' />
-                </Col>
-                <Col xs='12' md='6'>
-                    <Label className='mb-1' for='team-action-list-source'>Quelle</Label>
-                    <Input id='team-action-list-source' type='select'
-                        value={this.state.source}
-                        onChange={event => this.setState({source: event.target.value})}>
-                        <option value='group_stage_survivors'>Teams aus der Gruppenphase (Playoff-Teilnehmer)</option>
-                    </Input>
-                </Col>
-                <Col xs='12' md='6' className='d-flex align-items-end'>
-                    <Button type='submit' color='primary' className='w-100'
-                        disabled={this.state.creating}
-                        data-testid='create-team-action-list-button'>
-                        {this.state.creating ? 'Erstellt...' : 'Checkliste anlegen'}
-                    </Button>
-                </Col>
-            </Row>
-        </form>);
+        const detailsClassName = 'mission-control-panel mission-checklist-details ' +
+            'mission-create-checklist-details mb-3';
+
+        return (<MissionCollapsibleDetails className={detailsClassName}
+            bodyClassName='mission-checklist-body'
+            testId='create-team-action-list-form'
+            title='Formular ein- oder ausklappen'
+            summary={<h4 className='h6 mb-0'>Neue Checkliste anlegen</h4>}>
+            <form onSubmit={this.onCreate}>
+                {this.state.errorMessage &&
+                    <Alert color='danger' className='mb-3'>
+                        {this.state.errorMessage}
+                    </Alert>}
+                <Row className='g-2'>
+                    <Col xs='12' md='4'>
+                        <Label className='mb-1' for='team-action-list-name'>Name</Label>
+                        <Input id='team-action-list-name'
+                            value={this.state.name}
+                            onChange={event => this.setState({name: event.target.value})}
+                            placeholder='Playoff-Tokens einsammeln' />
+                    </Col>
+                    <Col xs='12' md='4'>
+                        <Label className='mb-1' for='team-action-list-key'>Schlüssel</Label>
+                        <Input id='team-action-list-key'
+                            value={this.state.key}
+                            onChange={event => this.setState({key: event.target.value})}
+                            placeholder='playoff_tokens_einsammeln' />
+                    </Col>
+                    <Col xs='12' md='4'>
+                        <Label className='mb-1' for='team-action-list-action-name'>Aktionsname</Label>
+                        <Input id='team-action-list-action-name'
+                            value={this.state.actionName}
+                            onChange={event => this.setState({actionName: event.target.value})}
+                            placeholder='Token abgegeben' />
+                    </Col>
+                    <Col xs='12' md='6'>
+                        <Label className='mb-1' for='team-action-list-source'>Quelle</Label>
+                        <Input id='team-action-list-source' type='select'
+                            value={this.state.source}
+                            onChange={event => this.setState({source: event.target.value})}>
+                            <option value='group_stage_survivors'>
+                                Teams aus der Gruppenphase (Playoff-Teilnehmer)
+                            </option>
+                        </Input>
+                    </Col>
+                    <Col xs='12' md='6' className='d-flex align-items-end'>
+                        <Button type='submit' color='primary' className='w-100'
+                            disabled={this.state.creating}
+                            data-testid='create-team-action-list-button'>
+                            {this.state.creating ? 'Erstellt...' : 'Checkliste anlegen'}
+                        </Button>
+                    </Col>
+                </Row>
+            </form>
+        </MissionCollapsibleDetails>);
     }
 }
 
@@ -1683,56 +2222,110 @@ class MissionStartConfirmButton extends React.Component {
     }
 }
 
-function MissionMatches(props) {
-    const rows = [];
-    if (props.tournament.groupStage) {
-        props.tournament.groupStage.groups.forEach(group => {
-            rows.push({
-                key: 'group-' + group.id,
-                name: 'Gruppe ' + group.number,
-                group: group,
-                matches: group.matches
-            });
+function isPlayoffStageFinished(stage) {
+    return stage.matches.length > 0 && stage.matches.every(match => match.state === 'finished');
+}
+
+function missionStageRowsForGroupStage(groupStage) {
+    return groupStage.groups.map(group => ({
+        key: 'group-' + group.id,
+        name: 'Gruppe ' + group.number,
+        group: group,
+        matches: group.matches
+    }));
+}
+
+function missionScoreSections(tournament) {
+    const sections = [];
+    if (tournament.groupStage) {
+        sections.push({
+            key: 'group-stage',
+            name: 'Gruppenphase',
+            finished: tournament.groupStage.state === 'finished',
+            rows: missionStageRowsForGroupStage(tournament.groupStage)
         });
     }
-    props.tournament.playoffStages.forEach(stage => {
-        rows.push({
+    tournament.playoffStages.forEach(stage => {
+        sections.push({
             key: 'stage-' + stage.id,
             name: stageName(stage.level),
-            matches: stage.matches
+            finished: isPlayoffStageFinished(stage),
+            rows: [{
+                key: 'stage-' + stage.id,
+                name: stageName(stage.level),
+                matches: stage.matches
+            }]
         });
     });
+    return sections;
+}
+
+function missionMatchPassesSearch(title, match, search) {
+    if (!search) {
+        return true;
+    }
+    const haystack = [
+        title,
+        match.team1.name,
+        match.team2.name,
+        match.state,
+        matchStateLabel(match.state),
+        'spiel ' + match.position,
+        'sp. ' + match.position,
+        'tisch ' + match.position,
+        match.group ? 'gruppe ' + match.group.number : '',
+        match.group ? 'g' + match.group.number : '',
+        'g' + (match.group ? match.group.number : Math.max(1, match.position)) + '-s' + match.position
+    ].join(' ').toLowerCase();
+    return haystack.indexOf(search) !== -1;
+}
+
+function missionStageMatches(title, matches, search) {
+    const normalizedSearch = search.trim().toLowerCase();
+    return matches
+        .filter(match => missionMatchPassesSearch(title, match, normalizedSearch))
+        .sort(sortMatchesByPositionAscending());
+}
+
+function missionSectionMatchCount(rows, search) {
+    return rows.reduce((total, row) => total + missionStageMatches(row.name, row.matches, search).length, 0);
+}
+
+function MissionMatches(props) {
+    const sections = missionScoreSections(props.tournament);
+    const activeSections = sections.filter(section => !section.finished);
+    const finishedSections = sections.filter(section => section.finished);
 
     return (
         <section className='mission-control-section mission-pane-scores' data-testid='mission-score-control'>
-            <div className='mission-match-toolbar'>
-                <div className='mission-match-search'>
-                    <FaSearch aria-hidden='true' />
-                    <Input
-                        type='search'
-                        value={props.search}
-                        onChange={props.onSearchChange}
-                        placeholder='Gruppen, Teams, Matches suchen...'
-                        aria-label='Scores suchen'
-                        title='Mit Cmd+K oder Ctrl+K fokussieren'
-                        innerRef={props.searchInputRef}
-                        data-testid='mission-control-search'
-                    />
-                </div>
-                <div className='mission-search-hint'>
-                    <FaKeyboard aria-hidden='true' /> Cmd+K
-                </div>
-                <Button color='link' className='mission-filter-reset'
-                    onClick={() => props.onSearchChange({target: {value: ''}})}>
-                    x Filter zurücksetzen
-                </Button>
-            </div>
-            {rows.map(row => (
-                <MissionStageBlock
-                    key={row.key}
-                    title={row.name}
-                    group={row.group}
-                    matches={row.matches}
+            <MissionSearchToolbar
+                value={props.search}
+                onChange={props.onSearchChange}
+                inputRef={props.searchInputRef}
+                placeholder='Gruppen, Teams, Matches suchen...'
+                ariaLabel='Scores suchen'
+            />
+            {activeSections.map(section => (
+                <React.Fragment key={section.key}>
+                    {section.rows.map(row => (
+                        <MissionStageBlock
+                            key={row.key}
+                            title={row.name}
+                            group={row.group}
+                            matches={row.matches}
+                            search={props.search}
+                            disabled={props.disabled}
+                            onTournamentChange={props.onTournamentChange}
+                        />
+                    ))}
+                </React.Fragment>
+            ))}
+            {finishedSections.map(section => (
+                <MissionFinishedStageDetails
+                    key={section.key}
+                    stageKey={section.key}
+                    title={section.name}
+                    rows={section.rows}
                     search={props.search}
                     disabled={props.disabled}
                     onTournamentChange={props.onTournamentChange}
@@ -1742,36 +2335,79 @@ function MissionMatches(props) {
     );
 }
 
+function MissionSearchToolbar(props) {
+    return (
+        <div className='mission-search-toolbar mission-match-toolbar'>
+            <div className='mission-match-search'>
+                <FaSearch aria-hidden='true' />
+                <Input
+                    type='search'
+                    value={props.value}
+                    onChange={props.onChange}
+                    placeholder={props.placeholder}
+                    aria-label={props.ariaLabel}
+                    title='Mit Cmd+K oder Ctrl+K fokussieren'
+                    innerRef={props.inputRef}
+                    data-testid='mission-control-search'
+                />
+            </div>
+            <div className='mission-search-hint'>
+                <FaKeyboard aria-hidden='true' /> Cmd+K
+            </div>
+            <Button color='link' className='mission-filter-reset'
+                onClick={() => props.onChange({target: {value: ''}})}>
+                x Filter zurücksetzen
+            </Button>
+        </div>
+    );
+}
+
+function MissionFinishedStageDetails(props) {
+    const matchCount = missionSectionMatchCount(props.rows, props.search);
+    if (matchCount === 0) {
+        return null;
+    }
+
+    return (
+        <MissionCollapsibleDetails className='mission-finished-stage-details'
+            summaryClassName='mission-finished-stage-summary'
+            bodyClassName='mission-finished-stage-body'
+            testId={'mission-finished-stage-' + props.stageKey}
+            summaryTestId='mission-finished-stage-summary'
+            chevronClassName='mission-finished-stage-chevron'
+            chevronTestId='mission-finished-stage-chevron'
+            summary={<>
+                <span className='mission-finished-stage-title'>{props.title}</span>
+                <Badge color='light' className='mission-stage-badge'>{matchCount} Matches</Badge>
+                <span className='mission-finished-stage-state'>abgeschlossen</span>
+            </>}>
+            {props.rows.map(row => (
+                <MissionStageBlock
+                    key={row.key}
+                    title={row.name}
+                    group={row.group}
+                    matches={row.matches}
+                    search={props.search}
+                    disabled={props.disabled}
+                    onTournamentChange={props.onTournamentChange}
+                    nested
+                />
+            ))}
+        </MissionCollapsibleDetails>
+    );
+}
+
 function MissionStageBlock(props) {
-    const search = props.search.trim().toLowerCase();
-    const matches = props.matches
-        .filter(match => {
-            if (!search) {
-                return true;
-            }
-            const haystack = [
-                props.title,
-                match.team1.name,
-                match.team2.name,
-                match.state,
-                matchStateLabel(match.state),
-                'spiel ' + match.position,
-                'sp. ' + match.position,
-                'tisch ' + match.position,
-                match.group ? 'gruppe ' + match.group.number : '',
-                match.group ? 'g' + match.group.number : '',
-                'g' + (match.group ? match.group.number : Math.max(1, match.position)) + '-s' + match.position
-            ].join(' ').toLowerCase();
-            return haystack.indexOf(search) !== -1;
-        })
-        .sort(sortMatchesByPositionAscending());
+    const matches = missionStageMatches(props.title, props.matches, props.search);
 
     if (matches.length === 0) {
         return null;
     }
 
+    const className = 'mission-match-stage' + (props.nested ? ' mission-match-stage-nested' : '');
+
     return (
-        <div className='mission-match-stage'>
+        <div className={className} data-testid='mission-stage-block' data-stage-title={props.title}>
             <h3 className='h5 mission-pane-heading'>
                 {props.title}
                 <Badge color='light' className='mission-stage-badge'>{matches.length} Matches</Badge>

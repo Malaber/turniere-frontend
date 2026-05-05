@@ -1,7 +1,12 @@
 import React from 'react';
 import {Spinner} from 'reactstrap';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
-import {formatTimerMs, getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
+import {
+    formatTimerDisplay,
+    getTimerDisplay,
+    getTimerDisplaySeconds,
+    TIMER_MODE_COUNTDOWN
+} from '../../utils/timerState';
 import styles from './DuringGameView.module.css';
 import {FullscreenMatchCard} from './FullscreenMatchCard';
 
@@ -37,72 +42,122 @@ function AnimatedDigit({value}) {
     );
 }
 
+function getTimerPhase(display) {
+    if (!display.active || display.mode !== TIMER_MODE_COUNTDOWN) {
+        return 'normal';
+    }
+
+    if (display.ms === 0) {
+        return 'finished';
+    }
+
+    return getTimerDisplaySeconds(display) <= COUNTDOWN_THRESHOLD_S ?
+        'countdown' :
+        'normal';
+}
+
+function animatedTimerDisplayKey(display) {
+    if (!display.active) return 'inactive';
+    if (display.mode === TIMER_MODE_COUNTDOWN && display.ms === 0) return 'finished';
+    return display.mode + ':' + formatTimerDisplay(display);
+}
+
 
 export class AnimatedTimer extends React.Component {
     constructor(props) {
         super(props);
         this.state = {display: getTimerDisplay(props.timerState, Date.now())};
         this.timerRef = React.createRef();
+        this.lastDisplayKey = null;
+        this.lastUrgentSecondAnimated = null;
         this.tick = this.tick.bind(this);
     }
 
     componentDidMount() {
-        this.startInterval();
+        this.startTicker();
     }
 
     componentDidUpdate(prevProps) {
         if (prevProps.timerState !== this.props.timerState) {
-            clearInterval(this.intervalId);
+            this.stopTicker();
             if (this.props.timerState && this.props.timerState.mode) {
-                this.startInterval();
+                this.startTicker();
             } else {
+                const display = getTimerDisplay(this.props.timerState, Date.now());
+                this.lastDisplayKey = animatedTimerDisplayKey(display);
+                this.lastUrgentSecondAnimated = null;
                 this.setState({
-                    display: getTimerDisplay(this.props.timerState, Date.now())
+                    display
                 });
             }
         }
     }
 
     componentWillUnmount() {
-        clearInterval(this.intervalId);
+        this.stopTicker();
     }
 
-    startInterval() {
+    startTicker() {
         if (!this.props.timerState || !this.props.timerState.mode) return;
+        this.lastDisplayKey = null;
+        this.lastUrgentSecondAnimated = null;
         this.tick();
-        this.intervalId = setInterval(this.tick, 1000);
+    }
+
+    stopTicker() {
+        if (this.frameId !== null && this.frameId !== undefined) {
+            window.cancelAnimationFrame(this.frameId);
+            this.frameId = null;
+        }
+        if (this.timeoutId !== null && this.timeoutId !== undefined) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = null;
+        }
+    }
+
+    scheduleTick() {
+        if (!this.props.timerState || !this.props.timerState.mode) return;
+        if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+            this.frameId = window.requestAnimationFrame(this.tick);
+            return;
+        }
+        this.timeoutId = setTimeout(this.tick, 250);
+    }
+
+    publishDisplay(display) {
+        const key = animatedTimerDisplayKey(display);
+        if (key === this.lastDisplayKey) return;
+
+        this.lastDisplayKey = key;
+        this.setState({display});
     }
 
     tick() {
+        this.stopTicker();
         const display = getTimerDisplay(this.props.timerState, Date.now());
 
-        this.setState({display}, () => {
-            const secs = Math.floor(display.ms / 1000);
+        this.publishDisplay(display);
 
-            if (this.props.onPhaseChange) {
-                if (!display.active || display.mode !== TIMER_MODE_COUNTDOWN) {
-                    this.props.onPhaseChange('normal');
-                } else if (display.ms === 0) {
-                    this.props.onPhaseChange('finished');
-                } else if (secs <= COUNTDOWN_THRESHOLD_S) {
-                    this.props.onPhaseChange('countdown');
-                } else {
-                    this.props.onPhaseChange('normal');
-                }
-            }
+        if (this.props.onPhaseChange) {
+            this.props.onPhaseChange(getTimerPhase(display));
+        }
 
-            if (
-                display.mode === TIMER_MODE_COUNTDOWN &&
-                secs <= COUNTDOWN_THRESHOLD_S &&
-                secs > 0 &&
-                this.timerRef.current
-            ) {
-                const el = this.timerRef.current;
-                el.style.animation = 'none';
-                void el.offsetWidth;
-                el.style.removeProperty('animation');
-            }
-        });
+        const visibleSeconds = getTimerDisplaySeconds(display);
+        if (
+            display.mode === TIMER_MODE_COUNTDOWN &&
+            visibleSeconds <= COUNTDOWN_THRESHOLD_S &&
+            visibleSeconds > 0 &&
+            visibleSeconds !== this.lastUrgentSecondAnimated &&
+            this.timerRef.current
+        ) {
+            this.lastUrgentSecondAnimated = visibleSeconds;
+            const el = this.timerRef.current;
+            el.style.animation = 'none';
+            void el.offsetWidth;
+            el.style.removeProperty('animation');
+        }
+
+        this.scheduleTick();
     }
 
     render() {
@@ -118,11 +173,11 @@ export class AnimatedTimer extends React.Component {
             );
         }
 
-        const totalSeconds = Math.floor(display.ms / 1000);
+        const totalSeconds = getTimerDisplaySeconds(display);
         const isUrgent = display.mode === TIMER_MODE_COUNTDOWN &&
             (totalSeconds <= 10 || this.props.forceUrgent);
 
-        const chars = formatTimerMs(display.ms).split('');
+        const chars = formatTimerDisplay(display).split('');
         const timerStyle = {'--timer-slots': String(chars.length)};
 
         const cls = styles.timer +

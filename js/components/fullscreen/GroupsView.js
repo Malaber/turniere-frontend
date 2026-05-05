@@ -1,7 +1,7 @@
 import React from 'react';
-import {Col, Container, Row, Spinner} from 'reactstrap';
-import {QRCodeSVG} from 'qrcode.react';
+import {Container, Row, Spinner} from 'reactstrap';
 import {Group} from '../GroupStage';
+import {GroupLogo, GroupQrCode} from './GroupMediaCard';
 
 
 export class GroupsView extends React.Component {
@@ -62,7 +62,7 @@ export class GroupsView extends React.Component {
     }
 
     render() {
-        const {tournament, qrCodeUrl, logoUrl} = this.props;
+        const {tournament, showQrCode} = this.props;
         const {groups, showLogo, backgroundColor} = this.state;
 
         if (!tournament || !tournament.groupStage) {
@@ -72,35 +72,14 @@ export class GroupsView extends React.Component {
             </Container>);
         }
 
-        let logo;
-        if (showLogo && logoUrl) {
-            logo = <Col>
-                <div className="d-flex justify-content-center align-items-center">
-                    <img height="300" width="300" src={logoUrl}/>
-                </div>
-            </Col>;
-        } else {
-            logo = <div/>;
-        }
-
         return (<div>
             <Container className="fs-5" fluid>
                 <Row className="row-cols-4">
                     {groups.map(group =>
-                        <Col className="mb-2" key={group.id}>
-                            <Group group={group} teams={tournament.teams}/>
-                        </Col>
+                        <Group group={group} key={group.id} teams={tournament.teams}/>
                     )}
-                    {qrCodeUrl && <Col>
-                        <div className="d-flex justify-content-center align-items-center">
-                            <QRCodeSVG
-                                className="shadow mx-auto"
-                                value={qrCodeUrl}
-                                size="300"
-                            />
-                        </div>
-                    </Col>}
-                    {logo}
+                    {showQrCode && <GroupQrCode/>}
+                    {showLogo && <GroupLogo/>}
                 </Row>
             </Container>
             <style global jsx>{`

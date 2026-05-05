@@ -3,43 +3,22 @@ import React from 'react';
 import {ErrorPageComponent} from '../js/components/ErrorComponents';
 import {convertTournamentSnapshot, getTournament} from '../js/redux/tournamentApi';
 import {
-    Col,
     Container, Row, Spinner
 } from 'reactstrap';
-import {QRCodeSVG} from 'qrcode.react';
 import {Group} from '../js/components/GroupStage';
+import {GroupLogo, GroupQrCode} from '../js/components/fullscreen/GroupMediaCard';
 import {connectToTournamentSocket} from '../js/utils/tournamentLiveSocket';
 
 
 function FullscreenPage(props) {
-    let logo;
-    if (props.showLogo) {
-        logo = <Col>
-            <div className="d-flex justify-content-center align-items-center">
-                <img height="300" width="300" src="/static/images/bpwstr_logo.png"></img>
-            </div>
-        </Col>;
-    } else {
-        logo = <div/>;
-    }
     return (<div>
         <Container className="fs-5" fluid>
             <Row className="row-cols-4">
                 {props.groups.map(group => (
-                    <Col className="mb-2">
-                        <Group group={group} key={group.id} teams={props.teams}/>
-                    </Col>
+                    <Group group={group} key={group.id} teams={props.teams}/>
                 ))}
-                <Col>
-                    <div className="d-flex justify-content-center align-items-center">
-                        <QRCodeSVG
-                            className="shadow mx-auto"
-                            value="https://qr.bpwstr.de/2"
-                            size="300"
-                        />
-                    </div>
-                </Col>
-                {logo}
+                <GroupQrCode/>
+                {props.showLogo && <GroupLogo/>}
             </Row>
         </Container>
     </div>);

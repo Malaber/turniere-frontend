@@ -33,6 +33,7 @@ interface TeamActionList {
   key: string;
   name: string;
   action_name: string;
+  created_at?: string;
   team_action_items: TeamActionItem[];
 }
 
@@ -164,6 +165,90 @@ test('Team action list renders with metadata and item checkboxes', async ({ cont
   await keyframe(page, testInfo, 'team_action_lists_render');
 });
 
+test('Mission Control searches and sorts team action lists', async ({ context, page }, testInfo) => {
+  await injectAuth(context, loadAuthState());
+  const { tournament } = await seedAndPlayGroupStage(1, 4, 2);
+  const client = await makeOwnerClient();
+  const zeta = await ensureTeamActionList(client, tournament.id, {
+    name: 'Zulu Materialausgabe',
+    key: randomKey('zulu_material'),
+    action_name: 'Material abgegeben',
+    source: 'group_stage_survivors'
+  });
+  const alpha = await ensureTeamActionList(client, tournament.id, {
+    name: 'Alpha Tokenrunde',
+    key: randomKey('alpha_token'),
+    action_name: 'Token abgegeben',
+    source: 'group_stage_survivors'
+  });
+  const alphaTeamName = alpha.team_action_items[0]?.team?.name;
+  if (!alphaTeamName) {
+    throw new Error('expected alpha checklist item with team name');
+  }
+  if (zeta.team_action_items.length === 0) {
+    throw new Error('expected zeta checklist item');
+  }
+  for (const item of zeta.team_action_items) {
+    const completeResponse = await client.patch<TeamActionItem>(
+      `/team_action_items/${item.id}`,
+      { completed: true }
+    );
+    expectStatus(completeResponse, 200, 'complete zeta checklist item for sort coverage');
+  }
+
+  await page.goto(`/t/${tournament.id}/mission-control#checklists`);
+  await page.waitForLoadState('networkidle');
+
+  const checklistsPane = page.getByTestId('mission-checklists-control');
+  await expect(checklistsPane).toBeVisible();
+  const search = checklistsPane.getByTestId('mission-control-search');
+  const sortSelect = checklistsPane.getByTestId('mission-checklists-sort');
+  await expect(search).toBeVisible();
+  await expect(sortSelect).toBeVisible();
+  await expect(checklistsPane.getByText('Cmd+K')).toBeVisible();
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
+  await expect(search).toBeFocused();
+
+  const cards = checklistsPane.getByTestId('team-action-list-card');
+  await expect(cards).toHaveCount(2);
+  await expect(cards.nth(0).getByRole('heading', { name: alpha.name })).toBeVisible();
+  await expect(cards.nth(1).getByRole('heading', { name: zeta.name })).toBeVisible();
+
+  await expect(cards.first().locator('summary')).toContainText(`0/${alpha.team_action_items.length} erledigt`);
+  await cards.first().locator('summary').click();
+  await expect(cards.first().locator('.form-check-input[type="checkbox"]').first()).toBeHidden();
+  await cards.first().locator('summary').click();
+  await expect(cards.first().locator('.form-check-input[type="checkbox"]').first()).toBeVisible();
+  await expect(cards.nth(1).locator('summary')).toContainText(
+    `${zeta.team_action_items.length}/${zeta.team_action_items.length} erledigt`
+  );
+  await expect(cards.nth(1).locator('.form-check-input[type="checkbox"]').first()).toBeHidden();
+  await cards.nth(1).locator('summary').click();
+  await expect(cards.nth(1).locator('.form-check-input[type="checkbox"]').first()).toBeVisible();
+
+  await sortSelect.selectOption('checked');
+  await expect(cards.nth(0).getByRole('heading', { name: zeta.name })).toBeVisible();
+  await sortSelect.selectOption('unchecked');
+  await expect(cards.nth(0).getByRole('heading', { name: alpha.name })).toBeVisible();
+  await sortSelect.selectOption('name');
+  await expect(cards.nth(0).getByRole('heading', { name: alpha.name })).toBeVisible();
+
+  await search.fill(alpha.key);
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText(alpha.name);
+  await expect(cards.first()).not.toContainText(zeta.name);
+
+  await search.fill(alphaTeamName);
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first().locator('.form-check-input[type="checkbox"]')).toHaveCount(1);
+  await expect(cards.nth(1).locator('.form-check-input[type="checkbox"]')).toHaveCount(1);
+
+  await checklistsPane.getByRole('button', { name: /Filter zurücksetzen/ }).click();
+  await expect(search).toHaveValue('');
+  await expect(cards).toHaveCount(2);
+  await keyframe(page, testInfo, 'team_action_lists_search_sort');
+});
+
 test('Owner can create a new team action list and other viewer receives it live', async ({
   context,
   browser,
@@ -175,7 +260,11 @@ test('Owner can create a new team action list and other viewer receives it live'
   await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
 
-  await expect(page.getByTestId('create-team-action-list-form')).toBeVisible();
+  const createForm = page.getByTestId('create-team-action-list-form');
+  await expect(createForm).toBeVisible();
+  await expect(createForm.locator('#team-action-list-name')).toBeHidden();
+  await createForm.locator('summary').click();
+  await expect(createForm.locator('#team-action-list-name')).toBeVisible();
 
   const viewerContext = await browser.newContext();
   await injectAuth(viewerContext, loadAuthState());
@@ -221,6 +310,11 @@ test('Create list form enforces required inputs and duplicate keys', async ({ co
 
   await page.goto(`/t/${tournament.id}/mission-control#checklists`);
   await page.waitForLoadState('networkidle');
+
+  const createForm = page.getByTestId('create-team-action-list-form');
+  await expect(createForm.locator('#team-action-list-name')).toBeHidden();
+  await createForm.locator('summary').click();
+  await expect(createForm.locator('#team-action-list-name')).toBeVisible();
 
   await page.getByTestId('create-team-action-list-button').click();
   await expect(page.getByText('Bitte Name, Schlüssel und Aktionsname ausfüllen.')).toBeVisible();

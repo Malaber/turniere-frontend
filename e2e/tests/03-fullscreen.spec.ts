@@ -1,7 +1,11 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
-import { seedAndPlayGroupStage, seedGroupStageTournament } from '../helpers/scenario-seeder';
+import {
+  seedAndPlayGroupStage,
+  seedGroupStageTournament,
+  seedPlayoffTournament,
+} from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 import { waitForActionCableSubscription } from '../helpers/action-cable';
 
@@ -72,6 +76,129 @@ async function stripGroupFromMatchesEndpoint(page: Page, tournamentId: number): 
 
     await route.fulfill({ response, json: payload });
   });
+}
+
+async function expectGroupTablesQrCode(page: Page): Promise<void> {
+  const qrCard = page.getByTestId('fullscreen-group-qr-card');
+  const qrCode = page.getByTestId('fullscreen-group-qr-code');
+  const firstGroupCard = page.locator('.card').filter({ hasText: /Gruppe 1/i }).first();
+
+  await expect(qrCard).toBeVisible({ timeout: 10_000 });
+  await expect(qrCode).toBeVisible();
+  await expect(qrCode).toHaveAttribute('src', /\/static\/images\/bpwstr_qr_code\.png$/);
+  await expect(firstGroupCard).toBeVisible();
+  await expect.poll(async () => qrCode.evaluate((node) => (
+    (node as HTMLImageElement).naturalWidth
+  )), { timeout: 10_000 }).toBeGreaterThan(0);
+
+  const [qrCardBox, qrCodeBox, groupCardBox] = await Promise.all([
+    qrCard.boundingBox(),
+    qrCode.boundingBox(),
+    firstGroupCard.boundingBox(),
+  ]);
+
+  expect(qrCardBox).toBeTruthy();
+  expect(qrCodeBox).toBeTruthy();
+  expect(groupCardBox).toBeTruthy();
+
+  const qrCardCenterX = qrCardBox!.x + qrCardBox!.width / 2;
+  const qrCardCenterY = qrCardBox!.y + qrCardBox!.height / 2;
+  const qrCodeCenterX = qrCodeBox!.x + qrCodeBox!.width / 2;
+  const qrCodeCenterY = qrCodeBox!.y + qrCodeBox!.height / 2;
+
+  expect(Math.abs(qrCodeCenterX - qrCardCenterX)).toBeLessThanOrEqual(2);
+  expect(Math.abs(qrCodeCenterY - qrCardCenterY)).toBeLessThanOrEqual(2);
+  expect(Math.abs(qrCardBox!.x - groupCardBox!.x)).toBeLessThanOrEqual(4);
+  expect(Math.abs(qrCardBox!.width - groupCardBox!.width)).toBeLessThanOrEqual(4);
+  expect(qrCodeBox!.width).toBeGreaterThanOrEqual(280);
+  expect(qrCodeBox!.height).toBeGreaterThanOrEqual(280);
+}
+
+async function expectWerbungImageAboveSolidTimerBar(page: Page): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport) {
+    throw new Error('Expected Werbung viewport size to be set');
+  }
+
+  const stage = page.getByTestId('beamer-werbung-stage');
+  const image = page.getByTestId('beamer-werbung-image');
+  const timerBar = page.getByTestId('beamer-werbung-timer-bar');
+
+  await expect(stage).toBeVisible();
+  await expect(image).toBeVisible();
+  await expect(timerBar).toBeVisible();
+  await expect.poll(async () => image.evaluate((node) => {
+    const img = node as HTMLImageElement;
+    return img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
+  }), { timeout: 10_000 }).toBe(true);
+
+  const barStyles = await timerBar.evaluate((node) => {
+    const style = window.getComputedStyle(node);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderTopWidth: style.borderTopWidth,
+    };
+  });
+  expect(barStyles.backgroundColor).toBe('rgb(0, 0, 0)');
+  expect(barStyles.borderTopWidth).toBe('0px');
+
+  const [stageBox, imageBox, timerBarBox] = await Promise.all([
+    stage.boundingBox(),
+    image.boundingBox(),
+    timerBar.boundingBox(),
+  ]);
+
+  if (!stageBox || !imageBox || !timerBarBox) {
+    throw new Error('Expected Werbung stage, image, and timer bar boxes');
+  }
+
+  expect(Math.abs(stageBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(stageBox.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(stageBox.width - viewport.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(stageBox.y + stageBox.height - timerBarBox.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(timerBarBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(timerBarBox.width - viewport.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(timerBarBox.y + timerBarBox.height - viewport.height)).toBeLessThanOrEqual(2);
+
+  expect(imageBox.y).toBeGreaterThanOrEqual(stageBox.y - 1);
+  expect(imageBox.y + imageBox.height).toBeLessThanOrEqual(timerBarBox.y + 1);
+  expect(Math.abs(imageBox.x - stageBox.x)).toBeLessThanOrEqual(2);
+  expect(Math.abs(imageBox.y - stageBox.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(imageBox.width - stageBox.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(imageBox.height - stageBox.height)).toBeLessThanOrEqual(2);
+}
+
+async function expectGroupTablesLogo(page: Page): Promise<void> {
+  const qrCard = page.getByTestId('fullscreen-group-qr-card');
+  const logoCard = page.getByTestId('fullscreen-group-logo-card');
+  const logo = page.getByTestId('fullscreen-group-logo');
+
+  await expect(logoCard).toBeVisible({ timeout: 35_000 });
+  await expect(logo).toBeVisible();
+  await expect(logo).toHaveAttribute('src', /\/static\/images\/bpwstr_logo\.png$/);
+  await expect.poll(async () => logo.evaluate((node) => (
+    (node as HTMLImageElement).naturalWidth
+  )), { timeout: 10_000 }).toBeGreaterThan(0);
+
+  const [qrCardBox, logoCardBox, logoBox] = await Promise.all([
+    qrCard.boundingBox(),
+    logoCard.boundingBox(),
+    logo.boundingBox(),
+  ]);
+
+  expect(qrCardBox).toBeTruthy();
+  expect(logoCardBox).toBeTruthy();
+  expect(logoBox).toBeTruthy();
+
+  const logoCardCenterX = logoCardBox!.x + logoCardBox!.width / 2;
+  const logoCardCenterY = logoCardBox!.y + logoCardBox!.height / 2;
+  const logoCenterX = logoBox!.x + logoBox!.width / 2;
+  const logoCenterY = logoBox!.y + logoBox!.height / 2;
+
+  expect(Math.abs(logoCenterX - logoCardCenterX)).toBeLessThanOrEqual(2);
+  expect(Math.abs(logoCenterY - logoCardCenterY)).toBeLessThanOrEqual(2);
+  expect(Math.abs(logoCardBox!.y - qrCardBox!.y)).toBeLessThanOrEqual(4);
+  expect(Math.abs(logoCardBox!.width - qrCardBox!.width)).toBeLessThanOrEqual(4);
 }
 
 test('Fullscreen beamer page renders with default fallback', async ({ page }, testInfo) => {
@@ -260,7 +387,182 @@ test('Fullscreen beamer page updates live from backend ActionCable only', async 
   );
   expectStatus(secondUpdate, 200, 'update beamer to group tables');
   await expect(page.getByText(/Gruppe 1/i)).toBeVisible({ timeout: 10_000 });
+  await expectGroupTablesQrCode(page);
+  await expectGroupTablesLogo(page);
   await keyframe(page, testInfo, 'live_beamer_group_tables');
+});
+
+test('Next matches beamer shows static 32-card 1080p layout and live updates', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(8, 4, 16);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const timerRes = await client.patch(
+    `/tournaments/${tournament.id}/timer`,
+    { timestamp_seconds: 20 * 60 },
+  );
+  expectStatus(timerRes, 200, 'set next matches timer');
+
+  const beamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'next-matches',
+    display_state: 'between_games',
+    config: { display_mode: 'next_matches', match_filter: 'state:not_started' },
+  });
+  expectStatus(beamer, 201, 'create next matches beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=next-matches`);
+  await expect(page.getByTestId('next-matches-view')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('next-matches-title')).toHaveText('> Nächste Spiele');
+
+  const timer = page.getByTestId('next-matches-timer');
+  await expect(timer).toBeVisible({ timeout: 10_000 });
+  await expect(timer).toContainText(/\d{1,2}:[0-5][0-9]/);
+
+  const timerBox = await timer.boundingBox();
+  expect(timerBox).toBeTruthy();
+  expect(timerBox!.x).toBeGreaterThan(1920 * 0.6);
+  expect(timerBox!.y).toBeLessThan(120);
+
+  const cards = page.getByTestId('fullscreen-match-card');
+  await expect(cards).toHaveCount(32, { timeout: 20_000 });
+  await expect(cards.first()).toContainText('G1-S1');
+  await expect(cards.first()).toContainText('G1-S2');
+
+  await page.evaluate(() => {
+    const counts: number[] = [];
+    (window as any).__nextMatchesCardCounts = counts;
+    const root = document.querySelector('[data-testid="next-matches-view"]');
+    const record = () => {
+      counts.push(document.querySelectorAll('[data-testid="fullscreen-match-card"]').length);
+    };
+    record();
+    if (root) {
+      new MutationObserver(record).observe(root, { childList: true, subtree: true });
+    }
+  });
+  await page.waitForTimeout(3_500);
+  const minimumCardCountDuringPoll = await page.evaluate(() => (
+    Math.min(...((window as any).__nextMatchesCardCounts || []))
+  ));
+  expect(minimumCardCountDuringPoll).toBe(32);
+
+  const firstBadge = cards.first().getByTestId('fullscreen-match-badge');
+  await expect(firstBadge).toHaveText('1');
+  await expect(firstBadge).toHaveAttribute('data-match-badge-kind', 'group');
+
+  const viewportFit = await page.getByTestId('fullscreen-match-card').evaluateAll((nodes) => (
+    nodes.every((node) => {
+      const box = node.getBoundingClientRect();
+      return box.left >= 0 &&
+        box.top >= 0 &&
+        box.right <= window.innerWidth &&
+        box.bottom <= window.innerHeight &&
+        box.width > 0 &&
+        box.height > 0;
+    })
+  ));
+  expect(viewportFit).toBe(true);
+  await keyframe(page, testInfo, 'next_matches_32_cards_1080p');
+
+  await waitForActionCableSubscription(page, {
+    channel: 'TournamentMatchesChannel',
+    tournament_id: tournament.id,
+    state: 'not_started',
+  });
+
+  const firstMatchId = await cards.first().getAttribute('data-match-id');
+  expect(firstMatchId).toBeTruthy();
+  const started = await client.patch(`/matches/${firstMatchId}`, { state: 'in_progress' });
+  expectStatus(started, 200, 'start first next match');
+
+  await expect(page.locator(`[data-match-id="${firstMatchId}"]`)).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByTestId('fullscreen-match-card')).toHaveCount(32);
+  await keyframe(page, testInfo, 'next_matches_live_update');
+
+  const { tournament: playoffTournament } = await seedPlayoffTournament(8);
+  const playoffMatches = await client.get<ApiMatchForBadge[]>(`/tournaments/${playoffTournament.id}/matches`);
+  expectStatus(playoffMatches, 200, 'fetch playoff next matches');
+  const playoffMatch = playoffMatches.json.find((match) =>
+    !match.group && match.state === 'not_started' && match.match_scores.length === 2
+  );
+  expect(playoffMatch).toBeTruthy();
+
+  const playoffBeamer = await client.post(`/tournaments/${playoffTournament.id}/beamers`, {
+    name: 'next-playoff',
+    display_state: 'between_games',
+    config: { display_mode: 'next_matches', match_filter: 'state:not_started' },
+  });
+  expectStatus(playoffBeamer, 201, 'create next playoff beamer');
+
+  await page.goto(`/t/${playoffTournament.id}/fullscreen?beamer=next-playoff`);
+  const playoffCard = page.locator(`[data-match-id="${playoffMatch!.id}"]`);
+  await expect(playoffCard).toBeVisible({ timeout: 20_000 });
+  const playoffBadge = playoffCard.getByTestId('fullscreen-match-badge');
+  await expect(playoffBadge).toHaveText(String(playoffMatch!.position + 1));
+  await expect(playoffBadge).toHaveAttribute('data-match-badge-kind', 'position');
+});
+
+test('Next matches beamer honors filters for running and finished cards', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament } = await seedGroupStageTournament(1, 4, 2);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const matches = await client.get<ApiMatchForBadge[]>(`/tournaments/${tournament.id}/matches`);
+  expectStatus(matches, 200, 'fetch next matches filter candidates');
+  const candidates = matches.json.filter((match) =>
+    match.state === 'not_started' && match.match_scores.length === 2
+  );
+  expect(candidates.length).toBeGreaterThanOrEqual(2);
+  const runningMatch = candidates[0];
+  const finishedMatch = candidates[1];
+
+  const running = await client.patch(`/matches/${runningMatch.id}`, { state: 'in_progress' });
+  expectStatus(running, 200, 'start running next match');
+
+  const startFinished = await client.patch(`/matches/${finishedMatch.id}`, { state: 'in_progress' });
+  expectStatus(startFinished, 200, 'start finished next match');
+  for (const [index, score] of finishedMatch.match_scores.entries()) {
+    const scored = await client.patch(`/match_scores/${score.id}`, { points: index === 0 ? 10 : 2 });
+    expectStatus(scored, 200, `score finished next match ${score.id}`);
+  }
+  const finished = await client.patch(`/matches/${finishedMatch.id}`, { state: 'finished' });
+  expectStatus(finished, 200, 'finish next match');
+
+  const runningBeamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'next-running',
+    display_state: 'between_games',
+    config: { display_mode: 'next_matches', match_filter: 'state:in_progress' },
+  });
+  expectStatus(runningBeamer, 201, 'create running next matches beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=next-running`);
+  const runningCard = page.locator(`[data-match-id="${runningMatch.id}"]`);
+  await expect(runningCard).toBeVisible({ timeout: 20_000 });
+  await expect(runningCard).toHaveAttribute('data-match-state', 'in_progress');
+  await expect.poll(async () => runningCard.evaluate((node) => (
+    window.getComputedStyle(node).backgroundColor
+  )), { timeout: 10_000 }).toBe('rgb(255, 243, 205)');
+  await keyframe(page, testInfo, 'next_matches_running_filter');
+
+  const finishedBeamer = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: 'next-finished',
+    display_state: 'between_games',
+    config: { display_mode: 'next_matches', match_filter: 'state:finished' },
+  });
+  expectStatus(finishedBeamer, 201, 'create finished next matches beamer');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?beamer=next-finished`);
+  const finishedCard = page.locator(`[data-match-id="${finishedMatch.id}"]`);
+  await expect(finishedCard).toBeVisible({ timeout: 20_000 });
+  await expect(finishedCard).toHaveAttribute('data-match-state', 'finished');
+  await expect.poll(async () => finishedCard.evaluate((node) => (
+    window.getComputedStyle(node).backgroundColor
+  )), { timeout: 10_000 }).toBe('rgb(209, 231, 221)');
+  await keyframe(page, testInfo, 'next_matches_finished_filter');
 });
 
 test('Fullscreen match list receives live match snapshots', async ({ page }, testInfo) => {
@@ -446,6 +748,7 @@ test('Werbung beamer rotates selected images and shows timer reason', async ({ p
   await expect(page.getByTestId('beamer-werbung-reason')).toContainText(/Werbepause|Spielende/);
   await expect(page.getByTestId('beamer-werbung-timer')).toBeVisible();
   await expect(page.getByTestId('beamer-werbung-image')).toHaveAttribute('src', /bpwstr_logo/);
+  await expectWerbungImageAboveSolidTimerBar(page);
   await expect(page.getByTestId('beamer-werbung-image')).toHaveAttribute('src', /bpwstr_banner/, {
     timeout: 5_000,
   });
