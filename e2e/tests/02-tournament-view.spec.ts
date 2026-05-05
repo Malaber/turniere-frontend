@@ -180,6 +180,30 @@ test('Tournament id view renders basic information while full tournament loads',
   await expect(page.getByText(/Gruppe/i).first()).toBeVisible();
 });
 
+test('Tournament view renders public metadata', async ({ page }) => {
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const updated = await client.patch(`/tournaments/${tournament.id}`, {
+    location: 'Berlin Arena',
+    starts_at: '2026-06-01T10:30:00Z',
+    ends_at: '2026-06-01T18:45:00Z',
+    website_url: 'https://turnie.re/events/tur-224',
+  });
+  expectStatus(updated, 200, 'update tournament public metadata');
+
+  await page.goto(`/t/${tournament.id}`);
+  await expect(page.locator('.big-image')).toBeVisible({ timeout: 120000 });
+  await expect(page.getByTestId('tournament-location')).toContainText('Berlin Arena');
+  await expect(page.getByTestId('tournament-date-range')).toContainText('2026');
+  await expect(page.getByTestId('tournament-website')).toContainText('turnie.re/events/tur-224');
+  await expect(page.getByTestId('tournament-website').getByRole('link')).toHaveAttribute(
+    'href',
+    'https://turnie.re/events/tur-224',
+  );
+});
+
 test('Anonymous tournament viewer opens match metadata from match card', async ({ page }) => {
   const { tournament } = await seedGroupStageTournament(2, 4, 4);
   const client = new ApiClient(backendUrl);

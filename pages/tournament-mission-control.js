@@ -339,7 +339,11 @@ class MissionControlPage extends React.Component {
                 syncTargetUrl: prev.tournament.syncTargetUrl,
                 syncAuthToken: prev.tournament.syncAuthToken,
                 syncLastPushedAt: prev.tournament.syncLastPushedAt,
-                syncLastPushError: prev.tournament.syncLastPushError
+                syncLastPushError: prev.tournament.syncLastPushError,
+                location: prev.tournament.location,
+                startsAt: prev.tournament.startsAt,
+                endsAt: prev.tournament.endsAt,
+                websiteUrl: prev.tournament.websiteUrl
             } : null;
             const tournament = convertTournamentSnapshot(message.tournament, cachedMetadata);
             if (!Array.isArray(message.tournament.team_action_lists) && prev.tournament) {

@@ -257,6 +257,10 @@ const reducerTournamentinfo = (state = defaultStateTournamentinfo, action) => {
             description: action.parameters.description,
             id: action.parameters.id,
             name: action.parameters.name,
+            location: action.parameters.location || '',
+            startsAt: action.parameters.starts_at || null,
+            endsAt: action.parameters.ends_at || null,
+            websiteUrl: action.parameters.website_url || '',
             ownerUsername: action.parameters.owner_username,
             isPublic: action.parameters.public,
             readOnlyMode: action.parameters.read_only_mode === true,
@@ -641,7 +645,19 @@ export function updateTournament(tournamentId, data, successCallback, errorCallb
                 data.sync_auth_token :
                 currentState.tournamentinfo.syncAuthToken,
             syncLastPushedAt: currentState.tournamentinfo.syncLastPushedAt,
-            syncLastPushError: currentState.tournamentinfo.syncLastPushError
+            syncLastPushError: currentState.tournamentinfo.syncLastPushError,
+            location: Object.prototype.hasOwnProperty.call(data, 'location') ?
+                data.location :
+                currentState.tournamentinfo.location,
+            startsAt: Object.prototype.hasOwnProperty.call(data, 'starts_at') ?
+                data.starts_at :
+                currentState.tournamentinfo.startsAt,
+            endsAt: Object.prototype.hasOwnProperty.call(data, 'ends_at') ?
+                data.ends_at :
+                currentState.tournamentinfo.endsAt,
+            websiteUrl: Object.prototype.hasOwnProperty.call(data, 'website_url') ?
+                data.website_url :
+                currentState.tournamentinfo.websiteUrl
         });
         if (Object.prototype.hasOwnProperty.call(data, 'read_only_mode')) {
             mergedTournament.read_only_mode = data.read_only_mode === true;

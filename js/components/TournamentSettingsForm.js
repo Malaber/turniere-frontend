@@ -36,9 +36,10 @@ export class TournamentSettingsForm extends React.Component {
 
     render() {
         const {
-            name, description, isPublic, readOnlyMode, syncTargetUrl,
-            syncAuthToken, syncLastPushedAt, syncLastPushError, saving,
-            testingSync, syncTestMessage, syncTestStatus
+            name, description, location, startsAt, endsAt, websiteUrl, isPublic,
+            readOnlyMode, syncTargetUrl, syncAuthToken, syncLastPushedAt,
+            syncLastPushError, saving, testingSync, syncTestMessage,
+            syncTestStatus
         } = this.state;
         const currentlyReadOnly = this.props.tournament.readOnlyMode === true;
         const syncTestConfigured = !readOnlyMode && syncTargetUrl.trim().length > 0 && syncAuthToken.trim().length > 0;
@@ -61,6 +62,48 @@ export class TournamentSettingsForm extends React.Component {
                     disabled={currentlyReadOnly || this.props.disabled}
                     value={description} placeholder={description}
                     onChange={this.handleDescriptionInput.bind(this)}/>
+            </div>
+            <div className="form-group mb-3">
+                <label htmlFor="edittournament-textfield-location">Ort</label>
+                <input className="form-control" type="text" id="edittournament-textfield-location"
+                    disabled={currentlyReadOnly || this.props.disabled}
+                    value={location} placeholder="z. B. Vereinsheim Süd"
+                    onChange={this.handleLocationInput.bind(this)}/>
+            </div>
+            <div className="row">
+                <div className="form-group mb-3 col-md-6">
+                    <Label htmlFor="edittournament-textfield-startsAt">Start</Label>
+                    <div className="input-group">
+                        <Input type="datetime-local" id="edittournament-textfield-startsAt"
+                            disabled={currentlyReadOnly || this.props.disabled}
+                            value={startsAt} onChange={this.handleStartsAtInput.bind(this)}/>
+                        <Button color="secondary" outline type="button" id="edittournament-button-resetStartsAt"
+                            disabled={currentlyReadOnly || this.props.disabled || startsAt.length === 0}
+                            onClick={this.handleResetStartsAtClick.bind(this)}>
+                            Löschen
+                        </Button>
+                    </div>
+                </div>
+                <div className="form-group mb-3 col-md-6">
+                    <Label htmlFor="edittournament-textfield-endsAt">Ende</Label>
+                    <div className="input-group">
+                        <Input type="datetime-local" id="edittournament-textfield-endsAt"
+                            disabled={currentlyReadOnly || this.props.disabled}
+                            value={endsAt} onChange={this.handleEndsAtInput.bind(this)}/>
+                        <Button color="secondary" outline type="button" id="edittournament-button-resetEndsAt"
+                            disabled={currentlyReadOnly || this.props.disabled || endsAt.length === 0}
+                            onClick={this.handleResetEndsAtClick.bind(this)}>
+                            Löschen
+                        </Button>
+                    </div>
+                </div>
+            </div>
+            <div className="form-group mb-3">
+                <Label htmlFor="edittournament-textfield-websiteUrl">Website</Label>
+                <Input type="url" id="edittournament-textfield-websiteUrl"
+                    disabled={currentlyReadOnly || this.props.disabled}
+                    value={websiteUrl} onChange={this.handleWebsiteUrlInput.bind(this)}
+                    placeholder="https://turnier.example"/>
             </div>
             <div className="form-group mb-3 form-check">
                 <input className="form-check-input" type="checkbox" name="isPublic"
@@ -142,6 +185,10 @@ export class TournamentSettingsForm extends React.Component {
         if (!tournament.readOnlyMode) {
             payload.name = this.state.name;
             payload.description = this.state.description;
+            payload.location = this.state.location;
+            payload.starts_at = this.state.startsAt || null;
+            payload.ends_at = this.state.endsAt || null;
+            payload.website_url = this.state.websiteUrl.trim();
             payload.public = this.state.isPublic;
         }
 
@@ -207,6 +254,30 @@ export class TournamentSettingsForm extends React.Component {
         this.setState({isPublic: input.target.checked});
     }
 
+    handleLocationInput(input) {
+        this.setState({location: input.target.value});
+    }
+
+    handleStartsAtInput(input) {
+        this.setState({startsAt: input.target.value});
+    }
+
+    handleEndsAtInput(input) {
+        this.setState({endsAt: input.target.value});
+    }
+
+    handleResetStartsAtClick() {
+        this.setState({startsAt: ''});
+    }
+
+    handleResetEndsAtClick() {
+        this.setState({endsAt: ''});
+    }
+
+    handleWebsiteUrlInput(input) {
+        this.setState({websiteUrl: input.target.value});
+    }
+
     handleReadOnlyModeInput(input) {
         this.setState({readOnlyMode: input.target.checked});
     }
@@ -248,24 +319,61 @@ function buildEditTournamentFormState(tournament) {
     return {
         name: tournament.name || '',
         description: tournament.description || '',
-        isPublic: tournament.public === true,
-        readOnlyMode: tournament.readOnlyMode === true,
-        syncTargetUrl: tournament.syncTargetUrl || '',
-        syncAuthToken: tournament.syncAuthToken || '',
-        syncLastPushedAt: tournament.syncLastPushedAt || null,
-        syncLastPushError: tournament.syncLastPushError || ''
+        location: readTournamentValue(tournament, 'location', 'location', ''),
+        startsAt: formatDateTimeLocal(readTournamentValue(tournament, 'startsAt', 'starts_at', null)),
+        endsAt: formatDateTimeLocal(readTournamentValue(tournament, 'endsAt', 'ends_at', null)),
+        websiteUrl: readTournamentValue(tournament, 'websiteUrl', 'website_url', ''),
+        isPublic: readTournamentBoolean(tournament, 'isPublic', 'public'),
+        readOnlyMode: readTournamentBoolean(tournament, 'readOnlyMode', 'read_only_mode'),
+        syncTargetUrl: readTournamentValue(tournament, 'syncTargetUrl', 'sync_target_url', ''),
+        syncAuthToken: readTournamentValue(tournament, 'syncAuthToken', 'sync_auth_token', ''),
+        syncLastPushedAt: readTournamentValue(tournament, 'syncLastPushedAt', 'sync_last_pushed_at', null),
+        syncLastPushError: readTournamentValue(tournament, 'syncLastPushError', 'sync_last_push_error', '')
     };
 }
 
 function buildEditTournamentFormKey(tournament) {
-    return JSON.stringify({
-        name: tournament.name || '',
-        description: tournament.description || '',
-        isPublic: tournament.public === true,
-        readOnlyMode: tournament.readOnlyMode === true,
-        syncTargetUrl: tournament.syncTargetUrl || '',
-        syncAuthToken: tournament.syncAuthToken || '',
-        syncLastPushedAt: tournament.syncLastPushedAt || null,
-        syncLastPushError: tournament.syncLastPushError || ''
-    });
+    return JSON.stringify(buildEditTournamentFormState(tournament));
+}
+
+function readTournamentValue(tournament, camelKey, snakeKey, fallback) {
+    if (Object.prototype.hasOwnProperty.call(tournament, camelKey)) {
+        return tournament[camelKey] || fallback;
+    }
+    if (Object.prototype.hasOwnProperty.call(tournament, snakeKey)) {
+        return tournament[snakeKey] || fallback;
+    }
+    return fallback;
+}
+
+function readTournamentBoolean(tournament, camelKey, snakeKey) {
+    if (typeof tournament[camelKey] === 'boolean') {
+        return tournament[camelKey];
+    }
+    return tournament[snakeKey] === true;
+}
+
+function formatDateTimeLocal(value) {
+    if (!value) {
+        return '';
+    }
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+        return value;
+    }
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+    return [
+        date.getFullYear(),
+        padDatePart(date.getMonth() + 1),
+        padDatePart(date.getDate())
+    ].join('-') + 'T' + [
+        padDatePart(date.getHours()),
+        padDatePart(date.getMinutes())
+    ].join(':');
+}
+
+function padDatePart(value) {
+    return String(value).padStart(2, '0');
 }
