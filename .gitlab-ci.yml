@@ -97,6 +97,7 @@ frontend e2e:
     - if [ -d e2e/screenshots ]; then cp -a e2e/screenshots/. screenshots/; fi
     - if [ -d e2e/test-results ]; then cp -a e2e/test-results/. test-results/; fi
   artifacts:
+    expose_as: 'E2E screenshots'
     when: always
     paths:
       - screenshots/
