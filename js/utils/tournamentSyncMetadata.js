@@ -24,7 +24,11 @@ export function readCachedTournamentSyncMetadata(tournamentId) {
             syncTargetUrl: cachedTournament.syncTargetUrl || '',
             syncAuthToken: cachedTournament.syncAuthToken || '',
             syncLastPushedAt: cachedTournament.syncLastPushedAt || null,
-            syncLastPushError: cachedTournament.syncLastPushError || ''
+            syncLastPushError: cachedTournament.syncLastPushError || '',
+            location: cachedTournament.location || '',
+            startsAt: cachedTournament.startsAt || null,
+            endsAt: cachedTournament.endsAt || null,
+            websiteUrl: cachedTournament.websiteUrl || ''
         };
     } catch (_error) {
         return null;
@@ -54,6 +58,18 @@ export function mergeTournamentSyncMetadata(apiTournament, cachedMetadata = null
     }
     if (typeof mergedTournament.sync_last_push_error === 'undefined' && hasOwn(fallback, 'syncLastPushError')) {
         mergedTournament.sync_last_push_error = fallback.syncLastPushError;
+    }
+    if (typeof mergedTournament.location === 'undefined' && hasOwn(fallback, 'location')) {
+        mergedTournament.location = fallback.location;
+    }
+    if (typeof mergedTournament.starts_at === 'undefined' && hasOwn(fallback, 'startsAt')) {
+        mergedTournament.starts_at = fallback.startsAt;
+    }
+    if (typeof mergedTournament.ends_at === 'undefined' && hasOwn(fallback, 'endsAt')) {
+        mergedTournament.ends_at = fallback.endsAt;
+    }
+    if (typeof mergedTournament.website_url === 'undefined' && hasOwn(fallback, 'websiteUrl')) {
+        mergedTournament.website_url = fallback.websiteUrl;
     }
 
     return mergedTournament;

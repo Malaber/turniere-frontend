@@ -382,7 +382,11 @@ class Main extends React.Component {
                 syncTargetUrl: previousTournament.syncTargetUrl,
                 syncAuthToken: previousTournament.syncAuthToken,
                 syncLastPushedAt: previousTournament.syncLastPushedAt,
-                syncLastPushError: previousTournament.syncLastPushError
+                syncLastPushError: previousTournament.syncLastPushError,
+                location: previousTournament.location,
+                startsAt: previousTournament.startsAt,
+                endsAt: previousTournament.endsAt,
+                websiteUrl: previousTournament.websiteUrl
             } : null;
             const tournament = convertTournamentSnapshot(message.tournament, cachedMetadata);
 
@@ -449,6 +453,10 @@ function createTournamentPlaceholder(tournamentId) {
         code: tournamentId,
         description: '',
         name: 'Turnier wird geladen...',
+        location: '',
+        startsAt: null,
+        endsAt: null,
+        websiteUrl: '',
         isPublic: null,
         readOnlyMode: false,
         ownerUsername: null,

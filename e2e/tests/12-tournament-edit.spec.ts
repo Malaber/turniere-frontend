@@ -33,6 +33,9 @@ test('Owner can open Mission Control settings and save normal properties', async
   await injectAuth(context, loadAuthState());
   const { tournament } = await seedGroupStageTournament(1, 4, 2);
   const client = await makeClient();
+  const startsAt = '2026-06-01T10:30';
+  const endsAt = '2026-06-01T18:45';
+  const websiteUrl = 'https://turnie.re/events/tur-224';
 
   // Route /edit should redirect to /mission-control
   await page.goto(`/t/${tournament.id}/edit`);
@@ -46,6 +49,10 @@ test('Owner can open Mission Control settings and save normal properties', async
 
   await page.fill('#edittournament-textfield-name', 'Edited Tournament Name');
   await page.fill('#edittournament-textfield-description', 'Edited Tournament Description');
+  await page.fill('#edittournament-textfield-location', 'Berlin Arena');
+  await page.fill('#edittournament-textfield-startsAt', startsAt);
+  await page.fill('#edittournament-textfield-endsAt', endsAt);
+  await page.fill('#edittournament-textfield-websiteUrl', websiteUrl);
   await page.locator('#edittournament-checkbox-isPublic').check({force: true});
   await expect(page.locator('#edittournament-checkbox-isPublic')).toBeChecked();
   await page.locator('#edittournament-button').click();
@@ -57,6 +64,10 @@ test('Owner can open Mission Control settings and save normal properties', async
   expectStatus(fetched, 200, `fetch tournament ${tournament.id} after edit`);
   expect((fetched.json as { name: string }).name).toBe('Edited Tournament Name');
   expect((fetched.json as { description: string }).description).toBe('Edited Tournament Description');
+  expect((fetched.json as { location: string }).location).toBe('Berlin Arena');
+  expect((fetched.json as { starts_at: string }).starts_at).toContain(startsAt);
+  expect((fetched.json as { ends_at: string }).ends_at).toContain(endsAt);
+  expect((fetched.json as { website_url: string }).website_url).toBe(websiteUrl);
   expect((fetched.json as { public: boolean }).public).toBe(true);
 });
 
