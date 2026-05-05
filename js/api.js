@@ -12,7 +12,8 @@ import {
     getRequest,
     patchRequest,
     postRequest,
-    putRequest
+    putRequest,
+    retryStoredRequest
 } from './redux/backendApi';
 import {
     actionTypesTournamentStatistics,
@@ -20,6 +21,10 @@ import {
     transformTournamentInfoToStatistics, transformTournamentStatsToStatistics
 } from './redux/tournamentStatistics';
 import {mergeTournamentSyncMetadata} from './utils/tournamentSyncMetadata';
+import {
+    markLocalSaveErrorRetryFailure,
+    markLocalSaveErrorRetrySuccess
+} from './utils/localSaveErrorLog';
 
 
 function normalizeErrorMessages(error, fallbackMessage) {
@@ -987,6 +992,23 @@ export function requestBackendVersion(successCallback, errorCallback) {
         successCallback(resp.data);
     }).catch(() => {
         errorCallback();
+    });
+}
+
+export function retryLocalSaveError(entry, successCallback, errorCallback) {
+    retryStoredRequest(getState(), entry).then(resp => {
+        storeOptionalToken(resp);
+        markLocalSaveErrorRetrySuccess(entry.id, resp);
+        successCallback(resp.data, resp.status);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            markLocalSaveErrorRetryFailure(entry.id, error);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            markLocalSaveErrorRetryFailure(entry.id, error);
+            errorCallback(null, -1);
+        }
     });
 }
 
