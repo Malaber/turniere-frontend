@@ -1737,6 +1737,7 @@ class MissionTimer extends React.Component {
             timestamp: '',
             timerReason: '',
             timerReasonText: '',
+            syncedTimerKey: null,
             running: false
         };
         this.setMinutes = this.setMinutes.bind(this);
@@ -1747,9 +1748,66 @@ class MissionTimer extends React.Component {
         this.setCountdownMinutes = this.setCountdownMinutes.bind(this);
         this.setCountdownTimestamp = this.setCountdownTimestamp.bind(this);
         this.startCountup = this.startCountup.bind(this);
+        this.changeTimerReason = this.changeTimerReason.bind(this);
         this.clearTimer = this.clearTimer.bind(this);
         this.onSuccess = this.onSuccess.bind(this);
         this.onError = this.onError.bind(this);
+    }
+
+    componentDidMount() {
+        this.syncTimerReasonFromProps();
+    }
+
+    componentDidUpdate(prevProps) {
+        const timerKey = this.activeTimerKey();
+        const prevTimerKey = this.activeTimerKey(prevProps);
+        const timerState = this.props.timerState || {};
+        const prevTimerState = prevProps.timerState || {};
+        const reasonChanged = timerKey && (
+            timerState.reason !== prevTimerState.reason ||
+            timerState.reasonText !== prevTimerState.reasonText
+        );
+
+        if (timerKey && (timerKey !== prevTimerKey || reasonChanged)) {
+            this.syncTimerReasonFromProps();
+        } else if (!timerKey && prevTimerKey && this.state.syncedTimerKey) {
+            this.setState({syncedTimerKey: null});
+        }
+    }
+
+    activeTimerKey(props = this.props) {
+        const timerState = props.timerState || {};
+        if (!timerState.mode || !timerState.timestampIso) {
+            return null;
+        }
+        return timerState.mode + ':' + timerState.timestampIso;
+    }
+
+    syncTimerReasonFromProps() {
+        const timerKey = this.activeTimerKey();
+        const timerState = this.props.timerState || {};
+        if (!timerKey) {
+            return;
+        }
+
+        const timerReason = timerState.reason || '';
+        const timerReasonText = timerState.reason === TIMER_REASON_CUSTOM && timerState.reasonText ?
+            timerState.reasonText :
+            '';
+
+        if (
+            this.state.syncedTimerKey === timerKey &&
+            this.state.timerReason === timerReason &&
+            this.state.timerReasonText === timerReasonText
+        ) {
+            return;
+        }
+
+        this.setState({
+            timerReason,
+            timerReasonText,
+            syncedTimerKey: timerKey
+        });
     }
 
     setMinutes(event) {
@@ -1781,9 +1839,14 @@ class MissionTimer extends React.Component {
         return !this.props.disabled && !this.state.running && !this.reasonTextMissing();
     }
 
-    timerReasonPayload() {
+    canChangeTimerReason() {
+        return Boolean(this.activeTimerKey()) && !this.props.disabled && !this.state.running &&
+            !this.reasonTextMissing();
+    }
+
+    timerReasonPayload(includeEmptyReason = false) {
         if (!this.state.timerReason) {
-            return {};
+            return includeEmptyReason ? {timer_reason: null} : {};
         }
 
         if (this.state.timerReason === TIMER_REASON_CUSTOM) {
@@ -1827,6 +1890,13 @@ class MissionTimer extends React.Component {
         this.patchTimer({timer_mode: TIMER_MODE_COUNTUP});
     }
 
+    changeTimerReason() {
+        if (!this.canChangeTimerReason()) {
+            return;
+        }
+        this.patchTimer(this.timerReasonPayload(true), {reasonOnly: true});
+    }
+
     clearTimer() {
         if (this.props.disabled || this.state.running) {
             return;
@@ -1834,11 +1904,11 @@ class MissionTimer extends React.Component {
         this.patchTimer({clear_timer: true});
     }
 
-    patchTimer(payload) {
+    patchTimer(payload, options = {}) {
         this.setState({running: true});
-        const requestPayload = payload.clear_timer ?
+        const requestPayload = payload.clear_timer || options.reasonOnly ?
             payload :
-            Object.assign({}, payload, this.timerReasonPayload());
+            Object.assign({}, payload, this.timerReasonPayload(false));
         setTournamentTimer(this.props.tournamentId, requestPayload, this.onSuccess, this.onError);
     }
 
@@ -1860,8 +1930,10 @@ class MissionTimer extends React.Component {
         const currentTimerReason = this.props.timerState && this.props.timerState.mode ?
             getTimerReasonLabel(this.props.timerState) :
             null;
+        const hasActiveTimer = Boolean(this.activeTimerKey());
         const reasonTextMissing = this.reasonTextMissing();
         const canStart = this.canStartTimer();
+        const canChangeReason = this.canChangeTimerReason();
         return (
             <section className='mission-control-section mission-pane-timer' data-testid='mission-timer-control'>
                 <div className='mission-current-timer mb-3'>
@@ -1905,6 +1977,13 @@ class MissionTimer extends React.Component {
                                     onChange={this.setTimerReasonText}/>
                             </Col>}
                     </Row>
+                    {hasActiveTimer &&
+                        <Button outline color='secondary' className='mt-3'
+                            data-testid='mission-timer-reason-save'
+                            disabled={!canChangeReason}
+                            onClick={this.changeTimerReason}>
+                            Aktiven Grund speichern
+                        </Button>}
                 </div>
                 <Row className='g-3'>
                     <Col lg='4'>
