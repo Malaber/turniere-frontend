@@ -21,6 +21,13 @@ const firstGroupStartCount = 1;
 
 test.setTimeout(180_000);
 
+type TimerStateResponse = {
+  timestamp?: string | null;
+  timer_mode?: string | null;
+  timer_reason?: string | null;
+  timer_reason_text?: string | null;
+};
+
 async function loggedInClient() {
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
@@ -83,6 +90,17 @@ async function expectBeamerCardOrder(page: Page, expectedNames: string[]) {
   await expect.poll(async () => page.locator('.mission-beamer-name').evaluateAll((elements) => (
     elements.map((element) => element.textContent?.trim() ?? '')
   )), { timeout: 20_000 }).toEqual(expectedNames);
+}
+
+async function timerState(client: ApiClient, tournamentId: number) {
+  const res = await client.get<TimerStateResponse>(`/tournaments/${tournamentId}/timer`);
+  expectStatus(res, 200, 'fetch timer state');
+  return {
+    timestamp: res.json.timestamp ?? null,
+    mode: res.json.timer_mode ?? null,
+    reason: res.json.timer_reason ?? null,
+    reasonText: res.json.timer_reason_text ?? null,
+  };
 }
 
 async function holdStartUntilConfirmOpen(page: Page, button: Locator) {
@@ -438,6 +456,85 @@ test('Mission Control loads transaction log lazily in Verlauf tab', async ({ con
   await expect.poll(async () => logRequests, { timeout: 20_000 }).toBeGreaterThanOrEqual(
     requestsAfterMutationRefresh + 1,
   );
+});
+
+test('Mission Control changes active timer reason without restarting timer', async ({ context, page }) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(2, 4, 4);
+  const client = await loggedInClient();
+  const timerPatchBodies: unknown[] = [];
+
+  await page.route('**/api/tournaments/*/timer', async (route) => {
+    const request = route.request();
+    if (request.method() === 'PATCH') {
+      const postData = request.postData();
+      timerPatchBodies.push(postData ? JSON.parse(postData) : {});
+    }
+    await route.continue();
+  });
+
+  await page.goto(`/t/${tournament.id}/mission-control`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('mission-timer-reason-select')).toContainText('Kein Grund');
+
+  await page.getByTestId('mission-timer-quick-2015').click();
+  await expect(page.getByTestId('mission-timer-reason-save')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId('mission-timer-reason-remove')).toBeDisabled();
+  await expect(page.getByTestId('mission-current-timer-display')).toContainText(/\d{1,2}:[0-5][0-9]/);
+
+  const started = await timerState(client, tournament.id);
+  expect(started.mode).toBe('countdown');
+  expect(started.timestamp).toBeTruthy();
+  expect(started.reason).toBeNull();
+  expect(started.reasonText).toBeNull();
+  expect(timerPatchBodies[timerPatchBodies.length - 1]).toEqual({
+    timestamp_seconds: (20 * 60) + 15,
+    timer_mode: 'countdown',
+    timer_reason: null,
+  });
+
+  await page.getByTestId('mission-timer-reason-select').selectOption('playoff_start');
+  await page.getByTestId('mission-timer-reason-save').click();
+  await expect.poll(async () => timerState(client, tournament.id), { timeout: 20_000 }).toEqual({
+    timestamp: started.timestamp,
+    mode: 'countdown',
+    reason: 'playoff_start',
+    reasonText: null,
+  });
+  expect(timerPatchBodies[timerPatchBodies.length - 1]).toEqual({ timer_reason: 'playoff_start' });
+  await expect(page.getByTestId('mission-current-timer-reason')).toContainText('Playoff-Start', {
+    timeout: 20_000,
+  });
+
+  await page.getByTestId('mission-timer-reason-select').selectOption('custom');
+  await page.getByTestId('mission-timer-reason-text').fill('Opening ceremony ran long');
+  await page.getByTestId('mission-timer-reason-save').click();
+  await expect.poll(async () => timerState(client, tournament.id), { timeout: 20_000 }).toEqual({
+    timestamp: started.timestamp,
+    mode: 'countdown',
+    reason: 'custom',
+    reasonText: 'Opening ceremony ran long',
+  });
+  expect(timerPatchBodies[timerPatchBodies.length - 1]).toEqual({
+    timer_reason: 'custom',
+    timer_reason_text: 'Opening ceremony ran long',
+  });
+  await expect(page.getByTestId('mission-current-timer-reason')).toContainText('Opening ceremony ran long', {
+    timeout: 20_000,
+  });
+
+  await page.getByTestId('mission-timer-reason-remove').click();
+  await expect.poll(async () => timerState(client, tournament.id), { timeout: 20_000 }).toEqual({
+    timestamp: started.timestamp,
+    mode: 'countdown',
+    reason: null,
+    reasonText: null,
+  });
+  expect(timerPatchBodies[timerPatchBodies.length - 1]).toEqual({ timer_reason: null });
+  await expect(page.getByTestId('mission-current-timer-reason')).toContainText('Timer', {
+    timeout: 20_000,
+  });
+  await expect(page.getByTestId('mission-timer-reason-select')).toHaveValue('');
 });
 
 test('Mission Control stores failed saves locally and retries them from Verlauf', async ({ context, page }) => {
