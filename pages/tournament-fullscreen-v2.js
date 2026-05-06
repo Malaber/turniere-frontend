@@ -654,7 +654,7 @@ class Main extends React.Component {
         if (metaStatus === 200) {
             return (<div>
                 <Head>
-                    <title>{tournamentMeta.name}: turnie.re</title>
+                    <title>{`${tournamentMeta.name}: turnie.re`}</title>
                 </Head>
                 <BeamerTimerEffects
                     timerState={this.state.timerState}

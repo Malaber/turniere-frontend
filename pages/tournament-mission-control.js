@@ -366,7 +366,7 @@ class MissionControlPage extends React.Component {
             return (
                 <div>
                     <Head>
-                        <title>{tournamentName}: Mission Control</title>
+                        <title>{`${tournamentName}: Mission Control`}</title>
                     </Head>
                     <TurniereNavigation tournament={tournament} />
                     <ConnectedMissionControlContent

@@ -32,7 +32,7 @@ class StatisticsTournamentPage extends React.Component {
         return (
             <div>
                 <Head>
-                    <title>{tournamentStatistics.name}: turnie.re</title>
+                    <title>{`${tournamentStatistics.name}: turnie.re`}</title>
                 </Head>
                 <TurniereNavigation/>
                 <TournamentBigImage {...tournamentStatistics}/>
