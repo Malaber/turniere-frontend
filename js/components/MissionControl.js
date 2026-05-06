@@ -472,7 +472,7 @@ export class MissionControl extends React.Component {
 
     startGroupMatches() {
         this.setState({actionRunning: 'group'});
-        startNextGroupMatches(this.props.tournament.groupStage.groups, this.onActionSuccess, this.onActionError);
+        startNextGroupMatches(this.props.tournament.id, this.onActionSuccess, this.onActionError);
     }
 
     startStageMatches(stage) {
