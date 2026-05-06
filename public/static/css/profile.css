@@ -1,3 +1,40 @@
 .w-small {
     min-width: 10em;
 }
+
+.account-profile-card {
+    border-radius: 0.45rem;
+}
+
+.account-profile-loading {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.5rem;
+}
+
+.account-profile-header {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.account-profile-tournament-list {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.account-profile-tournament {
+    align-items: center;
+    border: 1px solid #dde3ea;
+    border-radius: 0.35rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    text-decoration: none;
+}
+
+.account-profile-tournament span {
+    overflow-wrap: anywhere;
+}

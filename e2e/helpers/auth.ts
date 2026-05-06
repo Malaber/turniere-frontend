@@ -8,6 +8,7 @@ const e2ePassword = process.env.TURNIERE_E2E_PASSWORD ?? 'password123';
 
 export interface AuthState {
   username: string;
+  accountId?: number | null;
   accesstoken: string;
   client: string;
   expiry: string;
@@ -22,6 +23,7 @@ export async function injectAuthState(context: BrowserContext, state: AuthState)
       ...(reduxState.userinfo || {}),
       isSignedIn: true,
       username: nextState.username,
+      accountId: nextState.accountId ?? null,
       accesstoken: nextState.accesstoken,
       client: nextState.client,
       expiry: nextState.expiry,
@@ -52,8 +54,10 @@ async function freshLoginAttempt(): Promise<AuthState> {
   }
 
   const data = await res.json();
+  const account = data.data ?? data;
   return {
-    username: data.data?.username ?? data.username ?? e2eEmail,
+    username: account.username ?? e2eEmail,
+    accountId: account.id ?? account.account_id ?? null,
     accesstoken: res.headers.get('access-token')!,
     client: res.headers.get('client')!,
     uid: res.headers.get('uid')!,

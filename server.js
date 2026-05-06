@@ -351,6 +351,18 @@ async function routeRequest(req, res) {
         return;
     }
 
+    const publicProfileMatch = pathname.match(/^\/profiles\/(\d+)$/);
+    if (req.method === 'GET' && publicProfileMatch) {
+        await app.render(req, res, '/account-profile', {id: publicProfileMatch[1]});
+        return;
+    }
+
+    const legacyAccountProfileMatch = pathname.match(/^\/accounts\/(\d+)$/);
+    if (req.method === 'GET' && legacyAccountProfileMatch) {
+        redirect(res, `/profiles/${legacyAccountProfileMatch[1]}`);
+        return;
+    }
+
     const statisticsMatch = pathname.match(/^\/t\/([^/]+)\/statistics$/);
     if (req.method === 'GET' && statisticsMatch) {
         await app.render(req, res, '/tournament-statistics', {code: safeDecode(statisticsMatch[1])});

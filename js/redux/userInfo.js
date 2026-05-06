@@ -24,6 +24,7 @@ export const actionTypesUserinfo = {
 export const defaultStateUserinfo = {
     isSignedIn: false,
     username: null,
+    accountId: null,
     error: false,
     errorMessages: [],
 
