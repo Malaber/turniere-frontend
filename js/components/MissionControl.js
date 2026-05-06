@@ -3500,7 +3500,7 @@ class MissionMatchMetadataCard extends React.Component {
         this.onError = this.onError.bind(this);
         this.initialSwapTargetId = this.initialSwapTargetId.bind(this);
         this.updateSwapTargetId = this.updateSwapTargetId.bind(this);
-        this.toggleSwapControls = this.toggleSwapControls.bind(this);
+        this.onSwapDetailsToggle = this.onSwapDetailsToggle.bind(this);
         this.swapMatchPosition = this.swapMatchPosition.bind(this);
         this.onSwapSuccess = this.onSwapSuccess.bind(this);
         this.onSwapError = this.onSwapError.bind(this);
@@ -3553,10 +3553,8 @@ class MissionMatchMetadataCard extends React.Component {
         this.setState({swapTargetId: event.target.value});
     }
 
-    toggleSwapControls() {
-        this.setState(prevState => ({
-            swapControlsExpanded: !prevState.swapControlsExpanded
-        }));
+    onSwapDetailsToggle(event) {
+        this.setState({swapControlsExpanded: event.currentTarget.open});
     }
 
     swapMatchPosition() {
@@ -3626,48 +3624,49 @@ class MissionMatchMetadataCard extends React.Component {
         const selectedTarget = targets.find(target => String(target.match.id) === this.state.swapTargetId);
 
         return (
-            <div className='mission-metadata-swap' data-testid='swap-match-position-controls'>
-                <Button
-                    color='link'
+            <details className='mission-metadata-swap'
+                data-testid='swap-match-position-controls'
+                open={this.state.swapControlsExpanded}
+                onToggle={this.onSwapDetailsToggle}>
+                <summary
                     className='mission-metadata-swap-toggle'
-                    type='button'
-                    onClick={this.toggleSwapControls}
                     data-testid='swap-match-position-toggle'
                 >
-                    {this.state.swapControlsExpanded ? 'Tauschoptionen ausblenden' : 'Position tauschen'}
-                </Button>
-                {this.state.swapControlsExpanded && (
-                    <div className='mission-metadata-swap-body'>
-                        <Label for={'missionMetadataSwapTarget' + this.props.row.match.id}>Tauschen mit</Label>
-                        <div className='mission-metadata-swap-row'>
-                            <Input id={'missionMetadataSwapTarget' + this.props.row.match.id}
-                                type='select'
-                                value={this.state.swapTargetId}
-                                onChange={this.updateSwapTargetId}
-                                disabled={disabled}
-                                data-testid='swap-match-position-select'>
-                                {targets.map(target => (
-                                    <option key={target.match.id} value={target.match.id}>
-                                        {metadataSwapTargetLabel(target)}
-                                    </option>
-                                ))}
-                            </Input>
-                            <Button color='secondary'
-                                type='button'
-                                onClick={this.swapMatchPosition}
-                                disabled={disabled}
-                                data-testid='swap-match-position-button'>
-                                {this.state.swapping ? 'Tauscht...' : 'Tauschen'}
-                            </Button>
-                        </div>
-                        {selectedTarget &&
-                            <div className='text-muted small mt-1'>
-                                <TeamName name={selectedTarget.match.team1.name} inline/> vs.{' '}
-                                <TeamName name={selectedTarget.match.team2.name} inline/>
-                            </div>}
+                    Position tauschen
+                </summary>
+                <div className='mission-metadata-swap-body'>
+                    <Label for={'missionMetadataSwapTarget' + this.props.row.match.id}>Tauschen mit</Label>
+                    <div className='mission-metadata-swap-row'>
+                        <Input id={'missionMetadataSwapTarget' + this.props.row.match.id}
+                            type='select'
+                            value={this.state.swapTargetId}
+                            onChange={this.updateSwapTargetId}
+                            disabled={disabled}
+                            data-testid='swap-match-position-select'>
+                            {targets.map(target => (
+                                <option key={target.match.id} value={target.match.id}>
+                                    {metadataSwapTargetLabel(target)}
+                                </option>
+                            ))}
+                        </Input>
+                        <Button color='secondary'
+                            type='button'
+                            onClick={this.swapMatchPosition}
+                            disabled={disabled}
+                            data-testid='swap-match-position-button'>
+                            {this.state.swapping ? 'Tauscht...' : 'Tauschen'}
+                        </Button>
                     </div>
-                )}
-            </div>
+                    {selectedTarget &&
+                        <div className='mission-metadata-swap-matchup text-muted small'>
+                            <TeamName name={selectedTarget.match.team1.name} inline
+                                className='mission-metadata-swap-team'/>
+                            <span className='mission-metadata-swap-versus'>vs.</span>
+                            <TeamName name={selectedTarget.match.team2.name} inline
+                                className='mission-metadata-swap-team'/>
+                        </div>}
+                </div>
+            </details>
         );
     }
 
