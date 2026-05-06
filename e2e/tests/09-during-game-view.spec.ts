@@ -24,9 +24,11 @@ async function startMatches(
   client: ApiClient,
   tournamentId: number,
   count: number,
+  params: Record<string, string> = {},
 ): Promise<number[]> {
   const res = await client.get<Array<{ id: number; state: string }>>(
     `/tournaments/${tournamentId}/matches`,
+    params,
   );
   expectStatus(res, 200, 'fetch tournament matches');
 
@@ -43,6 +45,24 @@ async function startMatches(
   }
 
   return ids;
+}
+
+function parseMatchFilter(filter?: string): Record<string, string> {
+  if (!filter) return {};
+
+  return filter.split(',').reduce<Record<string, string>>((params, part) => {
+    const [key, value] = part.split(':');
+    if (key && value) params[key] = value;
+    return params;
+  }, {});
+}
+
+function startFilterForMatchFilter(matchFilter?: string): Record<string, string> {
+  const filters = parseMatchFilter(matchFilter);
+  if (filters.state === 'in_progress') {
+    return { ...filters, state: 'not_started' };
+  }
+  return filters;
 }
 
 async function waitForMatchStateCount(
@@ -126,7 +146,7 @@ async function setupBeamerAndMatches(
   );
   const hasBeamer = beamerRes.status === 201;
 
-  await startMatches(client, tournament.id, matchCount);
+  await startMatches(client, tournament.id, matchCount, startFilterForMatchFilter(matchFilter));
   await waitForMatchStateCount(client, tournament.id, 'in_progress', matchCount);
 
   const fullscreenQuery = hasBeamer
