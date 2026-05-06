@@ -28,6 +28,25 @@ type TimerStateResponse = {
   timer_reason_text?: string | null;
 };
 
+type SeededGroupMatch = {
+  id: number;
+  position: number;
+  state: string;
+};
+
+type SeededGroup = {
+  id: number;
+  number: number;
+  matches: SeededGroupMatch[];
+};
+
+type LiveMatch = {
+  id: number;
+  position: number;
+  state: string;
+  group?: { id: number; number: number } | null;
+};
+
 async function loggedInClient() {
   const client = new ApiClient(backendUrl);
   await client.login(e2eEmail, e2ePassword);
@@ -115,6 +134,16 @@ async function playoffStageCount(client: ApiClient, tournamentId: number) {
   const tournament = await client.get<{ stages: Array<{ level: number }> }>(`/tournaments/${tournamentId}`);
   expectStatus(tournament, 200, `fetch tournament ${tournamentId}`);
   return tournament.json.stages.filter((stage) => stage.level !== -1).length;
+}
+
+function matchForPosition(group: SeededGroup, position: number) {
+  const match = group.matches.find((candidate) => candidate.position === position);
+  if (!match) throw new Error(`No match at position ${position} in group ${group.number}`);
+  return match;
+}
+
+function sortedNumbers(values: number[]) {
+  return values.slice().sort((a, b) => a - b);
 }
 
 function responseErrorMessages(body: unknown): string[] {
@@ -609,6 +638,59 @@ test('Mission Control stores failed saves locally and retries them from Verlauf'
 
   await entry.getByTestId('mission-local-save-error-remove').click();
   await expect(localLog.getByTestId('mission-local-save-error-empty')).toBeVisible();
+});
+
+test('Mission Control starts next group matches through backend catch-up endpoint', async ({ context, page }) => {
+  const { tournament } = await seedGroupStageTournament(4, 4, 8);
+  const client = await loggedInClient();
+  const groupStage = tournament.stages.find((stage) => stage.level === -1);
+  if (!groupStage) throw new Error('Group stage not found');
+
+  const groups = groupStage.groups.slice().sort((a, b) => a.number - b.number) as SeededGroup[];
+  const preStartPlan: Array<[number, number[]]> = [
+    [0, [0, 1]],
+    [1, [0]],
+    [2, [0, 1]],
+    [3, [0, 1]],
+  ];
+  const preStartedIds: number[] = [];
+
+  for (const [groupIndex, positions] of preStartPlan) {
+    for (const position of positions) {
+      const match = matchForPosition(groups[groupIndex], position);
+      preStartedIds.push(match.id);
+      const started = await client.patch(`/matches/${match.id}`, { state: 'in_progress' });
+      expectStatus(started, 200, `pre-start group ${groups[groupIndex].number} position ${position}`);
+    }
+  }
+
+  const expectedMatch = matchForPosition(groups[1], 1);
+  await injectAuth(context);
+  await page.goto(`/t/${tournament.id}/mission-control#starts`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+
+  const groupStart = page.getByTestId('mission-start-next-groups');
+  await expect(groupStart).toBeVisible();
+  await holdStartUntilConfirmOpen(page, groupStart);
+
+  const startResponsePromise = page.waitForResponse((response) =>
+    response.request().method() === 'PATCH' &&
+    response.url().endsWith(`/tournaments/${tournament.id}/start_next_group_matches`),
+  );
+  await page.getByTestId('mission-start-confirm-ok').click();
+
+  const startResponse = await startResponsePromise;
+  expect(startResponse.status()).toBe(200);
+  const startedPayload = (await startResponse.json()) as Array<{ id: number }>;
+  expect(startedPayload.map((match) => match.id)).toEqual([expectedMatch.id]);
+
+  const inProgress = await client.get<LiveMatch[]>(`/tournaments/${tournament.id}/matches`, {
+    state: 'in_progress',
+  });
+  expectStatus(inProgress, 200, 'fetch in-progress matches after backend group start');
+  expect(sortedNumbers(inProgress.json.map((match) => match.id))).toEqual(
+    sortedNumbers([...preStartedIds, expectedMatch.id]),
+  );
 });
 
 test('Owner runs live tournament operations from Mission Control', async ({ context, page }, testInfo) => {

@@ -3,10 +3,12 @@ import { countBeamerEffects, installBeamerEffectSpies, waitForBeamerEffect } fro
 import { waitForActionCableSubscription } from '../helpers/action-cable';
 import { keyframe, screenshotFilePath } from '../helpers/screenshot';
 import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
+import { installPageVisibilityControls, setPageVisibility } from '../helpers/page-visibility';
 import {
   LONG_TEAM_NAME_SINGLE_WORD,
   longGroupStageTeamName,
   seedGroupStageTournament,
+  seedPlayoffTournament,
 } from '../helpers/scenario-seeder';
 import { ApiClient, expectStatus } from '../helpers/api-client';
 
@@ -72,6 +74,7 @@ async function setupBeamerAndMatches(
     timerReasonText?: string;
     beamerName?: string;
     displayState?: string;
+    matchFilter?: string;
     showTimerReason?: boolean;
   } = {},
 ) {
@@ -81,6 +84,7 @@ async function setupBeamerAndMatches(
     timerReasonText,
     beamerName = 'e2e-during',
     displayState = 'during_game',
+    matchFilter,
     showTimerReason = true,
   } = opts;
 
@@ -109,7 +113,12 @@ async function setupBeamerAndMatches(
       config: { display_mode: 'timer_only', show_timer_reason: showTimerReason },
       is_default: false,
     }
-    : { name: beamerName, display_state: displayState, is_default: false };
+    : {
+      name: beamerName,
+      display_state: displayState,
+      config: matchFilter ? { match_filter: matchFilter } : undefined,
+      is_default: false,
+    };
 
   const beamerRes = await client.post(
     `/tournaments/${tournament.id}/beamers`,
@@ -125,6 +134,48 @@ async function setupBeamerAndMatches(
     : `display=${displayState}`;
 
   return { tournament, client, fullscreenQuery };
+}
+
+async function setupPlayoffStageBeamer(stageLevel: number, beamerName: string) {
+  const { tournament } = await seedPlayoffTournament(4);
+  const client = new ApiClient(backendUrl);
+  await client.login(e2eEmail, e2ePassword);
+
+  const stage = tournament.stages.find((candidate) => candidate.level === stageLevel);
+  if (!stage) {
+    throw new Error(`Stage level ${stageLevel} not found`);
+  }
+
+  for (const match of stage.matches) {
+    const started = await client.patch(`/matches/${match.id}`, {
+      state: 'in_progress',
+    });
+    expectStatus(started, 200, `start playoff match ${match.id}`);
+  }
+
+  await expect
+    .poll(
+      async () => {
+        const res = await client.get<Array<{ state: string }>>(
+          `/tournaments/${tournament.id}/matches`,
+          { stage_level: String(stageLevel), state: 'in_progress' },
+        );
+        expectStatus(res, 200, 'fetch playoff matches');
+        return res.json.length;
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(stage.matches.length);
+
+  const beamerRes = await client.post(`/tournaments/${tournament.id}/beamers`, {
+    name: beamerName,
+    display_state: 'during_game',
+    config: { match_filter: `stage_level:${stageLevel},state:in_progress` },
+    is_default: false,
+  });
+  expectStatus(beamerRes, 201, 'create playoff stage beamer');
+
+  return { tournament, fullscreenQuery: `beamer=${beamerName}` };
 }
 
 async function activeCardAnimationName(page: Page): Promise<string> {
@@ -180,6 +231,35 @@ function parseTimerTextSeconds(text: string): number {
 // ---------------------------------------------------------------------------
 // Timer tests
 // ---------------------------------------------------------------------------
+
+test('During-game view shows group round name when no timer is set', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament, fullscreenQuery } = await setupBeamerAndMatches(4, {
+    beamerName: 'no-timer-group-round',
+    matchFilter: 'group_stage_position:0,state:in_progress',
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+
+  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('fullscreen-current-stage')).toHaveText('Gruppe - Runde 1');
+  await expect(page.getByText('Kein Timer gesetzt')).toHaveCount(0);
+});
+
+test('During-game view shows playoff stage name when no timer is set', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const { tournament, fullscreenQuery } = await setupPlayoffStageBeamer(1, 'no-timer-semifinal');
+
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+
+  await expect(page.getByTestId('fullscreen-match-card').first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('fullscreen-current-stage')).toHaveText('Halbfinale');
+  await expect(page.getByText('Kein Timer gesetzt')).toHaveCount(0);
+});
 
 test('During-game view shows animated timer that updates', async ({ page }, testInfo) => {
   test.setTimeout(120_000);
@@ -470,6 +550,50 @@ test('Beamer confetti does not fire when expired timer loads', async ({ page }) 
   await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/Spiel vorbei!/)).toBeVisible({ timeout: 5_000 });
   await page.waitForTimeout(1_000);
+  expect(await countBeamerEffects(page, 'confetti')).toBe(0);
+});
+
+test('Beamer timer drops queued confetti while tab is hidden', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await installBeamerEffectSpies(page);
+  await installPageVisibilityControls(page);
+
+  const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(4, {
+    beamerName: 'timer-hidden-confetti',
+    displayState: 'timer_only',
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+  await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
+  await waitForActionCableSubscription(page, {
+    channel: 'TournamentTimersChannel',
+    tournament_id: tournament.id,
+  });
+
+  const scheduledTimer = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 2,
+  });
+  expectStatus(scheduledTimer, 200, 'start visible timer for queued confetti');
+  await waitForBeamerEffect(page, 'confetti-scheduled', undefined, 1, 10_000);
+
+  await setPageVisibility(page, 'hidden');
+  await page.waitForTimeout(1_500);
+  expect(await countBeamerEffects(page, 'confetti')).toBe(0);
+
+  await setPageVisibility(page, 'visible');
+  await page.waitForTimeout(1_200);
+  expect(await countBeamerEffects(page, 'confetti')).toBe(0);
+
+  const scheduledBeforeHiddenFinish = await countBeamerEffects(page, 'confetti-scheduled');
+  await setPageVisibility(page, 'hidden');
+  const hiddenTimer = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 2,
+  });
+  expectStatus(hiddenTimer, 200, 'start hidden timer for skipped confetti');
+  await page.waitForTimeout(3_000);
+  expect(await countBeamerEffects(page, 'confetti-scheduled')).toBe(scheduledBeforeHiddenFinish);
+  expect(await countBeamerEffects(page, 'confetti-skipped')).toBeGreaterThan(0);
   expect(await countBeamerEffects(page, 'confetti')).toBe(0);
 });
 

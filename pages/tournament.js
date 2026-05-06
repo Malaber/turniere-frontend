@@ -421,7 +421,7 @@ class Main extends React.Component {
         )) {
             return (<div>
                 <Head>
-                    <title>{tournamentName}: turnie.re</title>
+                    <title>{`${tournamentName}: turnie.re`}</title>
                 </Head>
                 <TurniereNavigation tournament={this.state.tournament || this.state.tournamentMeta} />
                 <TournamentPage

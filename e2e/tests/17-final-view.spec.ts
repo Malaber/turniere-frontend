@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { keyframe } from '../helpers/screenshot';
 import { waitForActionCableSubscription } from '../helpers/action-cable';
 import { ApiClient, ApiResponse, expectStatus } from '../helpers/api-client';
+import { installPageVisibilityControls, setPageVisibility } from '../helpers/page-visibility';
 
 const backendUrl = process.env.TURNIERE_BACKEND_URL ?? 'http://localhost:3000';
 const e2eEmail = process.env.TURNIERE_E2E_EMAIL ?? 'e2e@example.com';
@@ -210,4 +211,41 @@ test('Final beamer fires fireworks and shows winner medal when final ends', asyn
     .toBeGreaterThanOrEqual(3);
 
   await keyframe(page, testInfo, 'final_beamer_winner_fireworks');
+});
+
+test('Final beamer does not pile up hidden-tab fireworks', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await installPageVisibilityControls(page);
+
+  const client = await authenticatedClient();
+  const tournament = await seedPlayoffToBeforeFinal(client);
+  const finalMatches = await fetchFinalMatches(client, tournament.id);
+  const finalMatch = finalMatches.find((match) => match.position !== 1) ?? finalMatches[0];
+
+  await page.goto(`/t/${tournament.id}/final`);
+  await expect(page.getByTestId('final-view')).toBeVisible({ timeout: 20_000 });
+  await waitForActionCableSubscription(page, {
+    channel: 'TournamentMatchesChannel',
+    tournament_id: tournament.id,
+    stage_level: 0,
+  });
+
+  await setPageVisibility(page, 'hidden');
+  await finishFinalMatch(client, finalMatch);
+
+  await expect(page.getByTestId('final-winner-panel')).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(2_000);
+  expect(await page.evaluate(() => {
+    const events = (window as any).__beamerFinalView?.events ?? [];
+    return events.filter((event: any) => event.type === 'confetti').length;
+  })).toBe(0);
+
+  await setPageVisibility(page, 'visible');
+  await page.waitForTimeout(1_100);
+  const visibleBursts = await page.evaluate(() => {
+    const events = (window as any).__beamerFinalView?.events ?? [];
+    return events.filter((event: any) => event.type === 'confetti').length;
+  });
+  expect(visibleBursts).toBeGreaterThan(0);
+  expect(visibleBursts).toBeLessThanOrEqual(2);
 });

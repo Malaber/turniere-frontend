@@ -251,6 +251,49 @@ test('Owner can create and resolve a decider match, then start playoffs', async 
   await keyframe(page, testInfo, 'playoffs_started_after_decider');
 });
 
+test('Owner creates and resolves a decider from Mission Control Match Starts', async ({ context, page }, testInfo) => {
+  await injectAuth(context, loadAuthState());
+  const { tournament, relevantTeamNames } = await seedRelevantDeciderScenario();
+
+  await page.goto(`/t/${tournament.id}/mission-control#starts`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  const startsPane = page.locator('.tab-pane.active');
+  const deciderSection = startsPane.getByTestId('mission-decider-starts');
+  const deciderRequest = deciderSection
+    .getByTestId('mission-decider-request')
+    .filter({ hasText: relevantTeamNames[0] });
+  await expect(deciderSection).toBeVisible();
+  await expect(deciderRequest).toContainText(relevantTeamNames[1]);
+  await expect(deciderRequest.getByTestId('mission-create-decider')).toBeVisible();
+  await keyframe(page, testInfo, 'mission_control_decider_required');
+
+  await deciderRequest.getByTestId('mission-create-decider').click();
+  const deciderCard = deciderSection
+    .getByTestId('mission-match-card')
+    .filter({ hasText: relevantTeamNames[0] })
+    .filter({ hasText: relevantTeamNames[1] });
+  await expect(deciderCard).toBeVisible({ timeout: 20_000 });
+  await expect(deciderCard).toHaveAttribute('data-decider-match', 'true');
+  await expectDeciderCardState(deciderCard, 'not_started', 20_000);
+  await expect(deciderCard).toContainText('Entscheidung');
+  await keyframe(page, testInfo, 'mission_control_decider_created');
+
+  await deciderCard.getByTestId('mission-match-start').click();
+  await expectDeciderCardState(deciderCard, 'in_progress', 20_000);
+  await expect(deciderCard.getByLabel('Live')).toBeChecked({ timeout: 20_000 });
+  const scoreInputs = deciderCard.locator('input[type="number"]');
+  await scoreInputs.nth(0).fill('5');
+  await scoreInputs.nth(1).fill('3');
+  await deciderCard.getByLabel('Live').uncheck();
+  await deciderCard.getByTestId('mission-match-save').click();
+
+  await expect(startsPane.getByTestId('mission-decider-starts')).toHaveCount(0, { timeout: 20_000 });
+  await gotoTournament(page, tournament.id);
+  await expect(page.getByLabel('Tie-Break nötig')).toHaveCount(0, { timeout: 20_000 });
+  await expectResolvedDecisionIconCount(page, 20_000);
+  await keyframe(page, testInfo, 'mission_control_decider_resolved');
+});
+
 test('Owner sees 1-vs-2 advancing tie require decider and keeps both names unstruck after resolution', async ({ context, page }) => {
   await injectAuth(context, loadAuthState());
   const { tournament, relevantTeamNames } = await seedAdvancingDeciderScenario();

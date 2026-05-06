@@ -881,9 +881,17 @@
 }
 
 .mission-start-table {
+    align-items: center;
     color: #0f7a2a;
+    display: flex;
+    gap: 0.5rem;
     font-weight: 700;
     margin-bottom: 0.75rem;
+}
+
+.mission-start-context {
+    color: #4d5b6b;
+    font-size: 0.85rem;
 }
 
 .mission-start-row,

@@ -567,6 +567,8 @@ class Main extends React.Component {
         case 'during_game':
             return <DuringGameView
                 tournamentMeta={tournamentMeta}
+                tournament={tournament}
+                matchFilters={filtersForDisplayState(displayState, this.state.beamerConfig)}
                 matches={matches}
                 timerState={timerState}/>;
         case 'timer_only':
@@ -654,7 +656,7 @@ class Main extends React.Component {
         if (metaStatus === 200) {
             return (<div>
                 <Head>
-                    <title>{tournamentMeta.name}: turnie.re</title>
+                    <title>{`${tournamentMeta.name}: turnie.re`}</title>
                 </Head>
                 <BeamerTimerEffects
                     timerState={this.state.timerState}

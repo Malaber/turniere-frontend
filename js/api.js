@@ -956,15 +956,23 @@ export function getTournamentTransactionLog(tournamentId, successCallback, error
     });
 }
 
-export function startNextGroupMatches(groups, successCallback, errorCallback) {
-    const matches = groups.map(group => group.matches
-        .filter(match => match.state === 'not_started')
-        .sort((a, b) => a.position - b.position)[0])
-        .filter(match => match !== undefined);
-    startMatchesInSequence(matches, successCallback, errorCallback);
+export function startNextGroupMatches(tournamentId, successCallback, errorCallback) {
+    const currentState = getState();
+    patchRequest(currentState, '/tournaments/' + tournamentId + '/start_next_group_matches').then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
 }
 
 export function startNextStageMatches(stage, successCallback, errorCallback) {
+    // TODO(TUR-151): Replace this client-side loop when backend exposes a single-stage playoff bulk start endpoint.
     const matches = stage.matches.filter(match => match.state === 'not_started');
     startMatchesInSequence(matches, successCallback, errorCallback);
 }
