@@ -772,7 +772,9 @@ test.describe('Fullscreen mobile viewport', () => {
 
     await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
-    await expect(page.getByText('Kein Timer gesetzt')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('fullscreen-current-stage')).toContainText(/Gruppenphase|Gruppe - Runde/, {
+      timeout: 15_000,
+    });
     const matchCards = page.getByTestId('fullscreen-match-card');
     await expect(matchCards).toHaveCount(8);
     await expect(page.getByTestId('fullscreen-page-dot')).toHaveCount(2);
