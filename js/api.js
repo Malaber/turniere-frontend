@@ -209,7 +209,7 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
     case actionTypesUserinfo.VERIFY_CREDENTIALS_SUCCESS:
         return Object.assign({}, state, {
             isSignedIn: true,
-            username: action.parameters.username || state.username,
+            username: state.username || action.parameters.username,
             accountId: action.parameters.accountId || state.accountId
         });
     case actionTypesUserinfo.CHANGE_MAIL:

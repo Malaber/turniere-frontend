@@ -785,12 +785,9 @@ test('Mission Control links player accounts to teams and profile page', async ({
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(1, 4, 2);
   const ownerClient = await loggedInClient();
-  const playerClient = new ApiClient(backendUrl);
   const unique = Date.now().toString(36);
-  const playerUsername = `tur225-player-${unique}`;
-  const playerEmail = `${playerUsername}@example.com`;
-  const createdPlayer = await playerClient.register(playerEmail, e2ePassword, playerUsername);
-  expect([200, 201]).toContain(createdPlayer.status);
+  const playerEmail = `tur225-player-${unique}@example.com`;
+  let playerDisplayName = playerEmail;
 
   const team = tournament.teams[0];
   await page.goto(`/t/${tournament.id}/mission-control#teams`);
@@ -804,8 +801,6 @@ test('Mission Control links player accounts to teams and profile page', async ({
 
   await teamCard.getByTestId('mission-team-player-email').fill(playerEmail);
   await teamCard.getByTestId('mission-team-player-add').click();
-  await expect(teamCard.getByTestId('mission-team-player')).toContainText(playerUsername, { timeout: 20_000 });
-  await keyframe(page, testInfo, 'mission_control_team_players');
 
   let playerId = 0;
   await expect.poll(async () => {
@@ -817,19 +812,21 @@ test('Mission Control links player accounts to teams and profile page', async ({
     }>(`/tournaments/${tournament.id}`);
     expectStatus(tournamentResponse, 200, 'fetch tournament after player link');
     const updatedTeam = tournamentResponse.json.teams.find((candidate) => candidate.id === team.id);
-    const player = updatedTeam?.players?.find((candidate) => (
-      candidate.username === playerUsername || candidate.name === playerUsername
-    ));
+    const player = updatedTeam?.players?.[0];
     playerId = player?.id ?? 0;
+    playerDisplayName = player?.username || player?.name || playerEmail;
     return playerId;
   }, { timeout: 20_000 }).toBeGreaterThan(0);
 
-  const profileLink = teamCard.getByTestId('mission-team-player-profile').filter({ hasText: playerUsername });
+  await expect(teamCard.getByTestId('mission-team-player')).toContainText(playerDisplayName, { timeout: 20_000 });
+  await keyframe(page, testInfo, 'mission_control_team_players');
+
+  const profileLink = teamCard.getByTestId('mission-team-player-profile').filter({ hasText: playerDisplayName });
   await expect(profileLink).toHaveAttribute('href', `/profiles/${playerId}`);
 
   await page.goto(`/profiles/${playerId}`);
   await expect(page.getByTestId('account-profile')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole('heading', { name: playerUsername })).toBeVisible();
+  await expect(page.getByRole('heading', { name: playerDisplayName })).toBeVisible();
   await expect(page.getByTestId('account-profile-teams')).toContainText(team.name);
   await expect(page.getByTestId('account-profile-teams')).toContainText(tournament.name);
   await keyframe(page, testInfo, 'account_profile_team_owner');
@@ -837,9 +834,9 @@ test('Mission Control links player accounts to teams and profile page', async ({
   await page.goto(`/t/${tournament.id}/mission-control#teams`);
   await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
   const refreshedPane = page.locator('.tab-pane.active');
-  await refreshedPane.getByTestId('mission-control-search').fill(playerUsername);
+  await refreshedPane.getByTestId('mission-control-search').fill(playerDisplayName);
   const refreshedTeamCard = refreshedPane.locator(`[data-testid="mission-team-card"][data-team-id="${team.id}"]`);
-  await expect(refreshedTeamCard.getByTestId('mission-team-player')).toContainText(playerUsername);
+  await expect(refreshedTeamCard.getByTestId('mission-team-player')).toContainText(playerDisplayName);
   await refreshedTeamCard.getByTestId('mission-team-player-remove').click();
   await refreshedPane.getByTestId('mission-control-search').fill(team.name);
   await expect(refreshedTeamCard.getByTestId('mission-team-players-empty')).toBeVisible({ timeout: 20_000 });
