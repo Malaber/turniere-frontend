@@ -5,11 +5,14 @@ import re
 import shlex
 import shutil
 import signal
+import socket
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
 from pathlib import Path
 
 from invoke import task
@@ -19,6 +22,7 @@ E2E_DIR = ROOT / "e2e"
 
 DEFAULT_API_URL = "http://127.0.0.1:3000"
 DEFAULT_FRONTEND_URL = "http://127.0.0.1:3001"
+DEFAULT_LOCAL_E2E_FRONTEND_URL = ""
 
 FRONTEND_INSTANCES_LEADER_FOLLOWER = [
     {
@@ -35,6 +39,7 @@ FRONTEND_INSTANCES_LEADER_FOLLOWER = [
 
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 3001
+DEFAULT_LOCAL_E2E_PORT = 0
 DEFAULT_NODE_VERSION = "24"
 DEFAULT_E2E_EMAIL = "e2e@example.com"
 DEFAULT_E2E_PASSWORD = "password123"
@@ -96,6 +101,38 @@ def _wait_for_url(url: str, timeout: int = 120, acceptable_statuses: set[int] | 
         time.sleep(1)
 
     raise RuntimeError(f"{url} did not become ready within {timeout}s. Last error: {last_error}")
+
+
+def _find_available_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _frontend_url_port(frontend_url: str) -> int | None:
+    if not frontend_url:
+        return None
+
+    parsed_url = urlparse(frontend_url)
+    if not parsed_url.hostname:
+        raise ValueError(f"Invalid frontend URL: {frontend_url}")
+    if parsed_url.port:
+        return int(parsed_url.port)
+    if parsed_url.scheme == "http":
+        return 80
+    if parsed_url.scheme == "https":
+        return 443
+    return None
+
+
+def _resolve_local_e2e_frontend(port: int | str, frontend_url: str) -> tuple[int, str]:
+    requested_port = int(port)
+    resolved_port = requested_port if requested_port > 0 else _frontend_url_port(frontend_url)
+    if not resolved_port:
+        resolved_port = _find_available_port()
+
+    resolved_url = frontend_url.rstrip("/") if frontend_url else f"http://127.0.0.1:{resolved_port}"
+    return resolved_port, resolved_url
 
 
 def _start_background_frontend(
@@ -164,6 +201,12 @@ def _compose(command: list[str], env: dict[str, str] | None = None, check: bool 
 def setup(c, node_version=DEFAULT_NODE_VERSION):
     """Install the frontend's Yarn dependencies."""
     _run_node(c, "yarn install", cwd=ROOT, node_version=node_version)
+
+
+@task(name="check-local-e2e-ports")
+def check_local_e2e_ports(c):
+    """Run fast checks for local E2E frontend port selection."""
+    _run_subprocess([sys.executable, "-m", "unittest", "discover", "-s", "tests"])
 
 
 @task(name="check-backend")
@@ -276,9 +319,9 @@ def e2e_test(
 def e2e_local(
     c,
     api_url=DEFAULT_API_URL,
-    frontend_url=DEFAULT_FRONTEND_URL,
+    frontend_url=DEFAULT_LOCAL_E2E_FRONTEND_URL,
     host=DEFAULT_HOST,
-    port=DEFAULT_PORT,
+    port=DEFAULT_LOCAL_E2E_PORT,
     install_frontend=True,
     install_e2e=True,
     node_version=DEFAULT_NODE_VERSION,
@@ -292,7 +335,8 @@ def e2e_local(
     Run the local frontend E2E flow end to end against an already running backend.
 
     This installs frontend + E2E deps when requested, starts the dev server in the
-    background, waits for readiness, runs Playwright, and then stops the dev server.
+    background on a free local port by default, waits for readiness, runs
+    Playwright, and then stops the dev server.
     """
     if install_frontend:
         setup(c, node_version=node_version)
@@ -302,18 +346,24 @@ def e2e_local(
     if install_e2e:
         e2e_install(c, node_version=node_version, browser=browser)
 
+    resolved_port, resolved_frontend_url = _resolve_local_e2e_frontend(port, frontend_url)
+    if int(port) == 0 and not frontend_url:
+        print(f"Starting frontend on random local E2E port: {resolved_port}")
+    else:
+        print(f"Starting frontend on port: {resolved_port}")
+
     process, log_path = _start_background_frontend(
         api_url=api_url,
         host=host,
-        port=int(port),
+        port=resolved_port,
         node_version=node_version,
     )
 
     try:
-        _wait_for_url(frontend_url.rstrip("/"))
+        _wait_for_url(resolved_frontend_url)
         e2e_test(
             c,
-            frontend_url=frontend_url,
+            frontend_url=resolved_frontend_url,
             backend_url=api_url,
             node_version=node_version,
             email=email,
@@ -353,9 +403,9 @@ def e2e_test_decider(
 def e2e_local_decider(
     c,
     api_url=DEFAULT_API_URL,
-    frontend_url=DEFAULT_FRONTEND_URL,
+    frontend_url=DEFAULT_LOCAL_E2E_FRONTEND_URL,
     host=DEFAULT_HOST,
-    port=DEFAULT_PORT,
+    port=DEFAULT_LOCAL_E2E_PORT,
     install_frontend=True,
     install_e2e=True,
     node_version=DEFAULT_NODE_VERSION,
