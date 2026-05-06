@@ -863,6 +863,75 @@ test('Owner runs live tournament operations from Mission Control', async ({ cont
   await expect(page).toHaveURL(new RegExp(`/t/${tournament.id}$`), { timeout: 20_000 });
 });
 
+test('Mission Control links player accounts to teams and profile page', async ({ context, page }, testInfo) => {
+  await injectAuth(context);
+  const { tournament } = await seedGroupStageTournament(1, 4, 2);
+  const ownerClient = await loggedInClient();
+  const unique = Date.now().toString(36);
+  const playerEmail = `tur225-player-${unique}@example.com`;
+  let playerDisplayName = playerEmail;
+
+  const team = tournament.teams[0];
+  await page.goto(`/t/${tournament.id}/mission-control#teams`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  const teamsPane = page.locator('.tab-pane.active');
+  await expect(teamsPane.getByTestId('mission-control-search')).toBeVisible();
+  await teamsPane.getByTestId('mission-control-search').fill(team.name);
+  const teamCard = teamsPane.locator(`[data-testid="mission-team-card"][data-team-id="${team.id}"]`);
+  await expect(teamCard.getByTestId('mission-team-name')).toHaveValue(team.name);
+  await expect(teamCard.getByTestId('mission-team-players-empty')).toBeVisible();
+
+  await teamCard.getByTestId('mission-team-player-email').fill(playerEmail);
+  await teamCard.getByTestId('mission-team-player-add').click();
+
+  let playerId = 0;
+  await expect.poll(async () => {
+    const tournamentResponse = await ownerClient.get<{
+      teams: Array<{
+        id: number;
+        players?: Array<{ id: number; name?: string; username?: string }>;
+      }>;
+    }>(`/tournaments/${tournament.id}`);
+    expectStatus(tournamentResponse, 200, 'fetch tournament after player link');
+    const updatedTeam = tournamentResponse.json.teams.find((candidate) => candidate.id === team.id);
+    const player = updatedTeam?.players?.[0];
+    playerId = player?.id ?? 0;
+    playerDisplayName = player?.username || player?.name || playerEmail;
+    return playerId;
+  }, { timeout: 20_000 }).toBeGreaterThan(0);
+
+  await expect(teamCard.getByTestId('mission-team-player')).toContainText(playerDisplayName, { timeout: 20_000 });
+  await keyframe(page, testInfo, 'mission_control_team_players');
+
+  const profileLink = teamCard.getByTestId('mission-team-player-profile').filter({ hasText: playerDisplayName });
+  await expect(profileLink).toHaveAttribute('href', `/profiles/${playerId}`);
+
+  await page.goto(`/profiles/${playerId}`);
+  await expect(page.getByTestId('account-profile')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: playerDisplayName })).toBeVisible();
+  await expect(page.getByTestId('account-profile-teams')).toContainText(team.name);
+  await expect(page.getByTestId('account-profile-teams')).toContainText(tournament.name);
+  await keyframe(page, testInfo, 'account_profile_team_owner');
+
+  await page.goto(`/t/${tournament.id}/mission-control#teams`);
+  await expect(page.getByTestId('mission-control')).toBeVisible({ timeout: 20_000 });
+  const refreshedPane = page.locator('.tab-pane.active');
+  await refreshedPane.getByTestId('mission-control-search').fill(playerDisplayName);
+  const refreshedTeamCard = refreshedPane.locator(`[data-testid="mission-team-card"][data-team-id="${team.id}"]`);
+  await expect(refreshedTeamCard.getByTestId('mission-team-player')).toContainText(playerDisplayName);
+  await refreshedTeamCard.getByTestId('mission-team-player-remove').click();
+  await refreshedPane.getByTestId('mission-control-search').fill(team.name);
+  await expect(refreshedTeamCard.getByTestId('mission-team-players-empty')).toBeVisible({ timeout: 20_000 });
+  await expect.poll(async () => {
+    const tournamentResponse = await ownerClient.get<{
+      teams: Array<{ id: number; players?: Array<{ id: number }> }>;
+    }>(`/tournaments/${tournament.id}`);
+    expectStatus(tournamentResponse, 200, 'fetch tournament after player removal');
+    const updatedTeam = tournamentResponse.json.teams.find((candidate) => candidate.id === team.id);
+    return updatedTeam?.players?.length ?? 0;
+  }, { timeout: 20_000 }).toBe(0);
+});
+
 test('Mission Control stops and restarts a running match', async ({ context, page }) => {
   await injectAuth(context);
   const { tournament } = await seedGroupStageTournament(2, 4, 4);

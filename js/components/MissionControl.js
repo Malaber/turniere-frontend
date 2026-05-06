@@ -27,6 +27,7 @@ import {
     submitDeciderMatchScores,
     submitMatchScores,
     swapMatchPositions,
+    updateTeam,
     updateMatchMetadata,
     updateBeamer,
     updateTeamName
@@ -795,21 +796,13 @@ export class MissionControl extends React.Component {
                             </TabPane>
 
                             <TabPane tabId='teams'>
-                                <div className='mission-control-toolbar mb-3'>
-                                    <Input
-                                        type='search'
-                                        value={this.state.search}
-                                        onChange={this.setSearch}
-                                        placeholder='Teams suchen'
-                                        aria-label='Teams suchen'
-                                        title='Mit Cmd+K oder Ctrl+K fokussieren'
-                                        innerRef={this.searchInput}
-                                        data-testid='mission-control-search'
-                                    />
-                                    <div className='mission-search-hint'>
-                                        <FaKeyboard aria-hidden='true' /> Cmd+K
-                                    </div>
-                                </div>
+                                <MissionSearchToolbar
+                                    value={this.state.search}
+                                    onChange={this.setSearch}
+                                    inputRef={this.searchInput}
+                                    placeholder='Teams oder Spieler suchen'
+                                    ariaLabel='Teams oder Spieler suchen'
+                                />
                                 <MissionTeams
                                     teams={tournament.teams}
                                     search={this.state.search}
@@ -3634,38 +3627,39 @@ class MissionMatchMetadataCard extends React.Component {
                 >
                     Position tauschen
                 </summary>
-                <div className='mission-metadata-swap-body'>
-                    <Label for={'missionMetadataSwapTarget' + this.props.row.match.id}>Tauschen mit</Label>
-                    <div className='mission-metadata-swap-row'>
-                        <Input id={'missionMetadataSwapTarget' + this.props.row.match.id}
-                            type='select'
-                            value={this.state.swapTargetId}
-                            onChange={this.updateSwapTargetId}
-                            disabled={disabled}
-                            data-testid='swap-match-position-select'>
-                            {targets.map(target => (
-                                <option key={target.match.id} value={target.match.id}>
-                                    {metadataSwapTargetLabel(target)}
-                                </option>
-                            ))}
-                        </Input>
-                        <Button color='secondary'
-                            type='button'
-                            onClick={this.swapMatchPosition}
-                            disabled={disabled}
-                            data-testid='swap-match-position-button'>
-                            {this.state.swapping ? 'Tauscht...' : 'Tauschen'}
-                        </Button>
-                    </div>
-                    {selectedTarget &&
-                        <div className='mission-metadata-swap-matchup text-muted small'>
-                            <TeamName name={selectedTarget.match.team1.name} inline
-                                className='mission-metadata-swap-team'/>
-                            <span className='mission-metadata-swap-versus'>vs.</span>
-                            <TeamName name={selectedTarget.match.team2.name} inline
-                                className='mission-metadata-swap-team'/>
-                        </div>}
-                </div>
+                {this.state.swapControlsExpanded &&
+                    <div className='mission-metadata-swap-body'>
+                        <Label for={'missionMetadataSwapTarget' + this.props.row.match.id}>Tauschen mit</Label>
+                        <div className='mission-metadata-swap-row'>
+                            <Input id={'missionMetadataSwapTarget' + this.props.row.match.id}
+                                type='select'
+                                value={this.state.swapTargetId}
+                                onChange={this.updateSwapTargetId}
+                                disabled={disabled}
+                                data-testid='swap-match-position-select'>
+                                {targets.map(target => (
+                                    <option key={target.match.id} value={target.match.id}>
+                                        {metadataSwapTargetLabel(target)}
+                                    </option>
+                                ))}
+                            </Input>
+                            <Button color='secondary'
+                                type='button'
+                                onClick={this.swapMatchPosition}
+                                disabled={disabled}
+                                data-testid='swap-match-position-button'>
+                                {this.state.swapping ? 'Tauscht...' : 'Tauschen'}
+                            </Button>
+                        </div>
+                        {selectedTarget &&
+                            <div className='mission-metadata-swap-matchup text-muted small'>
+                                <TeamName name={selectedTarget.match.team1.name} inline
+                                    className='mission-metadata-swap-team'/>
+                                <span className='mission-metadata-swap-versus'>vs.</span>
+                                <TeamName name={selectedTarget.match.team2.name} inline
+                                    className='mission-metadata-swap-team'/>
+                            </div>}
+                    </div>}
             </details>
         );
     }
@@ -4307,19 +4301,69 @@ class MissionMatchCard extends React.Component {
     }
 }
 
+function playerLabel(player) {
+    return player.name || player.username || ('Account #' + player.id);
+}
+
+function teamPlayers(team) {
+    return Array.isArray(team.players) ? team.players : [];
+}
+
+function teamMatchesSearch(team, search) {
+    if (!search) {
+        return true;
+    }
+    const players = teamPlayers(team);
+    const playerText = players.map(player => [
+        playerLabel(player),
+        player.username,
+        player.email
+    ].filter(Boolean).join(' ')).join(' ');
+    const haystack = [
+        team.name,
+        playerText
+    ].join(' ').toLowerCase();
+    return haystack.indexOf(search) !== -1;
+}
+
 class MissionTeams extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {teamNames: {}, savingTeamId: null};
+        this.state = {
+            teamNames: {},
+            playerEmails: {},
+            expandedTeamIds: {},
+            savingTeamId: null,
+            savingPlayerTeamId: null,
+            removingPlayerKey: null
+        };
         this.setTeamName = this.setTeamName.bind(this);
+        this.setPlayerEmail = this.setPlayerEmail.bind(this);
+        this.setTeamExpanded = this.setTeamExpanded.bind(this);
         this.saveTeamName = this.saveTeamName.bind(this);
-        this.onSuccess = this.onSuccess.bind(this);
-        this.onError = this.onError.bind(this);
+        this.addPlayer = this.addPlayer.bind(this);
+        this.removePlayer = this.removePlayer.bind(this);
+        this.onTeamNameSuccess = this.onTeamNameSuccess.bind(this);
+        this.onTeamNameError = this.onTeamNameError.bind(this);
+        this.onPlayersSuccess = this.onPlayersSuccess.bind(this);
+        this.onPlayersError = this.onPlayersError.bind(this);
     }
 
     setTeamName(teamId, name) {
         this.setState(prev => ({
             teamNames: Object.assign({}, prev.teamNames, {[teamId]: name})
+        }));
+    }
+
+    setPlayerEmail(teamId, email) {
+        this.setState(prev => ({
+            playerEmails: Object.assign({}, prev.playerEmails, {[teamId]: email})
+        }));
+    }
+
+    setTeamExpanded(teamId, expanded) {
+        this.setState(prev => ({
+            expandedTeamIds: Object.assign({}, prev.expandedTeamIds, {[teamId]: expanded})
         }));
     }
 
@@ -4331,46 +4375,185 @@ class MissionTeams extends React.Component {
         updateTeamName({
             id: team.id,
             name: this.state.teamNames[team.id] || team.name
-        }, this.onSuccess, this.onError);
+        }, this.onTeamNameSuccess, this.onTeamNameError);
     }
 
-    onSuccess() {
+    addPlayer(team) {
+        const email = (this.state.playerEmails[team.id] || '').trim();
+        if (this.props.disabled || this.state.savingPlayerTeamId === team.id || email.length === 0) {
+            return;
+        }
+        this.setState({savingPlayerTeamId: team.id});
+        updateTeam(team.id, {player_email: email}, updatedTeam => {
+            this.onPlayersSuccess(team.id, updatedTeam);
+        }, this.onPlayersError);
+    }
+
+    removePlayer(team, player) {
+        if (this.props.disabled) {
+            return;
+        }
+        const key = team.id + '-' + player.id;
+        this.setState({removingPlayerKey: key});
+        const nextPlayerIds = teamPlayers(team)
+            .filter(teamPlayer => teamPlayer.id !== player.id)
+            .map(teamPlayer => teamPlayer.id);
+        updateTeam(team.id, {player_ids: nextPlayerIds}, updatedTeam => {
+            this.onPlayersSuccess(team.id, updatedTeam);
+        }, this.onPlayersError);
+    }
+
+    onTeamNameSuccess() {
         notify.show('Team wurde umbenannt.', 'success', 2000);
         this.setState({savingTeamId: null});
         this.props.onTournamentChange();
     }
 
-    onError() {
-        notify.show('Team konnte nicht umbenannt werden.', 'error', 3000);
+    onTeamNameError(errorBody) {
+        notify.show(errorMessage(errorBody, 'Team konnte nicht umbenannt werden.'), 'error', 3000);
         this.setState({savingTeamId: null});
     }
 
-    render() {
-        const search = this.props.search.trim().toLowerCase();
-        const teams = this.props.teams.filter(team => !search || team.name.toLowerCase().indexOf(search) !== -1);
+    onPlayersSuccess(teamId) {
+        notify.show('Spieler wurden aktualisiert.', 'success', 2000);
+        this.setState(prev => ({
+            savingPlayerTeamId: null,
+            removingPlayerKey: null,
+            playerEmails: Object.assign({}, prev.playerEmails, {[teamId]: ''})
+        }));
+        this.props.onTournamentChange();
+    }
+
+    onPlayersError(errorBody) {
+        notify.show(errorMessage(errorBody, 'Spieler konnten nicht aktualisiert werden.'), 'error', 3000);
+        this.setState({
+            savingPlayerTeamId: null,
+            removingPlayerKey: null
+        });
+    }
+
+    renderPlayers(team, players) {
+        if (players.length === 0) {
+            return (
+                <div className='mission-team-player-empty' data-testid='mission-team-players-empty'>
+                    Keine Spieler verknüpft.
+                </div>
+            );
+        }
+
+        return players.map(player => {
+            const label = playerLabel(player);
+            const removeKey = team.id + '-' + player.id;
+            return (
+                <div className='mission-team-player' key={player.id} data-testid='mission-team-player'>
+                    <FaUser aria-hidden='true' />
+                    <a href={'/profiles/' + player.id}
+                        data-testid='mission-team-player-profile'>
+                        {label}
+                    </a>
+                    <Button color='link' className='mission-team-player-remove' type='button'
+                        aria-label={label + ' entfernen'}
+                        title='Spieler entfernen'
+                        data-testid='mission-team-player-remove'
+                        disabled={this.props.disabled || this.state.removingPlayerKey === removeKey}
+                        onClick={() => this.removePlayer(team, player)}>
+                        <FaTrash aria-hidden='true' />
+                    </Button>
+                </div>
+            );
+        });
+    }
+
+    renderTeam(team, hasSearch) {
+        const players = teamPlayers(team);
+        const playerCountLabel = players.length === 1 ? '1 Spieler' : players.length + ' Spieler';
+        const emailValue = this.state.playerEmails[team.id] || '';
+        const isOpen = hasSearch || this.state.expandedTeamIds[team.id] === true;
         return (
-            <section className='mission-control-section'>
-                <h3 className='h5'>Teams</h3>
-                <Row className='g-2'>
-                    {teams.map(team => (
-                        <Col md='6' lg='4' key={team.id}>
-                            <form className='d-flex gap-2' onSubmit={event => {
-                                event.preventDefault();
-                                this.saveTeamName(team);
-                            }}>
-                                <Input value={this.state.teamNames[team.id] || team.name}
+            <details className='mission-team-card mission-collapsible-details'
+                key={team.id}
+                open={isOpen}
+                data-testid='mission-team-card'
+                data-team-id={team.id}
+                onToggle={event => this.setTeamExpanded(team.id, event.currentTarget.open)}>
+                <summary className='mission-collapsible-summary mission-team-summary'
+                    data-testid='mission-team-summary'>
+                    <FaChevronRight aria-hidden='true' className='mission-collapsible-chevron' />
+                    <h4><TeamName name={team.name}/></h4>
+                    <span className='mission-checklist-count' data-testid='mission-team-player-count'>
+                        {playerCountLabel}
+                    </span>
+                </summary>
+                <div className='mission-team-body'>
+                    <form className='mission-team-name-form' onSubmit={event => {
+                        event.preventDefault();
+                        this.saveTeamName(team);
+                    }}>
+                        <FormGroup className='mb-0'>
+                            <Label for={'mission-team-name-' + team.id}>Teamname</Label>
+                            <div className='mission-team-name-controls'>
+                                <Input id={'mission-team-name-' + team.id}
+                                    value={this.state.teamNames[team.id] || team.name}
                                     onChange={event => this.setTeamName(team.id, event.target.value)}
-                                    disabled={this.props.disabled}/>
+                                    disabled={this.props.disabled}
+                                    data-testid='mission-team-name'/>
                                 <Button color='secondary' outline
                                     type='submit'
                                     data-testid='mission-team-save'
                                     disabled={this.props.disabled || this.state.savingTeamId === team.id}>
                                     Speichern
                                 </Button>
-                            </form>
-                        </Col>
-                    ))}
-                </Row>
+                            </div>
+                        </FormGroup>
+                    </form>
+
+                    <div className='mission-team-player-section'>
+                        <div className='mission-team-player-heading'>
+                            <FaUsers aria-hidden='true' /> Spieler
+                        </div>
+                        <div className='mission-team-player-list' data-testid='mission-team-players'>
+                            {this.renderPlayers(team, players)}
+                        </div>
+                        <form className='mission-team-player-form' onSubmit={event => {
+                            event.preventDefault();
+                            this.addPlayer(team);
+                        }}>
+                            <Input type='email'
+                                value={emailValue}
+                                onChange={event => this.setPlayerEmail(team.id, event.target.value)}
+                                placeholder='spieler@example.com'
+                                aria-label={'Spieler per E-Mail zu ' + team.name + ' hinzufügen'}
+                                disabled={this.props.disabled || this.state.savingPlayerTeamId === team.id}
+                                data-testid='mission-team-player-email'/>
+                            <Button color='primary' outline
+                                type='submit'
+                                data-testid='mission-team-player-add'
+                                disabled={this.props.disabled ||
+                                    this.state.savingPlayerTeamId === team.id ||
+                                    emailValue.trim().length === 0}>
+                                Hinzufügen
+                            </Button>
+                        </form>
+                    </div>
+                </div>
+            </details>
+        );
+    }
+
+    render() {
+        const search = this.props.search.trim().toLowerCase();
+        const teams = this.props.teams.filter(team => teamMatchesSearch(team, search));
+        const hasSearch = search.length > 0;
+        return (
+            <section className='mission-control-section'>
+                <h3 className='h5'>Teams</h3>
+                {teams.length === 0 &&
+                    <Alert color='light' data-testid='mission-teams-empty'>
+                        {hasSearch ? 'Keine Teams gefunden.' : 'Keine Teams verfügbar.'}
+                    </Alert>}
+                <div className='mission-team-list'>
+                    {teams.map(team => this.renderTeam(team, hasSearch))}
+                </div>
             </section>
         );
     }

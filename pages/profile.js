@@ -13,7 +13,7 @@ import RequireLogin from '../js/components/RequireLogin';
 
 function ContentContainer(props) {
     return (<Container className="pb-5">
-        <UserData name={props.name} email={props.email}/>
+        <UserData name={props.name} email={props.email} accountId={props.accountId}/>
         <h3 className='custom-font mt-5'>E-Mail-Adresse ändern</h3>
         <NewMailAddressInput email={props.email}/>
     </Container>);
@@ -36,7 +36,7 @@ export default class ProfilePage extends React.Component {
 }
 
 const Content = connect(state => {
-    return {email: state.userinfo.uid, name: state.userinfo.username};
+    return {email: state.userinfo.uid, name: state.userinfo.username, accountId: state.userinfo.accountId};
 })(ContentContainer);
 
 function UserData(props) {
@@ -50,6 +50,13 @@ function UserData(props) {
                 <th className='w-small'>E-Mail-Adresse</th>
                 <td className='mw-100'>{props.email}</td>
             </tr>
+            {props.accountId &&
+                <tr>
+                    <th className='w-small'>Spielerprofil</th>
+                    <td className='mw-100'>
+                        <a href={'/profiles/' + props.accountId}>/profiles/{props.accountId}</a>
+                    </td>
+                </tr>}
         </tbody>
     </Table>);
 }
