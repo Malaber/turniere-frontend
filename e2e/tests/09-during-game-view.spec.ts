@@ -3,6 +3,7 @@ import { countBeamerEffects, installBeamerEffectSpies, waitForBeamerEffect } fro
 import { waitForActionCableSubscription } from '../helpers/action-cable';
 import { keyframe, screenshotFilePath } from '../helpers/screenshot';
 import { expectFullscreenMatchCardFrame } from '../helpers/fullscreen-match-card';
+import { installPageVisibilityControls, setPageVisibility } from '../helpers/page-visibility';
 import {
   LONG_TEAM_NAME_SINGLE_WORD,
   longGroupStageTeamName,
@@ -470,6 +471,50 @@ test('Beamer confetti does not fire when expired timer loads', async ({ page }) 
   await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/Spiel vorbei!/)).toBeVisible({ timeout: 5_000 });
   await page.waitForTimeout(1_000);
+  expect(await countBeamerEffects(page, 'confetti')).toBe(0);
+});
+
+test('Beamer timer drops queued confetti while tab is hidden', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await installBeamerEffectSpies(page);
+  await installPageVisibilityControls(page);
+
+  const { tournament, client, fullscreenQuery } = await setupBeamerAndMatches(4, {
+    beamerName: 'timer-hidden-confetti',
+    displayState: 'timer_only',
+  });
+
+  await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
+  await expect(page.getByTestId('timer-only-view')).toBeVisible({ timeout: 20_000 });
+  await waitForActionCableSubscription(page, {
+    channel: 'TournamentTimersChannel',
+    tournament_id: tournament.id,
+  });
+
+  const scheduledTimer = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 2,
+  });
+  expectStatus(scheduledTimer, 200, 'start visible timer for queued confetti');
+  await waitForBeamerEffect(page, 'confetti-scheduled', undefined, 1, 10_000);
+
+  await setPageVisibility(page, 'hidden');
+  await page.waitForTimeout(1_500);
+  expect(await countBeamerEffects(page, 'confetti')).toBe(0);
+
+  await setPageVisibility(page, 'visible');
+  await page.waitForTimeout(1_200);
+  expect(await countBeamerEffects(page, 'confetti')).toBe(0);
+
+  const scheduledBeforeHiddenFinish = await countBeamerEffects(page, 'confetti-scheduled');
+  await setPageVisibility(page, 'hidden');
+  const hiddenTimer = await client.patch(`/tournaments/${tournament.id}/timer`, {
+    timestamp_seconds: 2,
+  });
+  expectStatus(hiddenTimer, 200, 'start hidden timer for skipped confetti');
+  await page.waitForTimeout(3_000);
+  expect(await countBeamerEffects(page, 'confetti-scheduled')).toBe(scheduledBeforeHiddenFinish);
+  expect(await countBeamerEffects(page, 'confetti-skipped')).toBeGreaterThan(0);
   expect(await countBeamerEffects(page, 'confetti')).toBe(0);
 });
 
