@@ -139,7 +139,7 @@ class Main extends React.Component {
         if (loadingStatus === 200) {
             return (<div>
                 <Head>
-                    <title>{tournament.name}: turnie.re</title>
+                    <title>{`${tournament.name}: turnie.re`}</title>
                 </Head>
                 <FullscreenPage
                     tournament={tournament} groups={groups} page={page} maxPage={this.pages}

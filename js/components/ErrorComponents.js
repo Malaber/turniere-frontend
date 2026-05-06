@@ -16,7 +16,7 @@ export class ErrorPageComponent extends React.Component {
         return (
             <div>
                 <Head>
-                    <title>turnie.re - Error {this.props.statusCode}</title>
+                    <title>{`turnie.re - Error ${this.props.statusCode}`}</title>
                 </Head>
                 <TurniereNavigation/>
                 <ErrorPage statusCode={this.props.statusCode}/>
