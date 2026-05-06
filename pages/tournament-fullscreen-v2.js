@@ -567,6 +567,8 @@ class Main extends React.Component {
         case 'during_game':
             return <DuringGameView
                 tournamentMeta={tournamentMeta}
+                tournament={tournament}
+                matchFilters={filtersForDisplayState(displayState, this.state.beamerConfig)}
                 matches={matches}
                 timerState={timerState}/>;
         case 'timer_only':
