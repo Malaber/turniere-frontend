@@ -7,6 +7,7 @@ import {
     getTimerDisplaySeconds,
     TIMER_MODE_COUNTDOWN
 } from '../../utils/timerState';
+import {groupRoundStageName, playoffStageName} from '../../utils/stageNames';
 import styles from './DuringGameView.module.css';
 import {FullscreenMatchCard} from './FullscreenMatchCard';
 
@@ -60,6 +61,84 @@ function animatedTimerDisplayKey(display) {
     if (!display.active) return 'inactive';
     if (display.mode === TIMER_MODE_COUNTDOWN && display.ms === 0) return 'finished';
     return display.mode + ':' + formatTimerDisplay(display);
+}
+
+function filterValue(filters, key) {
+    if (!filters || filters[key] === null || filters[key] === undefined || filters[key] === '') {
+        return null;
+    }
+    return filters[key];
+}
+
+function matchBackendPosition(match) {
+    if (match.backendPosition !== undefined && match.backendPosition !== null) {
+        return Number(match.backendPosition);
+    }
+    return Number(match.position) - 1;
+}
+
+function uniqueValues(values) {
+    return values.filter(value => value !== null && value !== undefined)
+        .filter((value, index, all) => all.indexOf(value) === index);
+}
+
+function stageNameFromFilters(filters, tournament) {
+    const groupPosition = filterValue(filters, 'group_stage_position');
+    if (groupPosition !== null) {
+        return groupRoundStageName(groupPosition);
+    }
+
+    const stageLevel = filterValue(filters, 'stage_level');
+    if (stageLevel !== null) {
+        return playoffStageName(stageLevel);
+    }
+
+    const stageId = filterValue(filters, 'stage_id');
+    const stages = tournament && Array.isArray(tournament.playoffStages) ?
+        tournament.playoffStages :
+        [];
+    const stage = stages.find(candidate => String(candidate.id) === String(stageId));
+    return stage ? playoffStageName(stage.level) : null;
+}
+
+function playoffStageLevelByMatchId(tournament) {
+    const stages = tournament && Array.isArray(tournament.playoffStages) ?
+        tournament.playoffStages :
+        [];
+    return stages.reduce((lookup, stage) => {
+        (stage.matches || []).forEach(match => {
+            lookup[match.id] = stage.level;
+        });
+        return lookup;
+    }, {});
+}
+
+function stageNameFromMatches(matches, tournament) {
+    if (!Array.isArray(matches) || matches.length === 0) {
+        return null;
+    }
+
+    const allGroupMatches = matches.every(match => match.group);
+    if (allGroupMatches) {
+        const positions = uniqueValues(matches.map(matchBackendPosition));
+        if (positions.length === 1) {
+            return groupRoundStageName(positions[0]);
+        }
+        return 'Gruppenphase';
+    }
+
+    const stageLevels = playoffStageLevelByMatchId(tournament);
+    const levels = uniqueValues(matches.map(match => stageLevels[match.id]));
+    if (levels.length === 1) {
+        return playoffStageName(levels[0]);
+    }
+
+    return null;
+}
+
+function currentStageName(filters, matches, tournament) {
+    return stageNameFromFilters(filters, tournament) ||
+        stageNameFromMatches(matches, tournament);
 }
 
 
@@ -344,6 +423,7 @@ export class DuringGameView extends React.Component {
         const {matches, timerState} = this.props;
         const {pageIndex, timerPhase, matchesPerPage, viewportHeight} = this.state;
         const hasTimer = timerState && timerState.mode;
+        const stageName = currentStageName(this.props.matchFilters, matches, this.props.tournament);
         const takeover = timerPhase === 'countdown' || timerPhase === 'finished';
         const rootStyle = viewportHeight ?
             {'--fullscreen-height': viewportHeight + 'px'} :
@@ -436,8 +516,8 @@ export class DuringGameView extends React.Component {
                                 testId="fullscreen-timer"
                             />
                         ) : (
-                            <div className={styles.noTimer}>
-                                Kein Timer gesetzt
+                            <div className={styles.noTimer} data-testid="fullscreen-current-stage">
+                                {stageName || 'Kein Timer gesetzt'}
                             </div>
                         )}
                     </div>
@@ -474,8 +554,8 @@ export class DuringGameView extends React.Component {
                             hideFinished={timerPhase === 'normal'}
                         />
                     ) : (
-                        <div className={styles.noTimer}>
-                            Kein Timer gesetzt
+                        <div className={styles.noTimer} data-testid="fullscreen-current-stage">
+                            {stageName || 'Kein Timer gesetzt'}
                         </div>
                     )}
                 </div>
