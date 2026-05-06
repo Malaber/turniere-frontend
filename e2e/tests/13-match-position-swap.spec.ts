@@ -98,9 +98,11 @@ test('Owner can swap group match positions from Mission Control Match-Infos', as
   const sourceMatch = before[0];
   const targetMatch = before[3];
   const sourceNames = teamNames(seedMatches.find((match) => match.id === sourceMatch.id) || seedMatches[0]);
+  const targetNames = teamNames(seedMatches.find((match) => match.id === targetMatch.id) || seedMatches[3]);
   expect(sourceMatch).toBeTruthy();
   expect(targetMatch).toBeTruthy();
   expect(sourceNames.length).toBe(2);
+  expect(targetNames.length).toBe(2);
 
   await openMissionMetadata(page, tournament.id);
   await page.locator('.tab-pane.active').getByTestId('mission-control-search').fill(sourceNames[0]);
@@ -111,6 +113,8 @@ test('Owner can swap group match positions from Mission Control Match-Infos', as
   await expect(sourceCard.getByTestId('swap-match-position-select')).toHaveCount(0);
   await sourceCard.getByTestId('swap-match-position-toggle').click();
   await expect(sourceCard.getByTestId('swap-match-position-select')).toBeVisible();
+  await expect(sourceCard.getByTestId('swap-match-position-select')).toContainText(targetNames[0]);
+  await expect(sourceCard.getByTestId('swap-match-position-select')).toContainText(targetNames[1]);
   await sourceCard.getByTestId('swap-match-position-select').selectOption(String(targetMatch.id));
   await keyframe(page, testInfo, 'swap_mission_metadata_before_submit');
 

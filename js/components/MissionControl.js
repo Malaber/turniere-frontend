@@ -2888,6 +2888,10 @@ function metadataSwapTargets(row, rows) {
         .sort((left, right) => sortMatchesByPositionAscending()(left.match, right.match));
 }
 
+function metadataSwapTargetLabel(row) {
+    return metadataMatchLabel(row) + ' · ' + row.match.team1.name + ' vs. ' + row.match.team2.name;
+}
+
 function uniqueSortedNumbers(values) {
     return values
         .filter(value => value !== null && value !== undefined && value !== '')
@@ -3456,7 +3460,7 @@ class MissionMatchMetadataCard extends React.Component {
                                 data-testid='swap-match-position-select'>
                                 {targets.map(target => (
                                     <option key={target.match.id} value={target.match.id}>
-                                        {metadataMatchLabel(target)}
+                                        {metadataSwapTargetLabel(target)}
                                     </option>
                                 ))}
                             </Input>
