@@ -4160,18 +4160,20 @@ class MissionTeams extends React.Component {
                     }}>
                         <FormGroup className='mb-0'>
                             <Label for={'mission-team-name-' + team.id}>Teamname</Label>
-                            <Input id={'mission-team-name-' + team.id}
-                                value={this.state.teamNames[team.id] || team.name}
-                                onChange={event => this.setTeamName(team.id, event.target.value)}
-                                disabled={this.props.disabled}
-                                data-testid='mission-team-name'/>
+                            <div className='mission-team-name-controls'>
+                                <Input id={'mission-team-name-' + team.id}
+                                    value={this.state.teamNames[team.id] || team.name}
+                                    onChange={event => this.setTeamName(team.id, event.target.value)}
+                                    disabled={this.props.disabled}
+                                    data-testid='mission-team-name'/>
+                                <Button color='secondary' outline
+                                    type='submit'
+                                    data-testid='mission-team-save'
+                                    disabled={this.props.disabled || this.state.savingTeamId === team.id}>
+                                    Speichern
+                                </Button>
+                            </div>
                         </FormGroup>
-                        <Button color='secondary' outline
-                            type='submit'
-                            data-testid='mission-team-save'
-                            disabled={this.props.disabled || this.state.savingTeamId === team.id}>
-                            Speichern
-                        </Button>
                     </form>
 
                     <div className='mission-team-player-section'>

@@ -318,7 +318,6 @@
     padding-top: 0.85rem;
 }
 
-.mission-team-name-form,
 .mission-team-player-form {
     align-items: end;
     display: grid;
@@ -326,10 +325,20 @@
     gap: 0.75rem;
 }
 
+.mission-team-name-controls {
+    align-items: center;
+    display: grid;
+    grid-template-columns: minmax(12rem, 1fr) auto;
+    gap: 0.75rem;
+}
+
 .mission-team-name-form .btn,
 .mission-team-player-form .btn {
-    align-self: end;
     min-height: calc(1.5em + 0.75rem + 2px);
+}
+
+.mission-team-player-form .btn {
+    align-self: end;
 }
 
 .mission-team-player-section {
@@ -1151,7 +1160,7 @@ i.is-finished {
         justify-self: start;
     }
 
-    .mission-team-name-form,
+    .mission-team-name-controls,
     .mission-team-player-form {
         grid-template-columns: 1fr;
     }
