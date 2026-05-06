@@ -2,6 +2,7 @@ import React from 'react';
 import {confetti} from '@tsparticles/confetti';
 import {beamerSoundEffectForKey} from '../../utils/soundEffects';
 import {getTimerDisplay, TIMER_MODE_COUNTDOWN} from '../../utils/timerState';
+import {isBrowserTabActive} from '../../utils/browserVisibility';
 
 
 const TIMER_EFFECT_CUES = [
@@ -51,6 +52,14 @@ function randomFireworkOrigin() {
 }
 
 function triggerConfettiBurst(origin, burstIndex) {
+    if (!isBrowserTabActive()) {
+        emitDebugEvent('confetti-skipped', {
+            burstIndex,
+            reason: 'tab-hidden'
+        });
+        return;
+    }
+
     emitDebugEvent('confetti', {
         burstIndex,
         style: 'firework',
@@ -102,10 +111,14 @@ export class BeamerTimerEffects extends React.Component {
         this.manualUnlock = this.manualUnlock.bind(this);
         this.retryPendingCue = this.retryPendingCue.bind(this);
         this.handleSoundEffectCommand = this.handleSoundEffectCommand.bind(this);
+        this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
     }
 
     componentDidMount() {
         this.lastSoundEffectCommandId = soundEffectCommandId(this.props.soundEffectCommand);
+        if (typeof document !== 'undefined' && document.addEventListener) {
+            document.addEventListener('visibilitychange', this.handleVisibilityChange);
+        }
         this.checkAudioPermission('page-load').catch(() => {});
         this.tick();
         this.intervalId = setInterval(this.tick, TICK_MS);
@@ -123,8 +136,18 @@ export class BeamerTimerEffects extends React.Component {
 
     componentWillUnmount() {
         clearInterval(this.intervalId);
+        if (typeof document !== 'undefined' && document.removeEventListener) {
+            document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+        }
         this.clearConfettiTimeouts();
         this.stopActiveSounds('unmount');
+    }
+
+    handleVisibilityChange() {
+        if (isBrowserTabActive()) return;
+
+        this.clearConfettiTimeouts();
+        emitDebugEvent('confetti-skipped', {reason: 'tab-hidden'});
     }
 
     clearConfettiTimeouts() {
@@ -138,6 +161,14 @@ export class BeamerTimerEffects extends React.Component {
 
     scheduleConfettiFireworks() {
         this.clearConfettiTimeouts();
+        if (!isBrowserTabActive()) {
+            emitDebugEvent('confetti-skipped', {
+                delayMs: CONFETTI_FINISH_DELAY_MS,
+                reason: 'tab-hidden'
+            });
+            return;
+        }
+
         emitDebugEvent('confetti-scheduled', {
             delayMs: CONFETTI_FINISH_DELAY_MS
         });
@@ -149,6 +180,10 @@ export class BeamerTimerEffects extends React.Component {
 
     startConfettiFireworks() {
         this.clearConfettiTimeouts();
+        if (!isBrowserTabActive()) {
+            emitDebugEvent('confetti-skipped', {reason: 'tab-hidden'});
+            return;
+        }
 
         for (let burstIndex = 0; burstIndex < CONFETTI_FIREWORK_BURSTS; burstIndex++) {
             const fire = () => {

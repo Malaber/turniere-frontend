@@ -5,6 +5,7 @@ import {Timer} from '../Timer';
 import {getTimerReasonLabel} from '../../utils/timerState';
 import {sortMatchesByPositionAscending} from '../../utils/sorting';
 import {FullscreenMatchCard} from './FullscreenMatchCard';
+import {isBrowserTabActive} from '../../utils/browserVisibility';
 import styles from './FinalView.module.css';
 
 
@@ -69,6 +70,14 @@ function randomFireworkOrigin() {
 }
 
 function fireFinalConfetti(burstIndex) {
+    if (!isBrowserTabActive()) {
+        emitFinalEvent('confetti-skipped', {
+            burstIndex,
+            reason: 'tab-hidden'
+        });
+        return;
+    }
+
     const origin = randomFireworkOrigin();
     emitFinalEvent('confetti', {
         burstIndex,
@@ -97,19 +106,55 @@ function useSteadyFireworks(active, sessionKey) {
         }
 
         let burstIndex = 0;
-        emitFinalEvent('confetti-started', {
-            intervalMs: FINAL_FIREWORK_INTERVAL_MS,
-            sessionKey
-        });
-        fireFinalConfetti(burstIndex);
-        burstIndex += 1;
-
-        const intervalId = window.setInterval(() => {
+        let intervalId = null;
+        const stop = () => {
+            if (intervalId === null) return;
+            window.clearInterval(intervalId);
+            intervalId = null;
+        };
+        const fire = () => {
             fireFinalConfetti(burstIndex);
             burstIndex += 1;
-        }, FINAL_FIREWORK_INTERVAL_MS);
+        };
+        const start = () => {
+            if (intervalId !== null) return;
+            if (!isBrowserTabActive()) {
+                emitFinalEvent('confetti-skipped', {
+                    reason: 'tab-hidden',
+                    sessionKey
+                });
+                return;
+            }
+            emitFinalEvent('confetti-started', {
+                intervalMs: FINAL_FIREWORK_INTERVAL_MS,
+                sessionKey
+            });
+            fire();
+            intervalId = window.setInterval(fire, FINAL_FIREWORK_INTERVAL_MS);
+        };
+        const handleVisibilityChange = () => {
+            if (isBrowserTabActive()) {
+                start();
+            } else {
+                stop();
+                emitFinalEvent('confetti-skipped', {
+                    reason: 'tab-hidden',
+                    sessionKey
+                });
+            }
+        };
 
-        return () => window.clearInterval(intervalId);
+        start();
+        if (typeof document !== 'undefined' && document.addEventListener) {
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+        }
+
+        return () => {
+            stop();
+            if (typeof document !== 'undefined' && document.removeEventListener) {
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            }
+        };
     }, [active, sessionKey]);
 }
 
