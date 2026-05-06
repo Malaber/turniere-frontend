@@ -326,6 +326,12 @@
     gap: 0.75rem;
 }
 
+.mission-team-name-form .btn,
+.mission-team-player-form .btn {
+    align-self: end;
+    min-height: calc(1.5em + 0.75rem + 2px);
+}
+
 .mission-team-player-section {
     margin-top: 1rem;
 }

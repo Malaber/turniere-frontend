@@ -4116,7 +4116,7 @@ class MissionTeams extends React.Component {
             return (
                 <div className='mission-team-player' key={player.id} data-testid='mission-team-player'>
                     <FaUser aria-hidden='true' />
-                    <a href={'/accounts/' + player.id}
+                    <a href={'/profiles/' + player.id}
                         data-testid='mission-team-player-profile'>
                         {label}
                     </a>

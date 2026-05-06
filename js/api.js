@@ -44,6 +44,14 @@ function normalizeErrorMessages(error, fallbackMessage) {
     return [fallbackMessage];
 }
 
+function identityFromAuthResponse(response) {
+    const data = response && response.data ? response.data : {};
+    const account = data.data && typeof data.data === 'object' ? data.data : data;
+    return {
+        username: account.username || null,
+        accountId: account.id || account.account_id || null
+    };
+}
 
 function storeOptionalToken(response) {
     if (checkForAuthenticationHeaders(response)) {
@@ -125,11 +133,13 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
             password: action.parameters.password
         }).then(resp => {
             storeOptionalToken(resp);
+            const identity = identityFromAuthResponse(resp);
 
             __store.dispatch({
                 type: actionTypesUserinfo.LOGIN_RESULT_SUCCESS,
                 parameters: {
-                    username: resp.data.username,
+                    username: identity.username || resp.data.username,
+                    accountId: identity.accountId,
                     successCallback: action.parameters.successCallback
                 }
             });
@@ -158,7 +168,8 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
             isSignedIn: true,
             error: false,
             errorMessages: [],
-            username: action.parameters.username
+            username: action.parameters.username,
+            accountId: action.parameters.accountId || state.accountId
         });
     case actionTypesUserinfo.LOGIN_RESULT_ERROR:
         return Object.assign({}, state, {
@@ -183,6 +194,10 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
     case actionTypesUserinfo.VERIFY_CREDENTIALS:
         getRequest(action.state, '/users/validate_token').then(resp => {
             storeOptionalToken(resp);
+            __store.dispatch({
+                type: actionTypesUserinfo.VERIFY_CREDENTIALS_SUCCESS,
+                parameters: identityFromAuthResponse(resp)
+            });
         }).catch(error => {
             if (error.response && error.response.status === 401) {
                 __store.dispatch({type: actionTypesUserinfo.CLEAR});
@@ -191,6 +206,12 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
             }
         });
         return Object.assign({}, state, {});
+    case actionTypesUserinfo.VERIFY_CREDENTIALS_SUCCESS:
+        return Object.assign({}, state, {
+            isSignedIn: true,
+            username: action.parameters.username || state.username,
+            accountId: action.parameters.accountId || state.accountId
+        });
     case actionTypesUserinfo.CHANGE_MAIL:
         putRequest(action.state, '/users', {
             email: action.parameters.newMail
@@ -207,6 +228,7 @@ const reducerUserinfo = (state = defaultStateUserinfo, action) => {
         return Object.assign({}, state, {
             isSignedIn: false,
             username: null,
+            accountId: null,
             error: false,
             errorMessages: [],
 

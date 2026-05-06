@@ -825,9 +825,9 @@ test('Mission Control links player accounts to teams and profile page', async ({
   }, { timeout: 20_000 }).toBeGreaterThan(0);
 
   const profileLink = teamCard.getByTestId('mission-team-player-profile').filter({ hasText: playerUsername });
-  await expect(profileLink).toHaveAttribute('href', `/accounts/${playerId}`);
+  await expect(profileLink).toHaveAttribute('href', `/profiles/${playerId}`);
 
-  await page.goto(`/accounts/${playerId}`);
+  await page.goto(`/profiles/${playerId}`);
   await expect(page.getByTestId('account-profile')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('heading', { name: playerUsername })).toBeVisible();
   await expect(page.getByTestId('account-profile-teams')).toContainText(team.name);

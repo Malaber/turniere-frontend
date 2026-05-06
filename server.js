@@ -351,9 +351,15 @@ async function routeRequest(req, res) {
         return;
     }
 
-    const accountProfileMatch = pathname.match(/^\/accounts\/(\d+)$/);
-    if (req.method === 'GET' && accountProfileMatch) {
-        await app.render(req, res, '/account-profile', {id: accountProfileMatch[1]});
+    const publicProfileMatch = pathname.match(/^\/profiles\/(\d+)$/);
+    if (req.method === 'GET' && publicProfileMatch) {
+        await app.render(req, res, '/account-profile', {id: publicProfileMatch[1]});
+        return;
+    }
+
+    const legacyAccountProfileMatch = pathname.match(/^\/accounts\/(\d+)$/);
+    if (req.method === 'GET' && legacyAccountProfileMatch) {
+        redirect(res, `/profiles/${legacyAccountProfileMatch[1]}`);
         return;
     }
 
