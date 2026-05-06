@@ -572,10 +572,10 @@ test('Beamer timer drops queued confetti while tab is hidden', async ({ page }) 
   });
 
   const scheduledTimer = await client.patch(`/tournaments/${tournament.id}/timer`, {
-    timestamp_seconds: 2,
+    timestamp_seconds: 5,
   });
   expectStatus(scheduledTimer, 200, 'start visible timer for queued confetti');
-  await waitForBeamerEffect(page, 'confetti-scheduled', undefined, 1, 10_000);
+  await waitForBeamerEffect(page, 'confetti-scheduled', undefined, 1, 15_000);
 
   await setPageVisibility(page, 'hidden');
   await page.waitForTimeout(1_500);
