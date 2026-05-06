@@ -814,6 +814,29 @@
     margin-bottom: 1rem;
 }
 
+.mission-metadata-swap {
+    border-top: 1px solid #dde3ea;
+    margin: 0.75rem 0 1rem;
+    padding-top: 0.75rem;
+}
+
+.mission-metadata-swap-toggle {
+    color: #4b5563;
+    padding: 0;
+    text-decoration: none;
+}
+
+.mission-metadata-swap-body {
+    margin-top: 0.65rem;
+}
+
+.mission-metadata-swap-row {
+    align-items: center;
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .match-metadata-details {
     background: #f8fafc;
     border: 1px solid #dde3ea;

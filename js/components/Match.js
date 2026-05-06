@@ -184,11 +184,7 @@ export class Match extends React.Component {
             <small className='text-muted'>{smallMessage}</small>
             <MatchModal title='Match' isOpen={this.state.modal} toggle={this.toggleModal} match={this.state.match}
                 startMatch={this.startMatch} endMatch={this.endMatch} changeScores={this.changeScores}
-                canControl={this.props.isSignedIn && this.props.isOwner && !this.props.readOnlyMode}
-                canSwapMatchPosition={this.props.canSwapMatchPosition === true}
-                swapTargets={this.props.swapTargets || []}
-                swapInProgress={this.props.swapInProgress === true}
-                onSwapMatchPosition={this.props.onSwapMatchPosition}/>
+                canControl={this.props.isSignedIn && this.props.isOwner && !this.props.readOnlyMode}/>
         </div>);
     }
 }
