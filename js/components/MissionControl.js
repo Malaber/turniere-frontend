@@ -11,6 +11,7 @@ import {notify} from './Notifications';
 import {
     bulkUpdateMatchMetadata,
     createBeamer,
+    createDeciderMatch,
     deleteBeamer,
     deletePlayoffs,
     endMatch,
@@ -328,7 +329,8 @@ export class MissionControl extends React.Component {
             transactionLogErrorStatus: null,
             transactionLogErrorMessage: '',
             localSaveErrorEntries: [],
-            localSaveErrorRetryingId: null
+            localSaveErrorRetryingId: null,
+            creatingDeciderKey: null
         };
         this.searchInput = React.createRef();
         this.setActiveTab = this.setActiveTab.bind(this);
@@ -342,6 +344,9 @@ export class MissionControl extends React.Component {
         this.startPlayoffs = this.startPlayoffs.bind(this);
         this.deletePlayoffs = this.deletePlayoffs.bind(this);
         this.completePlayoffAction = this.completePlayoffAction.bind(this);
+        this.createDecider = this.createDecider.bind(this);
+        this.onCreateDeciderSuccess = this.onCreateDeciderSuccess.bind(this);
+        this.onCreateDeciderError = this.onCreateDeciderError.bind(this);
         this.onActionSuccess = this.onActionSuccess.bind(this);
         this.onActionError = this.onActionError.bind(this);
         this.handleTournamentChange = this.handleTournamentChange.bind(this);
@@ -511,6 +516,23 @@ export class MissionControl extends React.Component {
 
     completePlayoffAction() {
         this.setState({actionRunning: null}, this.handleTournamentChange);
+    }
+
+    createDecider(groupId, teamIds) {
+        this.setState({creatingDeciderKey: deciderRequestKey(groupId, teamIds)});
+        createDeciderMatch(groupId, teamIds, this.onCreateDeciderSuccess, this.onCreateDeciderError);
+    }
+
+    onCreateDeciderSuccess() {
+        notify.show('Das Entscheidungsmatch wurde angelegt.', 'success', 2500);
+        this.setState({creatingDeciderKey: null});
+        this.handleTournamentChange();
+    }
+
+    onCreateDeciderError(errorBody) {
+        notify.show(errorMessage(errorBody, 'Das Entscheidungsmatch konnte nicht angelegt werden.'), 'error', 3000);
+        this.setState({creatingDeciderKey: null});
+        this.handleTournamentChange();
     }
 
     onActionSuccess(matches) {
@@ -743,6 +765,9 @@ export class MissionControl extends React.Component {
                                     onStartPlayoffs={this.startPlayoffs}
                                     onDeletePlayoffs={this.deletePlayoffs}
                                     onPlayoffActionResultClose={this.completePlayoffAction}
+                                    creatingDeciderKey={this.state.creatingDeciderKey}
+                                    onCreateDecider={this.createDecider}
+                                    onTournamentChange={this.handleTournamentChange}
                                 />
                             </TabPane>
 
@@ -2415,6 +2440,96 @@ class MissionTimer extends React.Component {
     }
 }
 
+function sortedTeamIds(teamIds) {
+    return teamIds.slice().sort((left, right) => Number(left) - Number(right));
+}
+
+function deciderRequestKey(groupId, teamIds) {
+    return 'group-' + groupId + '-' + sortedTeamIds(teamIds).join('-');
+}
+
+function pendingDeciderRequestsForGroup(group) {
+    const requests = [];
+    const seenKeys = new Set();
+
+    (group.scores || []).forEach(score => {
+        const rankingDecision = score.ranking_decision;
+        if (!rankingDecision || !rankingDecision.needs_decider_match || rankingDecision.decider_match_id) {
+            return;
+        }
+
+        const teamId = score.team && score.team.id;
+        const comparedTeamId = rankingDecision.compared_with_team_id;
+        if (!teamId || !comparedTeamId) {
+            return;
+        }
+
+        const teamIds = sortedTeamIds([teamId, comparedTeamId]);
+        const key = deciderRequestKey(group.id, teamIds);
+        if (seenKeys.has(key)) {
+            return;
+        }
+
+        const teamNamesById = {
+            [teamId]: score.team.name,
+            [comparedTeamId]: rankingDecision.compared_with_team_name
+        };
+        seenKeys.add(key);
+        requests.push({
+            key: key,
+            groupId: group.id,
+            groupNumber: group.number,
+            teamIds: teamIds,
+            teamNames: teamIds.map(id => teamNamesById[id] || ('Team ' + id))
+        });
+    });
+
+    return requests;
+}
+
+function pendingDeciderRequestsForTournament(tournament) {
+    if (!tournament.groupStage) {
+        return [];
+    }
+    return tournament.groupStage.groups
+        .flatMap(group => pendingDeciderRequestsForGroup(group))
+        .sort((left, right) => {
+            if (left.groupNumber !== right.groupNumber) {
+                return left.groupNumber - right.groupNumber;
+            }
+            return left.teamNames.join(' vs. ').localeCompare(right.teamNames.join(' vs. '), 'de', {
+                numeric: true,
+                sensitivity: 'base'
+            });
+        });
+}
+
+function activeDeciderMatchRowsForTournament(tournament) {
+    if (!tournament.groupStage) {
+        return [];
+    }
+
+    const rows = [];
+    tournament.groupStage.groups.forEach(group => {
+        group.matches
+            .filter(match => match.decider && match.state !== 'finished')
+            .forEach(match => {
+                rows.push({
+                    key: 'group-' + group.id + '-match-' + match.id,
+                    group: group,
+                    match: match
+                });
+            });
+    });
+
+    return rows.sort((left, right) => {
+        if (left.group.number !== right.group.number) {
+            return left.group.number - right.group.number;
+        }
+        return sortMatchesByPositionAscending()(left.match, right.match);
+    });
+}
+
 function MissionNextMatches(props) {
     const groupStage = props.tournament.groupStage;
     const hasPlayoffDeleteResult = props.actionRunning === 'playoff-delete';
@@ -2515,7 +2630,80 @@ function MissionNextMatches(props) {
                         <p>Keine startbaren Playoff-Matches vorhanden.</p>
                     </div>}
             </div>
+            <MissionDeciderStarts
+                tournament={props.tournament}
+                disabled={props.disabled}
+                creatingDeciderKey={props.creatingDeciderKey}
+                onCreateDecider={props.onCreateDecider}
+                onTournamentChange={props.onTournamentChange}
+            />
         </section>
+    );
+}
+
+function MissionDeciderStarts(props) {
+    const pendingRequests = pendingDeciderRequestsForTournament(props.tournament);
+    const deciderRows = activeDeciderMatchRowsForTournament(props.tournament);
+    const totalCount = pendingRequests.length + deciderRows.length;
+
+    if (totalCount === 0) {
+        return null;
+    }
+
+    return (
+        <div className='mission-match-stage mission-decider-starts mt-3' data-testid='mission-decider-starts'>
+            <h3 className='h5 mission-pane-heading'>
+                Entscheidungsmatches
+                <Badge color='light' className='mission-stage-badge'>{totalCount} offen</Badge>
+            </h3>
+            {pendingRequests.length > 0 &&
+                <div className='mission-bulk-start-grid mb-3'>
+                    {pendingRequests.map(request => (
+                        <MissionPendingDeciderCard
+                            key={request.key}
+                            request={request}
+                            disabled={props.disabled}
+                            creatingDeciderKey={props.creatingDeciderKey}
+                            onCreateDecider={props.onCreateDecider}
+                        />
+                    ))}
+                </div>}
+            {deciderRows.length > 0 &&
+                <div className='mission-match-grid mission-score-grid'>
+                    {deciderRows.map(row => (
+                        <MissionMatchCard
+                            key={row.key}
+                            match={row.match}
+                            contextLabel={'Gruppe ' + row.group.number}
+                            disabled={props.disabled}
+                            onTournamentChange={props.onTournamentChange}
+                        />
+                    ))}
+                </div>}
+        </div>
+    );
+}
+
+function MissionPendingDeciderCard(props) {
+    const request = props.request;
+    const creating = props.creatingDeciderKey === request.key;
+
+    return (
+        <div className='mission-control-panel mission-decider-request'
+            data-testid='mission-decider-request'
+            data-decider-request-key={request.key}>
+            <h4>Gruppe {request.groupNumber}</h4>
+            <p>
+                Entscheidungsmatch nötig:{' '}
+                <TeamName name={request.teamNames[0]} inline/> vs. <TeamName name={request.teamNames[1]} inline/>
+            </p>
+            <Button color='warning'
+                data-testid='mission-create-decider'
+                disabled={props.disabled || creating}
+                onClick={() => props.onCreateDecider(request.groupId, request.teamIds)}>
+                {creating ? 'Wird angelegt...' : 'Entscheidungsmatch anlegen'}
+            </Button>
+        </div>
     );
 }
 
@@ -3872,10 +4060,14 @@ class MissionMatchCard extends React.Component {
             <form onSubmit={this.submit} className={'mission-control-match mission-start-card ' + stateClass}
                 onKeyDown={this.onFormKeyDown}
                 data-match-id={match.id}
+                data-decider-match={match.decider ? 'true' : 'false'}
+                data-match-state={match.state}
                 data-testid='mission-match-card'>
-                {match.decider &&
+                {(match.decider || this.props.contextLabel) &&
                     <div className='mission-start-table'>
-                        <Badge color='warning'>Entscheidung</Badge>
+                        {this.props.contextLabel &&
+                            <span className='mission-start-context'>{this.props.contextLabel}</span>}
+                        {match.decider && <Badge color='warning'>Entscheidung</Badge>}
                     </div>}
                 <div className='mission-start-row'>
                     <Label className='mission-match-team-label mb-0'>
