@@ -617,15 +617,36 @@ export function requestTournament(code, successCallback, errorCallback) {
 }
 
 export function updateTeamName(team, successCB, errorCB) {
-    __store.dispatch({
-        type: actionTypesTournamentinfo.MODIFY_TOURNAMENT,
-        parameters: {
-            teamid: team.id,
-            name: team.name,
-            onSuccess: successCB,
-            onError: errorCB
-        },
-        state: getState()
+    updateTeam(team.id, {name: team.name}, successCB, errorCB);
+}
+
+export function updateTeam(teamId, payload, successCallback, errorCallback) {
+    const currentState = getState();
+    patchRequest(currentState, '/teams/' + teamId, payload).then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
+    });
+}
+
+export function getAccountProfile(accountId, successCallback, errorCallback) {
+    const currentState = getState();
+    getRequest(currentState, '/accounts/' + encodeURIComponent(accountId)).then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) {
+            storeOptionalToken(error.response);
+            errorCallback(error.response.data, error.response.status);
+        } else {
+            errorCallback(null, -1);
+        }
     });
 }
 

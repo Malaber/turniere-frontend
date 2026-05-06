@@ -351,6 +351,12 @@ async function routeRequest(req, res) {
         return;
     }
 
+    const accountProfileMatch = pathname.match(/^\/accounts\/(\d+)$/);
+    if (req.method === 'GET' && accountProfileMatch) {
+        await app.render(req, res, '/account-profile', {id: accountProfileMatch[1]});
+        return;
+    }
+
     const statisticsMatch = pathname.match(/^\/t\/([^/]+)\/statistics$/);
     if (req.method === 'GET' && statisticsMatch) {
         await app.render(req, res, '/tournament-statistics', {code: safeDecode(statisticsMatch[1])});

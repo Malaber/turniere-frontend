@@ -294,6 +294,92 @@
     padding-top: 0.85rem;
 }
 
+.mission-team-list {
+    display: grid;
+    gap: 0.85rem;
+}
+
+.mission-team-card {
+    border: 1px solid #dde3ea;
+    border-radius: 0.45rem;
+    background: #fff;
+    padding: 0.85rem 1rem;
+}
+
+.mission-team-summary h4 {
+    font-size: 1rem;
+    max-width: min(100%, 44rem);
+    overflow-wrap: anywhere;
+}
+
+.mission-team-body {
+    border-top: 1px solid #edf1f5;
+    margin-top: 0.85rem;
+    padding-top: 0.85rem;
+}
+
+.mission-team-name-form,
+.mission-team-player-form {
+    align-items: end;
+    display: grid;
+    grid-template-columns: minmax(12rem, 1fr) auto;
+    gap: 0.75rem;
+}
+
+.mission-team-player-section {
+    margin-top: 1rem;
+}
+
+.mission-team-player-heading {
+    align-items: center;
+    color: #4d5b6b;
+    display: inline-flex;
+    font-weight: 700;
+    gap: 0.4rem;
+    margin-bottom: 0.55rem;
+}
+
+.mission-team-player-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.mission-team-player,
+.mission-team-player-empty {
+    align-items: center;
+    border: 1px solid #dde3ea;
+    border-radius: 0.35rem;
+    display: inline-flex;
+    gap: 0.45rem;
+    min-height: 2.25rem;
+    padding: 0.35rem 0.6rem;
+}
+
+.mission-team-player {
+    background: #f8fbff;
+}
+
+.mission-team-player a {
+    overflow-wrap: anywhere;
+}
+
+.mission-team-player-empty {
+    background: #f8f9fa;
+    color: #607080;
+}
+
+.mission-team-player-remove {
+    align-items: center;
+    color: #8a1f2d;
+    display: inline-flex;
+    justify-content: center;
+    min-height: 1.75rem;
+    min-width: 1.75rem;
+    padding: 0;
+}
+
 .mission-bulk-start-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
@@ -1057,6 +1143,11 @@ i.is-finished {
 
     .mission-filter-reset {
         justify-self: start;
+    }
+
+    .mission-team-name-form,
+    .mission-team-player-form {
+        grid-template-columns: 1fr;
     }
 
     .mission-transaction-log-header {
