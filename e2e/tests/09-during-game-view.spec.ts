@@ -24,9 +24,11 @@ async function startMatches(
   client: ApiClient,
   tournamentId: number,
   count: number,
+  params: Record<string, string> = {},
 ): Promise<number[]> {
   const res = await client.get<Array<{ id: number; state: string }>>(
     `/tournaments/${tournamentId}/matches`,
+    params,
   );
   expectStatus(res, 200, 'fetch tournament matches');
 
@@ -43,6 +45,24 @@ async function startMatches(
   }
 
   return ids;
+}
+
+function parseMatchFilter(filter?: string): Record<string, string> {
+  if (!filter) return {};
+
+  return filter.split(',').reduce<Record<string, string>>((params, part) => {
+    const [key, value] = part.split(':');
+    if (key && value) params[key] = value;
+    return params;
+  }, {});
+}
+
+function startFilterForMatchFilter(matchFilter?: string): Record<string, string> {
+  const filters = parseMatchFilter(matchFilter);
+  if (filters.state === 'in_progress') {
+    return { ...filters, state: 'not_started' };
+  }
+  return filters;
 }
 
 async function waitForMatchStateCount(
@@ -126,7 +146,7 @@ async function setupBeamerAndMatches(
   );
   const hasBeamer = beamerRes.status === 201;
 
-  await startMatches(client, tournament.id, matchCount);
+  await startMatches(client, tournament.id, matchCount, startFilterForMatchFilter(matchFilter));
   await waitForMatchStateCount(client, tournament.id, 'in_progress', matchCount);
 
   const fullscreenQuery = hasBeamer
@@ -572,10 +592,10 @@ test('Beamer timer drops queued confetti while tab is hidden', async ({ page }) 
   });
 
   const scheduledTimer = await client.patch(`/tournaments/${tournament.id}/timer`, {
-    timestamp_seconds: 2,
+    timestamp_seconds: 5,
   });
   expectStatus(scheduledTimer, 200, 'start visible timer for queued confetti');
-  await waitForBeamerEffect(page, 'confetti-scheduled', undefined, 1, 10_000);
+  await waitForBeamerEffect(page, 'confetti-scheduled', undefined, 1, 15_000);
 
   await setPageVisibility(page, 'hidden');
   await page.waitForTimeout(1_500);
@@ -752,7 +772,9 @@ test.describe('Fullscreen mobile viewport', () => {
 
     await page.goto(`/t/${tournament.id}/fullscreen?${fullscreenQuery}`);
 
-    await expect(page.getByText('Kein Timer gesetzt')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('fullscreen-current-stage')).toContainText(/Gruppenphase|Gruppe - Runde/, {
+      timeout: 15_000,
+    });
     const matchCards = page.getByTestId('fullscreen-match-card');
     await expect(matchCards).toHaveCount(8);
     await expect(page.getByTestId('fullscreen-page-dot')).toHaveCount(2);

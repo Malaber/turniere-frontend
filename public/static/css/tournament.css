@@ -915,6 +915,48 @@
     margin-bottom: 1rem;
 }
 
+.mission-metadata-swap {
+    background: #f8fafc;
+    border: 1px solid #dde3ea;
+    border-radius: 0.45rem;
+    margin: 0.75rem 0 1rem;
+    padding: 0.65rem 0.75rem;
+}
+
+.mission-metadata-swap-toggle {
+    color: #4b5563;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.mission-metadata-swap-body {
+    margin-top: 0.65rem;
+}
+
+.mission-metadata-swap-row {
+    align-items: center;
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.mission-metadata-swap-matchup {
+    align-items: center;
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.45rem;
+    min-width: 0;
+}
+
+.mission-metadata-swap-team {
+    min-width: 0;
+}
+
+.mission-metadata-swap-versus {
+    color: #6b7280;
+    flex: 0 0 auto;
+}
+
 .match-metadata-details {
     background: #f8fafc;
     border: 1px solid #dde3ea;

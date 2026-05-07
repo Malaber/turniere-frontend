@@ -26,6 +26,7 @@ import {
     stopMatch,
     submitDeciderMatchScores,
     submitMatchScores,
+    swapMatchPositions,
     updateTeam,
     updateMatchMetadata,
     updateBeamer,
@@ -3059,6 +3060,19 @@ function metadataMatchLabel(row) {
     return row.title + ' · Spiel ' + row.match.position;
 }
 
+function metadataSwapTargets(row, rows) {
+    if (!row.group) {
+        return [];
+    }
+    return rows
+        .filter(otherRow => otherRow.group && otherRow.group.id === row.group.id && otherRow.match.id !== row.match.id)
+        .sort((left, right) => sortMatchesByPositionAscending()(left.match, right.match));
+}
+
+function metadataSwapTargetLabel(row) {
+    return metadataMatchLabel(row) + ' · ' + row.match.team1.name + ' vs. ' + row.match.team2.name;
+}
+
 function uniqueSortedNumbers(values) {
     return values
         .filter(value => value !== null && value !== undefined && value !== '')
@@ -3210,6 +3224,7 @@ class MissionMatchMetadata extends React.Component {
                             <MissionMatchMetadataCard
                                 key={row.key}
                                 row={row}
+                                swapTargets={metadataSwapTargets(row, rows)}
                                 disabled={this.props.disabled}
                                 onTournamentChange={this.props.onTournamentChange}
                             />
@@ -3467,11 +3482,21 @@ class MissionMatchMetadataBulkForm extends React.Component {
 class MissionMatchMetadataCard extends React.Component {
     constructor(props) {
         super(props);
-        this.state = this.stateFromMatch(props.row.match);
+        this.state = Object.assign({}, this.stateFromMatch(props.row.match), {
+            swapTargetId: this.initialSwapTargetId(props.swapTargets),
+            swapControlsExpanded: false,
+            swapping: false
+        });
         this.setField = this.setField.bind(this);
         this.submit = this.submit.bind(this);
         this.onSuccess = this.onSuccess.bind(this);
         this.onError = this.onError.bind(this);
+        this.initialSwapTargetId = this.initialSwapTargetId.bind(this);
+        this.updateSwapTargetId = this.updateSwapTargetId.bind(this);
+        this.onSwapDetailsToggle = this.onSwapDetailsToggle.bind(this);
+        this.swapMatchPosition = this.swapMatchPosition.bind(this);
+        this.onSwapSuccess = this.onSwapSuccess.bind(this);
+        this.onSwapError = this.onSwapError.bind(this);
     }
 
     stateFromMatch(match) {
@@ -3483,14 +3508,33 @@ class MissionMatchMetadataCard extends React.Component {
         };
     }
 
+    initialSwapTargetId(swapTargets) {
+        if (!Array.isArray(swapTargets) || swapTargets.length === 0) {
+            return '';
+        }
+        return String(swapTargets[0].match.id);
+    }
+
     componentDidUpdate(prevProps) {
         const prevMatch = prevProps.row.match;
         const match = this.props.row.match;
         if (prevMatch.id !== match.id ||
+            prevMatch.position !== match.position ||
             prevMatch.location !== match.location ||
             prevMatch.startTime !== match.startTime ||
             prevMatch.notes !== match.notes) {
-            this.setState(this.stateFromMatch(match));
+            this.setState(Object.assign({}, this.stateFromMatch(match), {
+                swapTargetId: this.initialSwapTargetId(this.props.swapTargets),
+                swapControlsExpanded: false,
+                swapping: false
+            }));
+            return;
+        }
+
+        const swapTargets = this.props.swapTargets || [];
+        if (prevProps.swapTargets !== this.props.swapTargets && swapTargets.length > 0 &&
+            !swapTargets.some(target => String(target.match.id) === this.state.swapTargetId)) {
+            this.setState({swapTargetId: this.initialSwapTargetId(swapTargets)});
         }
     }
 
@@ -3498,9 +3542,29 @@ class MissionMatchMetadataCard extends React.Component {
         this.setState({[field]: event.target.value});
     }
 
+    updateSwapTargetId(event) {
+        this.setState({swapTargetId: event.target.value});
+    }
+
+    onSwapDetailsToggle(event) {
+        this.setState({swapControlsExpanded: event.currentTarget.open});
+    }
+
+    swapMatchPosition() {
+        if (this.props.disabled || this.state.swapping || this.state.swapTargetId === '') {
+            return;
+        }
+        const otherMatchId = Number(this.state.swapTargetId);
+        if (!Number.isFinite(otherMatchId)) {
+            return;
+        }
+        this.setState({swapping: true});
+        swapMatchPositions(this.props.row.match.id, otherMatchId, this.onSwapSuccess, this.onSwapError);
+    }
+
     submit(event) {
         event.preventDefault();
-        if (this.props.disabled || this.state.saving) {
+        if (this.props.disabled || this.state.saving || this.state.swapping) {
             return;
         }
         this.setState({saving: true});
@@ -3526,10 +3590,84 @@ class MissionMatchMetadataCard extends React.Component {
         this.setState({saving: false});
     }
 
+    onSwapSuccess() {
+        notify.show('Die Positionen wurden getauscht.', 'success', 2500);
+        this.setState({swapping: false, swapControlsExpanded: false});
+        this.props.onTournamentChange();
+    }
+
+    onSwapError(errorBody, statusCode) {
+        let message = 'Die Match-Positionen konnten nicht getauscht werden.';
+        if (statusCode === 422 && errorBody && typeof errorBody.error === 'string') {
+            message = errorBody.error;
+        } else if (statusCode === 404) {
+            message = 'Das Ziel-Match wurde nicht gefunden.';
+        } else if (statusCode === 423) {
+            message = 'Follower-Modus aktiv. Match-Positionen sind gesperrt.';
+        }
+        notify.show(message, 'error', 3000);
+        this.setState({swapping: false});
+    }
+
+    renderSwapControls(disabled) {
+        const targets = Array.isArray(this.props.swapTargets) ? this.props.swapTargets : [];
+        if (this.props.disabled || targets.length === 0) {
+            return null;
+        }
+        const selectedTarget = targets.find(target => String(target.match.id) === this.state.swapTargetId);
+
+        return (
+            <details className='mission-metadata-swap'
+                data-testid='swap-match-position-controls'
+                open={this.state.swapControlsExpanded}
+                onToggle={this.onSwapDetailsToggle}>
+                <summary
+                    className='mission-metadata-swap-toggle'
+                    data-testid='swap-match-position-toggle'
+                >
+                    Position tauschen
+                </summary>
+                {this.state.swapControlsExpanded &&
+                    <div className='mission-metadata-swap-body'>
+                        <Label for={'missionMetadataSwapTarget' + this.props.row.match.id}>Tauschen mit</Label>
+                        <div className='mission-metadata-swap-row'>
+                            <Input id={'missionMetadataSwapTarget' + this.props.row.match.id}
+                                type='select'
+                                value={this.state.swapTargetId}
+                                onChange={this.updateSwapTargetId}
+                                disabled={disabled}
+                                data-testid='swap-match-position-select'>
+                                {targets.map(target => (
+                                    <option key={target.match.id} value={target.match.id}>
+                                        {metadataSwapTargetLabel(target)}
+                                    </option>
+                                ))}
+                            </Input>
+                            <Button color='secondary'
+                                type='button'
+                                onClick={this.swapMatchPosition}
+                                disabled={disabled}
+                                data-testid='swap-match-position-button'>
+                                {this.state.swapping ? 'Tauscht...' : 'Tauschen'}
+                            </Button>
+                        </div>
+                        {selectedTarget &&
+                            <div className='mission-metadata-swap-matchup text-muted small'>
+                                <TeamName name={selectedTarget.match.team1.name} inline
+                                    className='mission-metadata-swap-team'/>
+                                <span className='mission-metadata-swap-versus'>vs.</span>
+                                <TeamName name={selectedTarget.match.team2.name} inline
+                                    className='mission-metadata-swap-team'/>
+                            </div>}
+                    </div>}
+            </details>
+        );
+    }
+
     render() {
         const row = this.props.row;
         const match = row.match;
-        const disabled = this.props.disabled || this.state.saving;
+        const disabled = this.props.disabled || this.state.saving || this.state.swapping;
 
         return (
             <form className='mission-control-panel mission-metadata-card'
@@ -3574,6 +3712,7 @@ class MissionMatchMetadataCard extends React.Component {
                         onChange={event => this.setField('notes', event)}
                     />
                 </FormGroup>
+                {this.renderSwapControls(disabled)}
                 <Button color='primary' type='submit'
                     disabled={disabled}
                     data-testid='mission-metadata-save'>
