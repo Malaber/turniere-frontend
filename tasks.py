@@ -203,6 +203,12 @@ def setup(c, node_version=DEFAULT_NODE_VERSION):
     _run_node(c, "yarn install", cwd=ROOT, node_version=node_version)
 
 
+@task
+def build(c, node_version=DEFAULT_NODE_VERSION, webpack=False):
+    """Compile the production frontend, including static support pages."""
+    _run_node(c, "yarn build" + (" --webpack" if webpack else ""), node_version=node_version)
+
+
 @task(name="check-local-e2e-ports")
 def check_local_e2e_ports(c):
     """Run fast checks for local E2E frontend port selection."""

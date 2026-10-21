@@ -10,6 +10,10 @@ export function Footer() {
                     <Privacy/>
                     <span className="turniere-footer__separator" aria-hidden="true">&middot;</span>
                     <Imprint/>
+                    <span className="turniere-footer__separator" aria-hidden="true">&middot;</span>
+                    <a className="text-white" href="/app">iOS-App</a>
+                    <span className="turniere-footer__separator" aria-hidden="true">&middot;</span>
+                    <a className="text-white" href="/support">App-Hilfe</a>
                 </nav>
             </div>
         </footer>
