@@ -1,5 +1,6 @@
 ARG PLAYWRIGHT_IMAGE
-FROM ${PLAYWRIGHT_IMAGE}
+# Match GitLab even when Compose uses the legacy builder on Apple Silicon.
+FROM --platform=linux/amd64 ${PLAYWRIGHT_IMAGE}
 
 WORKDIR /app
 
