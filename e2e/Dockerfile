@@ -1,4 +1,5 @@
-FROM mcr.microsoft.com/playwright:v1.59.1-noble
+ARG PLAYWRIGHT_IMAGE
+FROM ${PLAYWRIGHT_IMAGE}
 
 WORKDIR /app
 
@@ -10,4 +11,4 @@ RUN npm ci
 # Copy test sources
 COPY . .
 
-CMD ["npx", "playwright", "test"]
+CMD ["bash", "run-ci.sh"]

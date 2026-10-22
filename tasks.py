@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import re
 import shlex
 import shutil
@@ -464,7 +465,7 @@ def seed_manual_scenarios(
 
 
 @task(name="e2e-docker")
-def e2e_docker(c, backend_version="latest", keep_running=False, spec=""):
+def e2e_docker(c, backend_version="", keep_running=False, spec=""):
     """
     Run Playwright against the same Dockerized backend image family the pipeline uses.
 
@@ -472,7 +473,9 @@ def e2e_docker(c, backend_version="latest", keep_running=False, spec=""):
     container build, then runs the E2E container on the same internal network.
     Pass --spec to run one Playwright spec file in the same Docker stack.
     """
-    env = {"BACKEND_VERSION": backend_version}
+    env = json.loads((ROOT / "ci" / "e2e-images.yml").read_text())["variables"]
+    if backend_version:
+        env["E2E_BACKEND_IMAGE"] = f"registry.gitlab.com/turniere/turniere-backend/production:{backend_version}"
     exit_error = None
 
     try:
@@ -487,7 +490,7 @@ def e2e_docker(c, backend_version="latest", keep_running=False, spec=""):
         )
         run_command = ["run", "--rm", "e2e"]
         if spec:
-            run_command += ["npx", "playwright", "test", spec]
+            run_command += ["bash", "run-ci.sh", spec]
         _compose(run_command, env=env)
     except subprocess.CalledProcessError as error:
         exit_error = error

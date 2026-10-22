@@ -7,6 +7,7 @@ variables:
   DOCKER_IMAGE_ENVS: "production"
 
 include:
+  - local: '/ci/e2e-images.yml'
   - project: 'turniere/turniere-infra'
     file: '/ci/pipeline.yaml'
 
@@ -22,12 +23,12 @@ frontend e2e:
     - docker
   needs:
     - job: build_image
-  image: mcr.microsoft.com/playwright:v1.59.1-noble
+  image: $E2E_PLAYWRIGHT_IMAGE
   services:
-    - name: postgres:16
+    - name: $E2E_POSTGRES_IMAGE
       alias: postgres
     # Production backend server
-    - name: $CI_REGISTRY/turniere/turniere-backend/production:latest
+    - name: $E2E_BACKEND_IMAGE
       alias: backend
       pull_policy: always
       command:
@@ -82,16 +83,9 @@ frontend e2e:
     - if: $CI_PIPELINE_SOURCE != "push"
       when: never
     - when: always
-  before_script:
-    # Wait for the backend to be healthy after schema prep + user bootstrap.
-    - echo "Waiting for backend…"
-    - until curl -sf http://backend:3000/healthz 2>/dev/null; do sleep 2; done
-    - echo "Backend is ready."
-    # Install JS deps. Browser already ships in Playwright CI image.
-    - cd e2e
-    - npm ci
   script:
-    - npx playwright test
+    # global-setup performs bounded backend/frontend readiness and login checks.
+    - bash e2e/run-ci.sh
   after_script:
     - mkdir -p screenshots test-results
     - if [ -d e2e/screenshots ]; then cp -a e2e/screenshots/. screenshots/; fi

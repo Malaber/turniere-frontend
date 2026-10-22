@@ -79,3 +79,21 @@ The built container exposes port 80.
 # Todo 
 
 showMatches={playoffStages !== null} showmatches in GroupStage mittlerweile vmtl useless weil immer eingeklappt
+
+
+### Reproduce CI E2E locally
+
+`inv e2e-docker` runs the suite; use
+`inv e2e-docker --spec=tests/16-footer-mobile.spec.ts` for the footer regression.
+`ci/e2e-images.yml` is a JSON-compatible YAML lock containing exact backend,
+Postgres, and Playwright image digests. GitLab includes it and the Invoke task
+reads the same file for Compose. Update those pins deliberately rather than
+using a moving backend `latest` tag. Images target linux/amd64 like the runner.
+`e2e/run-ci.sh` is the shared npm-install/test entrypoint; global setup bounds
+readiness and login waits. The local task rebuilds the frontend from this checkout
+and deletes its disposable database volume afterward. `--backend-version` is an
+explicit override for backend integration work, not the reproducible default.
+
+Footer links may wrap on small screens; regression checks enforce copyright
+above all links, correct destinations, no clipping/overlap, and no horizontal
+page overflow.
