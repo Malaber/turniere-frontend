@@ -2,6 +2,6 @@
   "variables": {
     "E2E_BACKEND_IMAGE": "registry.gitlab.com/turniere/turniere-backend/production@sha256:7bf87f6151456a3822c95c1df954deed4142481469eaffaa92eddefc7b1b0537",
     "E2E_POSTGRES_IMAGE": "postgres@sha256:71e27bf60b70bded003791b5573f8b808365613f341df20ffcf0c1ed7bc13ddf",
-    "E2E_PLAYWRIGHT_IMAGE": "mcr.microsoft.com/playwright@sha256:b0ab6f3cb99aa7803adbc14d9027ec1785fc6e433b97e134e0f8fe61683b6b53"
+    "E2E_PLAYWRIGHT_IMAGE": "mcr.microsoft.com/playwright@sha256:eac9b0a5312cdab40ee8c2429df5bf19bffdccf8f3bf3c42268e173f97541645"
   }
 }
