@@ -106,3 +106,27 @@ image names remain compatible with deployment.
 See the [infra migration and secret-transfer checklist](https://github.com/Malaber/turniere-infra/blob/main/ci/GITHUB_MIGRATION.md)
 before enabling release/deploy variables. Backend/frontend are active; the legacy
 match service is archived and superseded by Mission Control.
+
+### Player score proposals (TUR-246)
+
+Signed-in players on configured followers can propose the complete live score for
+a team they belong to. Both teams' proposals and the official score are displayed
+separately; matching proposals lock while the leader polls and republishes the
+canonical score. Players cannot finish matches or advance stages. Mission Control
+history displays the submitted and previous canonical values.
+
+Deploy the companion backend change (including migrations) first. The frontend
+uses `player_score_proposals_enabled`, a public capability flag, and the existing
+sign-in flow. Trusted follower team memberships must already be provisioned;
+account enrollment and membership synchronization are separate work.
+
+New UI text lives in `js/locales/scoreProposals.js` (English/German). Browser
+coverage can run against the existing pinned backend image using API fixtures:
+
+```sh
+inv e2e-test --frontend-url=http://127.0.0.1:3001 --backend-url=http://127.0.0.1:3000 --spec=20-player-score-proposals.spec.ts
+```
+
+Backend request/concurrency tests verify actual authorization, persistence and
+leader application; browser tests verify pending/locked/official presentation,
+participant-only controls and request failure feedback.

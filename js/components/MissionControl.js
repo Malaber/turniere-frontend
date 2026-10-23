@@ -1,3 +1,4 @@
+import {PlayerScoreAudit} from './PlayerScoreProposals';
 import React from 'react';
 import {
     Alert, Badge, Button, Card, CardBody, Col, FormGroup, Input, Label, Modal, ModalBody, ModalFooter, ModalHeader,
@@ -1093,6 +1094,7 @@ function TransactionLogEntry(props) {
             <div className='mission-transaction-log-message' data-testid='mission-transaction-log-message'>
                 {entry.message || entry.action || 'Unbekannter Verlaufseintrag'}
             </div>
+            <PlayerScoreAudit metadata={metadata}/>
             {chips.length > 0 &&
                 <div className='mission-transaction-log-chips' data-testid='mission-transaction-log-chips'>
                     {chips.map(chip => chip.href ?
