@@ -125,3 +125,10 @@ by the infra `.env` file.
 - The Express server (`server.js`) handles custom routing that Next.js 12
   file-system routing does not cover natively; this will need explicit
   handling in any framework migration.
+
+## GitHub CI migration
+
+Active CI now lives in `.github/workflows`. Use the Invoke CI tasks documented in
+the README for local reproduction. The GitLab YAML is a disabled compatibility
+stub; container names remain in the GitLab registry during cutover. Backend and
+frontend Mission Control replace the archived match application.
