@@ -604,9 +604,9 @@ export async function seedIrrelevantTieScenario(): Promise<SeededTournament> {
   return { tournament, code: tournament.code };
 }
 
-export async function seedReadOnlyFollowerTournament(): Promise<SeededTournament> {
+export async function seedReadOnlyFollowerTournament(isPublic = false): Promise<SeededTournament> {
   const client = await makeClient();
-  const created = await client.post<Tournament>('/tournaments', playoffOnlyPayload(4));
+  const created = await client.post<Tournament>('/tournaments', {...playoffOnlyPayload(4), public: isPublic});
   expectStatus(created, 201, 'create base tournament for read only follower');
 
   const tournamentId = (created.json as { id: number }).id;
