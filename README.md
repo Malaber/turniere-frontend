@@ -86,8 +86,7 @@ showMatches={playoffStages !== null} showmatches in GroupStage mittlerweile vmtl
 `inv e2e-docker` runs the suite; use
 `inv e2e-docker --spec=tests/16-footer-mobile.spec.ts` for the footer regression.
 `ci/e2e-images.yml` is a JSON-compatible YAML lock containing exact backend,
-Postgres, and Playwright image digests. GitLab includes it and the Invoke task
-reads the same file for Compose. Update those pins deliberately rather than
+Postgres, and Playwright image digests. The Invoke task reads this file for Compose both locally and in GitHub Actions. Update those pins deliberately rather than
 using a moving backend `latest` tag. Images target linux/amd64 like the runner.
 `e2e/run-ci.sh` is the shared npm-install/test entrypoint; global setup bounds
 readiness and login waits. The local task rebuilds the frontend from this checkout
@@ -97,3 +96,13 @@ explicit override for backend integration work, not the reproducible default.
 Footer links may wrap on small screens; regression checks enforce copyright
 above all links, correct destinations, no clipping/overlap, and no horizontal
 page overflow.
+
+## GitHub Actions
+
+`.github/workflows/ci.yml` replaces GitLab CI. PR checks run without credentials;
+publication and deployment are opt-in main-branch jobs. Existing GitLab registry
+image names remain compatible with deployment.
+
+See the [infra migration and secret-transfer checklist](https://github.com/Malaber/turniere-infra/blob/main/ci/GITHUB_MIGRATION.md)
+before enabling release/deploy variables. Backend/frontend are active; the legacy
+match service is archived and superseded by Mission Control.
