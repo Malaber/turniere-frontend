@@ -1,4 +1,6 @@
-FROM mcr.microsoft.com/playwright:v1.59.1-noble
+ARG PLAYWRIGHT_IMAGE
+# Match GitLab even when Compose uses the legacy builder on Apple Silicon.
+FROM --platform=linux/amd64 ${PLAYWRIGHT_IMAGE}
 
 WORKDIR /app
 
@@ -10,4 +12,4 @@ RUN npm ci
 # Copy test sources
 COPY . .
 
-CMD ["npx", "playwright", "test"]
+CMD ["bash", "run-ci.sh"]

@@ -32,10 +32,28 @@ test.describe('Mobile footer', () => {
     expect(copyrightBox).not.toBeNull();
     expect(linksBox).not.toBeNull();
     expect(copyrightBox!.y + copyrightBox!.height).toBeLessThanOrEqual(linksBox!.y);
-    const linkTops = await footer.getByRole('link').evaluateAll(links =>
-      links.map(link => Math.round(link.getBoundingClientRect().top))
+    await expect(footer.getByRole('link', { name: 'iOS-App', exact: true })).toHaveAttribute('href', '/app');
+    await expect(footer.getByRole('link', { name: 'App-Hilfe', exact: true })).toHaveAttribute('href', '/support');
+    const linkBoxes = await footer.getByRole('link').evaluateAll(links =>
+      links.map(link => {
+        const { x, y, width, height } = link.getBoundingClientRect();
+        return { x, y, width, height };
+      })
     );
-    expect(Math.max(...linkTops) - Math.min(...linkTops)).toBeLessThanOrEqual(1);
+    // Links may wrap as navigation grows. Every link must remain inside its
+    // navigation container, below copyright, and separate from every other link.
+    for (const [index, box] of linkBoxes.entries()) {
+      expect(box.x).toBeGreaterThanOrEqual(linksBox!.x - 1);
+      expect(box.x + box.width).toBeLessThanOrEqual(linksBox!.x + linksBox!.width + 1);
+      expect(box.y).toBeGreaterThanOrEqual(linksBox!.y - 1);
+      expect(box.y + box.height).toBeLessThanOrEqual(linksBox!.y + linksBox!.height + 1);
+      for (const other of linkBoxes.slice(index + 1)) {
+        const separated = box.x + box.width <= other.x + 1 ||
+          other.x + other.width <= box.x + 1 ||
+          box.y + box.height <= other.y + 1 || other.y + other.height <= box.y + 1;
+        expect(separated, 'Footer links must not overlap').toBe(true);
+      }
+    }
 
     const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
     expect(documentWidth).toBeLessThanOrEqual(390);

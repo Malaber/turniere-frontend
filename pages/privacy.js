@@ -14,6 +14,7 @@ function Main() {
 
 function PrivacyText() {
     return (<Container>
+        <p>Für die iPhone- und iPad-App findest du ergänzende Informationen unter <a href="/app-privacy">Datenschutz der App</a>.</p>
         <p>
             Die nachfolgende Datenschutzerklärung gilt für die Nutzung unseres Online-Angebots turnie.re (nachfolgend
             „Website“).<br/>
