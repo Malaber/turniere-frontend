@@ -130,5 +130,5 @@ by the infra `.env` file.
 
 Active CI now lives in `.github/workflows`. Use the Invoke CI tasks documented in
 the README for local reproduction. The GitLab YAML is a disabled compatibility
-stub; container names remain in the GitLab registry during cutover. Backend and
+stub; new main builds publish to GHCR with automatic GitHub patch releases. Backend and
 frontend Mission Control replace the archived match application.

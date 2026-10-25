@@ -85,8 +85,8 @@ showMatches={playoffStages !== null} showmatches in GroupStage mittlerweile vmtl
 
 `inv e2e-docker` runs the suite; use
 `inv e2e-docker --spec=tests/16-footer-mobile.spec.ts` for the footer regression.
-`ci/e2e-images.yml` is a JSON-compatible YAML lock containing exact backend,
-Postgres, and Playwright image digests. The Invoke task reads this file for Compose both locally and in GitHub Actions. Update those pins deliberately rather than
+`ci/e2e-images.yml` is a JSON-compatible YAML lock containing a full backend source commit,
+plus exact Postgres and Playwright image digests. The backend production image is built from that immutable GitHub commit. The Invoke task reads this file for Compose both locally and in GitHub Actions. Update those pins deliberately rather than
 using a moving backend `latest` tag. Images target linux/amd64 like the runner.
 `e2e/run-ci.sh` is the shared npm-install/test entrypoint; global setup bounds
 readiness and login waits. The local task rebuilds the frontend from this checkout
@@ -100,8 +100,8 @@ page overflow.
 ## GitHub Actions
 
 `.github/workflows/ci.yml` replaces GitLab CI. PR checks run without credentials;
-publication and deployment are opt-in main-branch jobs. Existing GitLab registry
-image names remain compatible with deployment.
+successful main runs publish GHCR images and automatic GitHub patch releases.
+Publication does not deploy. See [release setup](ci/GITHUB_RELEASES.md).
 
 See the [infra migration and secret-transfer checklist](https://github.com/Malaber/turniere-infra/blob/main/ci/GITHUB_MIGRATION.md)
 before enabling release/deploy variables. Backend/frontend are active; the legacy

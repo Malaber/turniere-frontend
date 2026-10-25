@@ -469,13 +469,14 @@ def e2e_docker(c, backend_version="", keep_running=False, spec=""):
     """
     Run Playwright against the same Dockerized backend image family the pipeline uses.
 
-    This boots Postgres + the GitLab backend production image + the local frontend
+    This boots Postgres + a pinned backend production build + the local frontend
     container build, then runs the E2E container on the same internal network.
     Pass --spec to run one Playwright spec file in the same Docker stack.
     """
-    env = json.loads((ROOT / "ci" / "e2e-images.yml").read_text())["variables"]
+    config = json.loads((ROOT / "ci" / "e2e-images.yml").read_text())
+    env = config["variables"]
     if backend_version:
-        env["E2E_BACKEND_IMAGE"] = f"registry.gitlab.com/turniere/turniere-backend/production:{backend_version}"
+        env["E2E_BACKEND_IMAGE"] = f"ghcr.io/malaber/turniere-backend:{backend_version}"
     exit_error = None
 
     try:
@@ -483,7 +484,15 @@ def e2e_docker(c, backend_version="", keep_running=False, spec=""):
         # Without this, repeated local E2E runs can silently reuse older
         # images and exercise stale app code or stale test specs.
         _compose(["build", "frontend", "e2e"], env=env)
-        _compose(["pull", "backend"], env=env)
+        if backend_version:
+            _compose(["pull", "backend"], env=env)
+        else:
+            commit = config["backend_commit"]
+            if not re.fullmatch(r"[0-9a-f]{40}", commit):
+                raise ValueError("backend_commit must be a full commit SHA")
+            subprocess.run(["docker", "build", "--platform", "linux/amd64", "--target", "production",
+                            "--build-arg", f"base_commit={commit}", "-t", env["E2E_BACKEND_IMAGE"],
+                            f"https://github.com/Malaber/turniere-backend.git#{commit}"], check=True)
         _compose(
             ["up", "-d", "--force-recreate", "postgres", "backend", "frontend"],
             env=env,
@@ -503,3 +512,15 @@ def e2e_docker(c, backend_version="", keep_running=False, spec=""):
 
     if exit_error:
         raise exit_error
+
+
+@task(name="release-github")
+def release_github(c):
+    """Promote published commit images and create an idempotent GitHub patch release."""
+    c.run("python ci/release.py")
+
+
+@task(name="ci-task-tests")
+def ci_task_tests(c):
+    """Verify release helper behavior without Docker or remote writes."""
+    c.run("python -m unittest discover -s ci -p 'test_*.py'")
