@@ -15,6 +15,8 @@ services:
   # Run migrations + bootstrap the E2E user, then start the server — all in one
   # container so there is no init-container-exits-prematurely race.
   backend:
+    ports:
+      - "127.0.0.1:${E2E_BACKEND_PORT:-0}:3000"
     image: ${E2E_BACKEND_IMAGE:?Use inv e2e-docker to load pinned CI images}
     platform: linux/amd64
     depends_on:

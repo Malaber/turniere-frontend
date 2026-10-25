@@ -199,9 +199,9 @@ def _compose(command: list[str], env: dict[str, str] | None = None, check: bool 
 
 
 @task
-def setup(c, node_version=DEFAULT_NODE_VERSION):
+def setup(c, node_version=DEFAULT_NODE_VERSION, force=False):
     """Install the frontend's Yarn dependencies."""
-    _run_node(c, "yarn install", cwd=ROOT, node_version=node_version)
+    _run_node(c, "yarn install" + (" --force --frozen-lockfile" if force else ""), cwd=ROOT, node_version=node_version)
 
 
 @task
@@ -465,7 +465,7 @@ def seed_manual_scenarios(
 
 
 @task(name="e2e-docker")
-def e2e_docker(c, backend_version="", keep_running=False, spec=""):
+def e2e_docker(c, backend_version="", keep_running=False, spec="", host_browser=False):
     """
     Run Playwright against the same Dockerized backend image family the pipeline uses.
 
@@ -477,13 +477,15 @@ def e2e_docker(c, backend_version="", keep_running=False, spec=""):
     env = config["variables"]
     if backend_version:
         env["E2E_BACKEND_IMAGE"] = f"ghcr.io/malaber/turniere-backend:{backend_version}"
+    if host_browser:
+        env["E2E_BACKEND_PORT"] = str(_find_available_port())
     exit_error = None
 
     try:
         # Always rebuild frontend and E2E containers before Playwright runs.
         # Without this, repeated local E2E runs can silently reuse older
         # images and exercise stale app code or stale test specs.
-        _compose(["build", "frontend", "e2e"], env=env)
+        _compose(["build", "frontend"] + ([] if host_browser else ["e2e"]), env=env)
         if backend_version:
             _compose(["pull", "backend"], env=env)
         else:
@@ -494,13 +496,17 @@ def e2e_docker(c, backend_version="", keep_running=False, spec=""):
                             "--build-arg", f"base_commit={commit}", "-t", env["E2E_BACKEND_IMAGE"],
                             f"https://github.com/Malaber/turniere-backend.git#{commit}"], check=True)
         _compose(
-            ["up", "-d", "--force-recreate", "postgres", "backend", "frontend"],
+            ["up", "-d", "--force-recreate", "postgres", "backend"] + ([] if host_browser else ["frontend"]),
             env=env,
         )
-        run_command = ["run", "--rm", "e2e"]
-        if spec:
-            run_command += ["bash", "run-ci.sh", spec]
-        _compose(run_command, env=env)
+        if host_browser:
+            e2e_local(c, api_url=f"http://127.0.0.1:{env['E2E_BACKEND_PORT']}",
+                      install_frontend=False, install_e2e=False, spec=spec)
+        else:
+            run_command = ["run", "--rm", "e2e"]
+            if spec:
+                run_command += ["bash", "run-ci.sh", spec]
+            _compose(run_command, env=env)
     except subprocess.CalledProcessError as error:
         exit_error = error
         _compose(["logs", "--no-color", "backend", "frontend", "e2e"], env=env, check=False)

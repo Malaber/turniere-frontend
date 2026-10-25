@@ -139,3 +139,26 @@ inv e2e-test --frontend-url=http://127.0.0.1:3001 --backend-url=http://127.0.0.1
 Backend request/concurrency tests verify actual authorization, persistence and
 leader application; browser tests verify pending/locked/official presentation,
 participant-only controls and request failure feedback.
+
+### Native browser with Docker backend (Apple Silicon)
+
+Emulated AMD64 Chromium may exit with SIGTRAP on ARM Docker hosts. Keep CI's
+native AMD64 container path unchanged; locally use:
+
+```sh
+inv setup
+inv e2e-install
+# If native Next.js bindings are missing despite an up-to-date install:
+# inv setup --force
+inv e2e-docker --host-browser
+# Focused repeat:
+inv e2e-docker --host-browser --spec=tests/20-player-score-proposals.spec.ts
+```
+
+This builds the same pinned backend production image and frontend production
+image, starts disposable Postgres/backend containers, then runs the local dev
+frontend and native Playwright browser. The backend binds to a randomly selected
+loopback port; the frontend uses another free port. Containers and database are
+removed afterward, including on failure. This verifies real backend integration
+but is not the identical all-container browser environment used by GitHub CI.
+The backend production target does not build development/test gem stages.
