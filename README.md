@@ -85,6 +85,15 @@ showMatches={playoffStages !== null} showmatches in GroupStage mittlerweile vmtl
 
 `inv e2e-docker` runs the suite; use
 `inv e2e-docker --spec=tests/16-footer-mobile.spec.ts` for the footer regression.
+Install Docker Compose v2 and working Docker Buildx for the same multi-stage
+builder as CI. The deprecated legacy builder also compiles unused intermediate
+stages and is much slower.
+
+Allocate at least 6 GB to the Docker VM for source builds and the E2E stack.
+On Apple Silicon the pinned AMD64 backend runs under emulation; 2 GB Colima
+defaults can kill native gem compilation (exit 137). Stop other containers before
+resizing Colima (`colima stop`, then `colima start --memory 6`).
+
 `ci/e2e-images.yml` is a JSON-compatible YAML lock containing a full backend source commit,
 plus exact Postgres and Playwright image digests. The backend production image is built from that immutable GitHub commit. The Invoke task reads this file for Compose both locally and in GitHub Actions. Update those pins deliberately rather than
 using a moving backend `latest` tag. Images target linux/amd64 like the runner.
