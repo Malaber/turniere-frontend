@@ -89,10 +89,10 @@ test('Owner sees read-only tournament locked on main page and can take over in M
 
 test('Owner can run sync test button and get real leader to follower roundtrip in Mission Control', async ({ context, page }, testInfo) => {
   await injectAuth(context, loadAuthState());
-  const { leader, follower, syncToken } = await seedLeaderFollowerSyncPair();
+  const { leader, follower, syncToken, syncTargetUrl } = await seedLeaderFollowerSyncPair();
   await injectTournamentSyncState(context, leader.id, {
     readOnlyMode: false,
-    syncTargetUrl: `${backendUrl}/tournaments/${follower.id}/sync_state`,
+    syncTargetUrl,
     syncAuthToken: syncToken
   });
 
@@ -110,7 +110,7 @@ test('Owner can run sync test button and get real leader to follower roundtrip i
   await page.getByRole('link', { name: 'Turnier-Einstellungen' }).click();
 
   await expect(page.locator('#edittournament-textfield-syncTargetUrl'))
-    .toHaveValue(`${backendUrl}/tournaments/${follower.id}/sync_state`);
+    .toHaveValue(syncTargetUrl);
   await expect(page.locator('#edittournament-textfield-syncAuthToken')).toHaveValue(syncToken);
   await keyframe(page, testInfo, 'sync_test_before_click');
 

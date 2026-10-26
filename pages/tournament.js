@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import {PlayerScoreProposals} from '../js/components/PlayerScoreProposals';
 import React from 'react';
 import {connect} from 'react-redux';
 import {Alert, Badge, ButtonGroup, Spinner} from 'reactstrap';
@@ -48,6 +49,8 @@ class PrivateTournamentPage extends React.Component {
                 {this.props.loadingTournament ?
                     <TournamentFavoritesLoading/> :
                     <FavoriteBar teams={teams} tournamentId={this.props.tournament.id}/>}
+                {this.props.tournament.playerScoreProposalsEnabled && isSignedIn && !this.props.loadingTournament &&
+                    <PlayerScoreProposals tournamentId={this.props.tournament.id}/>}
                 <div className='stages'>
                     {this.props.loadErrorStatus ?
                         <TournamentLoadError statusCode={this.props.loadErrorStatus}/> :

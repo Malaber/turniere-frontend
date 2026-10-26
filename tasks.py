@@ -199,9 +199,9 @@ def _compose(command: list[str], env: dict[str, str] | None = None, check: bool 
 
 
 @task
-def setup(c, node_version=DEFAULT_NODE_VERSION):
+def setup(c, node_version=DEFAULT_NODE_VERSION, force=False):
     """Install the frontend's Yarn dependencies."""
-    _run_node(c, "yarn install", cwd=ROOT, node_version=node_version)
+    _run_node(c, "yarn install" + (" --force --frozen-lockfile" if force else ""), cwd=ROOT, node_version=node_version)
 
 
 @task
@@ -298,6 +298,7 @@ def e2e_test(
     username=DEFAULT_E2E_USERNAME,
     spec="",
     clean_screenshots=True,
+    backend_sync_url="",
 ):
     """Run Playwright against an already running frontend and backend."""
     _wait_for_url(f"{backend_url.rstrip('/')}/healthz")
@@ -315,6 +316,7 @@ def e2e_test(
         env={
             "TURNIERE_FRONTEND_URL": frontend_url,
             "TURNIERE_BACKEND_URL": backend_url,
+            "TURNIERE_BACKEND_SYNC_URL": backend_sync_url or backend_url,
             "TURNIERE_E2E_EMAIL": email,
             "TURNIERE_E2E_PASSWORD": password,
             "TURNIERE_E2E_USERNAME": username,
@@ -337,6 +339,7 @@ def e2e_local(
     password=DEFAULT_E2E_PASSWORD,
     username=DEFAULT_E2E_USERNAME,
     spec="",
+    backend_sync_url="",
 ):
     """
     Run the local frontend E2E flow end to end against an already running backend.
@@ -372,6 +375,7 @@ def e2e_local(
             c,
             frontend_url=resolved_frontend_url,
             backend_url=api_url,
+            backend_sync_url=backend_sync_url,
             node_version=node_version,
             email=email,
             password=password,
@@ -465,33 +469,49 @@ def seed_manual_scenarios(
 
 
 @task(name="e2e-docker")
-def e2e_docker(c, backend_version="", keep_running=False, spec=""):
+def e2e_docker(c, backend_version="", keep_running=False, spec="", host_browser=False):
     """
     Run Playwright against the same Dockerized backend image family the pipeline uses.
 
-    This boots Postgres + the GitLab backend production image + the local frontend
+    This boots Postgres + a pinned backend production build + the local frontend
     container build, then runs the E2E container on the same internal network.
     Pass --spec to run one Playwright spec file in the same Docker stack.
     """
-    env = json.loads((ROOT / "ci" / "e2e-images.yml").read_text())["variables"]
+    config = json.loads((ROOT / "ci" / "e2e-images.yml").read_text())
+    env = config["variables"]
     if backend_version:
-        env["E2E_BACKEND_IMAGE"] = f"registry.gitlab.com/turniere/turniere-backend/production:{backend_version}"
+        env["E2E_BACKEND_IMAGE"] = f"ghcr.io/malaber/turniere-backend:{backend_version}"
+    if host_browser:
+        env["E2E_BACKEND_PORT"] = str(_find_available_port())
     exit_error = None
 
     try:
         # Always rebuild frontend and E2E containers before Playwright runs.
         # Without this, repeated local E2E runs can silently reuse older
         # images and exercise stale app code or stale test specs.
-        _compose(["build", "frontend", "e2e"], env=env)
-        _compose(["pull", "backend"], env=env)
+        _compose(["build", "frontend"] + ([] if host_browser else ["e2e"]), env=env)
+        if backend_version:
+            _compose(["pull", "backend"], env=env)
+        else:
+            commit = config["backend_commit"]
+            if not re.fullmatch(r"[0-9a-f]{40}", commit):
+                raise ValueError("backend_commit must be a full commit SHA")
+            subprocess.run(["docker", "build", "--platform", "linux/amd64", "--target", "production",
+                            "--build-arg", f"base_commit={commit}", "-t", env["E2E_BACKEND_IMAGE"],
+                            f"https://github.com/Malaber/turniere-backend.git#{commit}"], check=True)
         _compose(
-            ["up", "-d", "--force-recreate", "postgres", "backend", "frontend"],
+            ["up", "-d", "--force-recreate", "postgres", "backend"] + ([] if host_browser else ["frontend"]),
             env=env,
         )
-        run_command = ["run", "--rm", "e2e"]
-        if spec:
-            run_command += ["bash", "run-ci.sh", spec]
-        _compose(run_command, env=env)
+        if host_browser:
+            e2e_local(c, api_url=f"http://127.0.0.1:{env['E2E_BACKEND_PORT']}",
+                      install_frontend=False, install_e2e=False, spec=spec,
+                      backend_sync_url="http://127.0.0.1:3000")
+        else:
+            run_command = ["run", "--rm", "e2e"]
+            if spec:
+                run_command += ["bash", "run-ci.sh", spec]
+            _compose(run_command, env=env)
     except subprocess.CalledProcessError as error:
         exit_error = error
         _compose(["logs", "--no-color", "backend", "frontend", "e2e"], env=env, check=False)
@@ -503,3 +523,15 @@ def e2e_docker(c, backend_version="", keep_running=False, spec=""):
 
     if exit_error:
         raise exit_error
+
+
+@task(name="release-github")
+def release_github(c):
+    """Promote published commit images and create an idempotent GitHub patch release."""
+    c.run("python ci/release.py")
+
+
+@task(name="ci-task-tests")
+def ci_task_tests(c):
+    """Verify release helper behavior without Docker or remote writes."""
+    c.run("python -m unittest discover -s ci -p 'test_*.py'")

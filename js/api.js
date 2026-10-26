@@ -1125,3 +1125,23 @@ function ensureApplicationHydrated() {
         rehydrateApplicationState();
     }
 }
+
+export function getPlayerScoreMatches(tournamentId, successCallback, errorCallback) {
+    getRequest(getState(), '/tournaments/' + tournamentId + '/player_score_matches').then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) storeOptionalToken(error.response);
+        errorCallback(error.response?.data, error.response?.status ?? -1);
+    });
+}
+
+export function submitPlayerScoreProposal(matchId, teamId, scores, successCallback, errorCallback) {
+    patchRequest(getState(), '/matches/' + matchId + '/score_proposal', {team_id: teamId, scores}).then(resp => {
+        storeOptionalToken(resp);
+        successCallback(resp.data);
+    }).catch(error => {
+        if (error.response) storeOptionalToken(error.response);
+        errorCallback(error.response?.data, error.response?.status ?? -1);
+    });
+}

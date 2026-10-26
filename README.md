@@ -85,8 +85,17 @@ showMatches={playoffStages !== null} showmatches in GroupStage mittlerweile vmtl
 
 `inv e2e-docker` runs the suite; use
 `inv e2e-docker --spec=tests/16-footer-mobile.spec.ts` for the footer regression.
-`ci/e2e-images.yml` is a JSON-compatible YAML lock containing exact backend,
-Postgres, and Playwright image digests. The Invoke task reads this file for Compose both locally and in GitHub Actions. Update those pins deliberately rather than
+Install Docker Compose v2 and working Docker Buildx for the same multi-stage
+builder as CI. The deprecated legacy builder also compiles unused intermediate
+stages and is much slower.
+
+Allocate at least 6 GB to the Docker VM for source builds and the E2E stack.
+On Apple Silicon the pinned AMD64 backend runs under emulation; 2 GB Colima
+defaults can kill native gem compilation (exit 137). Stop other containers before
+resizing Colima (`colima stop`, then `colima start --memory 6`).
+
+`ci/e2e-images.yml` is a JSON-compatible YAML lock containing a full backend source commit,
+plus exact Postgres and Playwright image digests. The backend production image is built from that immutable GitHub commit. The Invoke task reads this file for Compose both locally and in GitHub Actions. Update those pins deliberately rather than
 using a moving backend `latest` tag. Images target linux/amd64 like the runner.
 `e2e/run-ci.sh` is the shared npm-install/test entrypoint; global setup bounds
 readiness and login waits. The local task rebuilds the frontend from this checkout
@@ -100,9 +109,61 @@ page overflow.
 ## GitHub Actions
 
 `.github/workflows/ci.yml` replaces GitLab CI. PR checks run without credentials;
-publication and deployment are opt-in main-branch jobs. Existing GitLab registry
-image names remain compatible with deployment.
+successful main runs publish GHCR images and automatic GitHub patch releases.
+Publication does not deploy. See [release setup](ci/GITHUB_RELEASES.md).
 
-See the [infra migration and secret-transfer checklist](https://github.com/Malaber/turniere-infra/blob/main/ci/GITHUB_MIGRATION.md)
-before enabling release/deploy variables. Backend/frontend are active; the legacy
+See the [publishing permissions and package setup](ci/GITHUB_RELEASES.md).
+Infra deployment remains a separate step in the local infra checkout. Backend/frontend are active; the legacy
 match service is archived and superseded by Mission Control.
+
+### Player score proposals (TUR-246)
+
+Signed-in players on configured followers can propose the complete live score for
+a team they belong to. Both teams' proposals and the official score are displayed
+separately; matching proposals lock while the leader polls and republishes the
+canonical score. Players cannot finish matches or advance stages. Mission Control
+history displays the submitted and previous canonical values.
+
+Deploy the companion backend change (including migrations) first. The frontend
+uses `player_score_proposals_enabled`, a public capability flag, and the existing
+sign-in flow. Trusted follower team memberships must already be provisioned;
+account enrollment and membership synchronization are separate work.
+
+New UI text lives in `js/locales/scoreProposals.js` (English/German). Browser
+coverage can run against the existing pinned backend image using API fixtures:
+
+```sh
+inv e2e-test --frontend-url=http://127.0.0.1:3001 --backend-url=http://127.0.0.1:3000 --spec=20-player-score-proposals.spec.ts
+```
+
+Backend request/concurrency tests verify actual authorization, persistence and
+leader application; browser tests verify pending/locked/official presentation,
+participant-only controls and request failure feedback.
+
+### Native browser with Docker backend (Apple Silicon)
+
+Emulated AMD64 Chromium may exit with SIGTRAP on ARM Docker hosts. Keep CI's
+native AMD64 container path unchanged; locally use:
+
+```sh
+inv setup
+inv e2e-install
+# If native Next.js bindings are missing despite an up-to-date install:
+# inv setup --force
+inv e2e-docker --host-browser
+# Focused repeat:
+inv e2e-docker --host-browser --spec=tests/20-player-score-proposals.spec.ts
+```
+
+This builds the same pinned backend production image and frontend production
+image, starts disposable Postgres/backend containers, then runs the local dev
+frontend and native Playwright browser. The backend binds to a randomly selected
+loopback port; the frontend uses another free port. Containers and database are
+removed afterward, including on failure. This verifies real backend integration
+but is not the identical all-container browser environment used by GitHub CI.
+The backend production target does not build development/test gem stages.
+
+Native-browser Docker tests use the published host port for browser/API access and
+`http://127.0.0.1:3000` inside Rails for leader-to-follower sync. For custom mixed
+network setups, pass `--backend-sync-url` to `inv e2e-local` or `inv e2e-test`; it
+sets `TURNIERE_BACKEND_SYNC_URL` for sync fixtures, defaulting to the normal API URL.
