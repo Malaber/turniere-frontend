@@ -624,6 +624,7 @@ export async function seedLeaderFollowerSyncPair(): Promise<{
   leader: Tournament;
   follower: Tournament;
   syncToken: string;
+  syncTargetUrl: string;
 }> {
   const client = await makeClient();
   const syncToken = `playwright-sync-${Date.now()}`;
@@ -642,7 +643,9 @@ export async function seedLeaderFollowerSyncPair(): Promise<{
   });
   expectStatus(followerConfigured, 200, 'configure follower tournament for sync pair');
 
-  const syncTargetUrl = `${backendUrl}/tournaments/${followerId}/sync_state`;
+  // The leader makes this request; its network may differ from the browser host.
+  const syncBackendUrl = process.env.TURNIERE_BACKEND_SYNC_URL || backendUrl;
+  const syncTargetUrl = `${syncBackendUrl.replace(/\/$/, "")}/tournaments/${followerId}/sync_state`;
   const leaderConfigured = await client.patch<Tournament>(`/tournaments/${leaderId}`, {
     sync_target_url: syncTargetUrl,
     sync_auth_token: syncToken,
@@ -651,5 +654,5 @@ export async function seedLeaderFollowerSyncPair(): Promise<{
 
   const leader = await fetchTournament(client, leaderId);
   const follower = await fetchTournament(client, followerId);
-  return { leader, follower, syncToken };
+  return { leader, follower, syncToken, syncTargetUrl };
 }

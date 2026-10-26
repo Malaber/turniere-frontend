@@ -298,6 +298,7 @@ def e2e_test(
     username=DEFAULT_E2E_USERNAME,
     spec="",
     clean_screenshots=True,
+    backend_sync_url="",
 ):
     """Run Playwright against an already running frontend and backend."""
     _wait_for_url(f"{backend_url.rstrip('/')}/healthz")
@@ -315,6 +316,7 @@ def e2e_test(
         env={
             "TURNIERE_FRONTEND_URL": frontend_url,
             "TURNIERE_BACKEND_URL": backend_url,
+            "TURNIERE_BACKEND_SYNC_URL": backend_sync_url or backend_url,
             "TURNIERE_E2E_EMAIL": email,
             "TURNIERE_E2E_PASSWORD": password,
             "TURNIERE_E2E_USERNAME": username,
@@ -337,6 +339,7 @@ def e2e_local(
     password=DEFAULT_E2E_PASSWORD,
     username=DEFAULT_E2E_USERNAME,
     spec="",
+    backend_sync_url="",
 ):
     """
     Run the local frontend E2E flow end to end against an already running backend.
@@ -372,6 +375,7 @@ def e2e_local(
             c,
             frontend_url=resolved_frontend_url,
             backend_url=api_url,
+            backend_sync_url=backend_sync_url,
             node_version=node_version,
             email=email,
             password=password,
@@ -501,7 +505,8 @@ def e2e_docker(c, backend_version="", keep_running=False, spec="", host_browser=
         )
         if host_browser:
             e2e_local(c, api_url=f"http://127.0.0.1:{env['E2E_BACKEND_PORT']}",
-                      install_frontend=False, install_e2e=False, spec=spec)
+                      install_frontend=False, install_e2e=False, spec=spec,
+                      backend_sync_url="http://127.0.0.1:3000")
         else:
             run_command = ["run", "--rm", "e2e"]
             if spec:

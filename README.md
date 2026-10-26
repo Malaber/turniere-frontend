@@ -162,3 +162,8 @@ loopback port; the frontend uses another free port. Containers and database are
 removed afterward, including on failure. This verifies real backend integration
 but is not the identical all-container browser environment used by GitHub CI.
 The backend production target does not build development/test gem stages.
+
+Native-browser Docker tests use the published host port for browser/API access and
+`http://127.0.0.1:3000` inside Rails for leader-to-follower sync. For custom mixed
+network setups, pass `--backend-sync-url` to `inv e2e-local` or `inv e2e-test`; it
+sets `TURNIERE_BACKEND_SYNC_URL` for sync fixtures, defaulting to the normal API URL.

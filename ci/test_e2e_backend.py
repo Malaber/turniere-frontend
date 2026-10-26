@@ -33,6 +33,25 @@ class BackendSourceTests(unittest.TestCase):
         tasks.e2e_docker.body(None, host_browser=True, spec='tests/20-player-score-proposals.spec.ts')
         local.assert_called_once_with(None, api_url='http://127.0.0.1:43123',
                                      install_frontend=False, install_e2e=False,
-                                     spec='tests/20-player-score-proposals.spec.ts')
+                                     spec='tests/20-player-score-proposals.spec.ts',
+                                     backend_sync_url='http://127.0.0.1:3000')
         self.assertEqual(compose.call_args_list[-1].args[0], ['down', '-v', '--remove-orphans'])
         self.assertFalse(any(call.args[0][0] == 'run' for call in compose.call_args_list))
+
+    @patch('tasks._reset_screenshots_dir')
+    @patch('tasks._wait_for_url')
+    @patch('tasks._run_node')
+    def test_sync_url_reaches_browser_process(self, node, wait, reset):
+        tasks.e2e_test.body(None, backend_url='http://127.0.0.1:43123',
+                            backend_sync_url='http://127.0.0.1:3000')
+        env = node.call_args.kwargs['env']
+        self.assertEqual(env['TURNIERE_BACKEND_URL'], 'http://127.0.0.1:43123')
+        self.assertEqual(env['TURNIERE_BACKEND_SYNC_URL'], 'http://127.0.0.1:3000')
+
+    @patch('tasks._reset_screenshots_dir')
+    @patch('tasks._wait_for_url')
+    @patch('tasks._run_node')
+    def test_sync_url_defaults_to_backend_url(self, node, wait, reset):
+        tasks.e2e_test.body(None, backend_url='http://backend:3000')
+        self.assertEqual(node.call_args.kwargs['env']['TURNIERE_BACKEND_SYNC_URL'],
+                         'http://backend:3000')
